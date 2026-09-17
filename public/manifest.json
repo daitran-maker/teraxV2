@@ -1,0 +1,17 @@
+{
+  "name": "TeraX – Company Request Center",
+  "short_name": "CRC App",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "description": "Company Request Center App",
+  "icons": [
+    {
+      "src": "/icon-v2.png",
+      "sizes": "192x192 512x512 1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-v2.png?v=20260912">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-v2.png?v=20260912">
+  <link rel="manifest" href="manifest.json" />
+
+  <title>TeraX – Company Request Center</title>
+  <meta name="description" content="CRC internal system" />
+  <link rel="stylesheet" href="style.css?v=1043" />
+  <!-- Material Symbols -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    rel="stylesheet" />
+  <!-- PWA & iOS Support -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CRC App" />
+  <script>
+    (async () => {
+      try {
+        const res = await fetch('/api/public/brand-info');
+        const b = await res.json();
+        if (b && b.app_title) document.title = b.app_title;
+        const iconUrl = b && (b.icon || b.logo);
+        if (iconUrl) {
+          const fav = document.querySelector("link[rel*='icon']");
+          if (fav) fav.href = iconUrl;
+          const apple = document.querySelector("link[rel='apple-touch-icon']");
+          if (apple) apple.href = iconUrl;
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar expanded">
+    <div class="sidebar-logo"
+      style="padding: 20px 18px 16px; justify-content: flex-start; border-bottom: 1px solid rgba(255, 255, 255, 0.05); overflow: hidden; white-space: nowrap; display: flex; align-items: center; width: 100%;">
+      <div id="sidebar-toggle" style="display: flex; align-items: center; padding-left: 6px; cursor: pointer;" onclick="document.querySelector('.sidebar').classList.toggle('expanded')" title="Toggle Menu">
+        <img class="sidebar-logo-full" src="/assets/terax-logo-light.png" alt="TeraX" style="height: 24px; max-width: 140px; object-fit: contain; transition: opacity 0.2s ease;" />
+        <img class="sidebar-logo-collapsed" src="/assets/terax-icon-light.png" alt="X" style="height: 24px; width: 24px; object-fit: contain; display: none;" />
+      </div>
+      <div class="sidebar-sync-btn" style="margin-left: auto; cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.6); transition: color 0.2s;" onclick="location.reload()" title="Reload App">
+        <span class="material-symbols-rounded" style="font-size: 20px;">sync</span>
+      </div>
+      <div id="sidebar-close" style="display: none; align-items: center; justify-content: center; width: 30px; height: 30px; background: rgba(255,255,255,0.1); border-radius: 6px; cursor: pointer; margin-left: auto;" onclick="document.querySelector('.sidebar').classList.remove('mobile-open'); document.querySelector('.sidebar-backdrop').classList.remove('active');">
+        <span class="material-symbols-rounded" style="color: white; font-size: 18px;">close</span>
+      </div>
+    </div>
+
+    <div class="sidebar-nav" style="flex:1; overflow-y:auto; opacity:0; transition: opacity 0.15s ease;">
+      <!-- Section 1: WORKSPACE -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-label" data-i18n="sidebar.section.workspace">Workspace</div>
+
+        <a href="#home" class="nav-item" data-module="home" id="nav-home" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-home">dashboard</span>
+          <span data-i18n="nav.home">Dashboard</span>
+        </a>
+        
+        <a href="#my_request" class="nav-item" data-module="my_request" id="nav-my_request" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-my_request">check_box</span> 
+          <span data-i18n="nav.my_request">My Requests</span>
+        </a>
+
+        <a href="#my_approval" class="nav-item" data-module="my_approval" id="nav-my_approval" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-my_approval">person</span> 
+          <span data-i18n="nav.my_approval">My Approvals</span>
+        </a>
+
+        <a href="#my_process_owner" class="nav-item" data-module="my_process_owner" id="nav-my_process_owner" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-my_process_owner">assignment_ind</span> 
+          <span data-i18n="nav.my_task">My Task</span>
+        </a>
+
+
+        <a href="#my_team" class="nav-item" data-module="my_team" id="nav-my_team" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-my_team">account_tree</span> 
+          <span data-i18n="nav.my_team">My Process</span>
+        </a>
+      </div>
+
+      <!-- Section 2: ORGANIZATION -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-label" data-i18n="sidebar.section.organization">Organization</div>
+
+         <a href="#my_company" class="nav-item" data-module="my_company" id="nav-my_company" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-my_company">domain</span> 
+          <span data-i18n="nav.my_company">My Company</span>
+        </a>
+
+        <a href="#employee" class="nav-item" data-module="employee" id="nav-employee" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-employee">manage_accounts</span> 
+          <span data-i18n="nav.employee">Employees</span>
+        </a>
+
+        <a href="#company" class="nav-item" data-module="company" id="nav-company" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-company">corporate_fare</span> 
+          <span data-i18n="nav.company">Customer / Supplier</span>
+        </a>
+
+        <a href="#oppotunity" class="nav-item" data-module="oppotunity" id="nav-oppotunity" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-oppotunity">cases</span> 
+          <span data-i18n="nav.oppotunity">Opportunities</span>
+        </a>
+      </div>
+
+      <!-- Section 3: FINANCE -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-label" data-i18n="sidebar.section.finance">Finance</div>
+
+        <a href="#payment" class="nav-item" data-module="payment" id="nav-payment" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-payment">payments</span> 
+          <span data-i18n="nav.payment">Payments</span>
+        </a>
+
+        <a href="#expense" class="nav-item" data-module="expense" id="nav-expense" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-expense">receipt_long</span> 
+          <span data-i18n="nav.expense">Expenses</span>
+        </a>
+
+        <a href="#invoice" class="nav-item" data-module="invoice" id="nav-invoice" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-invoice">description</span> 
+          <span data-i18n="nav.invoice">Invoices</span>
+        </a>
+
+        <a href="#contract" class="nav-item" data-module="contract" id="nav-contract" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-contract">history_edu</span> 
+          <span data-i18n="nav.contract">Contracts</span>
+        </a>
+
+        <a href="#account" class="nav-item" data-module="account" id="nav-account" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-account">wallet</span> 
+          <span data-i18n="nav.account">Accounts</span>
+        </a>
+
+        <a href="#finance" class="nav-item" data-module="finance" id="nav-finance" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-finance">bar_chart</span> 
+          <span data-i18n="nav.finance">Finance</span>
+        </a>
+      </div>
+
+      <!-- Section 4: ADMINISTRATION -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-label" data-i18n="sidebar.section.administration">Administration</div>
+
+        <a href="#service" class="nav-item" data-module="service" id="nav-service" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-service">settings_suggest</span> 
+          <span data-i18n="nav.service">Services</span>
+        </a>
+
+        <a href="#asset" class="nav-item" data-module="asset" id="nav-asset" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-asset">inventory_2</span> 
+          <span data-i18n="nav.asset">Assets</span>
+        </a>
+
+        <a href="#policy" class="nav-item" data-module="policy" id="nav-policy" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-policy">schema</span> 
+          <span data-i18n="nav.policy">Process</span>
+        </a>
+      </div>
+
+      <!-- Section 5: OTHER -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Other</div>
+
+        <a href="#request_activity_log" class="nav-item" data-module="request_activity_log" id="nav-request_activity_log" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-request_activity_log">assessment</span> 
+          <span data-i18n="nav.reports">Reports</span>
+        </a>
+
+        <a href="#support" class="nav-item" data-module="support" id="nav-support" style="text-decoration:none;">
+          <span class="nav-icon material-symbols-rounded" id="icon-support">support_agent</span> 
+          <span data-i18n="nav.support">Support</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" id="nav-settings" style="text-decoration:none;" onclick="toggleSettingsSubmenu(event)">
+          <span class="nav-icon material-symbols-rounded" id="icon-settings">settings</span> 
+          <span data-i18n="nav.settings">Settings</span>
+          <span class="material-symbols-rounded settings-arrow" style="margin-left: auto; font-size: 16px; transition: transform 0.2s;">expand_more</span>
+        </a>
+
+        <!-- Settings Submenu containing advanced/configuration items -->
+        <div id="settings-submenu" style="display: none; flex-direction: column; gap: 2px; padding-left: 12px; margin-top: 2px;">
+          <a href="#action_rules" class="nav-item" data-module="action_rules" id="nav-action_rules" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-action_rules" style="font-size:16px;">bolt</span> 
+            <span data-i18n="nav.action_rules">Action Rules</span>
+          </a>
+          <a href="#automation" class="nav-item" data-module="automation" id="nav-automation" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-automation" style="font-size:16px;">rule_settings</span>
+            <span data-i18n="nav.automation">Automation</span>
+          </a>
+
+          <a href="#permissions" class="nav-item" data-module="permissions" id="nav-permissions" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-permissions" style="font-size:16px;">security</span> 
+            <span data-i18n="nav.permissions">Column Permissions</span>
+          </a>
+
+          <a href="#exception_rules" class="nav-item" data-module="exception_rules" id="nav-exception_rules" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-exception_rules" style="font-size:16px;">manage_search</span> 
+            <span data-i18n="nav.exception_rules">Menu</span>
+          </a>
+
+          <a href="#cms_tenant_info" class="nav-item" data-module="cms_tenant_info" id="nav-cms_tenant_info" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-cms_tenant_info" style="font-size:16px;">card_membership</span> 
+            <span data-i18n="nav.cms_tenant_info">Subscription</span>
+          </a>
+
+          <a href="#employee_active" class="nav-item" data-module="employee_active" id="nav-employee_active" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-employee_active" style="font-size:16px;">how_to_reg</span> 
+            <span data-i18n="nav.employee_active">Active Employees</span>
+          </a>
+
+
+
+          <a href="#request" class="nav-item" data-module="request" id="nav-request" style="text-decoration:none; font-size:12px; padding: 6px 10px;">
+            <span class="nav-icon material-symbols-rounded" id="icon-request" style="font-size:16px;">assignment</span> 
+            <span data-i18n="nav.request">Requests (SR)</span>
+          </a>
+
+
+          <a href="#setup" class="nav-item" data-module="setup" id="nav-setup" style="text-decoration:none; font-size:12px; padding: 6px 10px; display:none;">
+            <span class="nav-icon material-symbols-rounded" id="icon-setup" style="font-size:16px;">build_circle</span> 
+            <span data-i18n="nav.setup">Setup Wizard</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer" style="padding:20px; border-top:1px solid rgba(255, 255, 255, 0.05); margin-top:auto; overflow: hidden; white-space: nowrap; display: flex; flex-direction: column; gap: 8px;">
+      <div id="sidebar-lang-container" style="margin-bottom:4px; width: 100%;"></div>
+      <button class="btn btn-logout" onclick="openChangePasswordModal()" style="margin-bottom: 4px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; gap: 8px; justify-content: center;">
+        <span class="material-symbols-rounded" style="font-size: 18px; flex-shrink: 0;">key</span> 
+        <span class="sidebar-logout-text" data-i18n="sidebar.change_password" style="transition: opacity 0.3s ease;">Change Password</span>
+      </button>
+      <button class="btn btn-logout" onclick="logout()" style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+        <span class="material-symbols-rounded" style="font-size: 18px; flex-shrink: 0;">logout</span> 
+        <span class="sidebar-logout-text" data-i18n="sidebar.logout" style="transition: opacity 0.3s ease;">Logout</span>
+      </button>
+      <div style="text-align: center; font-size: 10px; color: rgba(255,255,255,0.2); margin-top: 4px;">Version 2.0.0</div>
+    </div>
+  </aside>
+
+  <!-- SIDEBAR BACKDROP FOR MOBILE -->
+  <div class="sidebar-backdrop" onclick="document.querySelector('.sidebar').classList.remove('mobile-open'); this.classList.remove('active');" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:999;"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <!-- HAMBURGER MENU FOR MOBILE -->
+      <button id="mobileMenuBtn" class="btn" style="display:none; align-items:center; justify-content:center; padding:0; width:36px; height:36px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.25); border-radius:8px; cursor:pointer; margin-right:8px;" onclick="document.querySelector('.sidebar').classList.add('mobile-open'); document.querySelector('.sidebar-backdrop').classList.add('active');" title="Menu">
+        <img src="/assets/terax-icon-dark.png" alt="TeraX" style="height: 24px; width: 24px; object-fit: contain;" />
+      </button>
+      <!-- Tabs container -->
+      <div id="topbar-tabs-container" style="display:flex; overflow:hidden; gap:8px; flex:1; max-width:calc(100vw - 350px); align-items:center;"></div>
+
+      <div class="topbar-actions" style="display:flex; align-items:center; gap:12px; flex-shrink:0; margin-left:auto;">
+        
+        <!-- USER SWITCHER (hidden on mobile) -->
+        <div id="topbar-user-switcher" style="position:relative; flex-shrink:0;">
+          <button type="button" id="topbar-greeting-wrapper" onclick="toggleUserSwitcher(event)" style="display:flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:12px; font-weight:600; color:var(--text-primary); gap:3px; cursor:pointer; font-family:inherit; background:transparent; border:none;">
+            <span id="topbar-greeting-icon" class="material-symbols-rounded" style="font-size:15px; color:#fbbf24;">account_circle</span>
+            <span id="topbar-greeting-time" style="white-space:nowrap;">Hi,</span>
+            <span id="topbar-greeting-name" style="white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis;"></span>
+            <span class="material-symbols-rounded" style="font-size:15px; color:var(--text-muted); margin-left:-2px;">expand_more</span>
+          </button>
+          <div id="user-switcher-dropdown" style="display:none; position:absolute; top:calc(100% + 8px); right:0; width:320px; max-width:calc(100vw - 24px); background:#FFFFFF; border:1px solid #E5E7EB; border-radius:8px; box-shadow:0 16px 40px rgba(15,23,42,0.18); z-index:3000; overflow:hidden;">
+            <div style="padding:10px; border-bottom:1px solid #F1F5F9;">
+              <input id="user-switcher-search" type="text" placeholder="Search user..." oninput="filterUserSwitcher(this.value)" style="width:100%; height:34px; border:1px solid #E5E7EB; border-radius:6px; padding:0 10px; font-size:12.5px; outline:none; box-sizing:border-box;">
+            </div>
+            <div id="user-switcher-list" style="max-height:360px; overflow-y:auto; padding:4px;"></div>
+          </div>
+        </div>
+
+        <!-- ADD / CUSTOM ACTIONS (moved before notifications to ensure visibility on mobile) -->
+        <div id="topbar-actions-custom" style="display:flex; gap:8px; align-items:center;"></div>
+
+        <!-- TOOLS PILL (Live Dot + Notifications) -->
+        <div style="display:flex; align-items:center; padding:2px 8px; gap:4px; flex-shrink:0;">
+          
+          <span id="topbar-status" style="display:flex; align-items:center; justify-content:center; margin-right:2px;"></span>
+          
+          <div style="width:1px; height:16px; background:rgba(255,255,255,0.1);"></div>
+          
+          <!-- NOTIFICATIONS -->
+          <div class="notification-container" style="position: relative;">
+            <button id="notificationBtn" class="btn" style="background:transparent; border:none; padding:4px 6px; position:relative; cursor:pointer; color:var(--text); display:flex; align-items:center; justify-content:center;">
+              <span class="material-symbols-rounded" style="font-size: 20px;">notifications</span>
+              <span id="notificationBadge" style="display:none; position:absolute; top:2px; right:4px; background:var(--accent-red); color:white; font-size:9px; font-weight:bold; border-radius:10px; padding:2px 4px; line-height:1;">0</span>
+            </button>
+          
+          <div id="notificationDropdown" class="notification-dropdown" style="display:none; position:absolute; right:0; top:45px; width:350px; background:rgba(255, 255, 255, 0.98); backdrop-filter: blur(20px); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); z-index:100; max-height:400px; flex-direction:column; overflow:hidden;">
+            <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--bg-default);">
+              <h4 style="margin:0; font-size:15px; font-weight:600; color:var(--text);" data-i18n="dash.noti.title">Notifications</h4>
+              <button class="btn btn-sm" style="font-size:12px; background:transparent; border:none; color:var(--accent); cursor:pointer;" onclick="markAllNotificationsRead()" data-i18n="dash.noti.mark_all_read">Mark all as read</button>
+            </div>
+            <div id="notificationList" style="overflow-y:auto; flex:1; padding:0; margin:0; list-style:none;">
+               <div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;" data-i18n="dash.noti.empty">No notifications</div>
+            </div>
+            <div id="notificationPagination" style="padding:10px 15px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--bg-default); font-size:12px; gap:8px; flex-shrink:0;">
+              <button id="notifPrevBtn" class="btn btn-sm" style="font-size:11px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; padding:4px 8px; border-radius:4px; transition: all 0.2s;" onclick="changeNotificationPage(-1)" data-i18n="table.prev">Prev</button>
+              <span id="notifPageInfo" style="color:var(--text-muted); font-weight:500;">Page 1 of 1</span>
+              <button id="notifNextBtn" class="btn btn-sm" style="font-size:11px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; padding:4px 8px; border-radius:4px; transition: all 0.2s;" onclick="changeNotificationPage(1)" data-i18n="table.next">Next</button>
+            </div>
+          </div>
+        </div>
+
+        </div>
+        <!-- END TOOLS PILL -->
+
+      </div>
+    </div>
+    <div id="global-status-cards-container" style="background:#F8FAFC; border-bottom:1px solid #E5E7EB; padding:0; margin:0; display:none; flex-shrink:0; width:100%; box-sizing:border-box;"></div>
+    <div class="tabs-bar" id="tabs-bar" style="display:none; align-items:flex-end; gap:6px; padding:10px 15px 0 15px; background:var(--bg-default); border-bottom:none; box-shadow:none; overflow-x:auto; white-space:nowrap; min-height:44px; position:relative; z-index:10;"></div>
+
+    <div class="content" id="content">
+      <div id="global-loading" class="skeleton-table-wrapper" style="height: 100%;">
+        <!-- Top Search Bar Skeleton -->
+        <div class="skeleton-header-row" style="height: 72px; padding: 12px 24px;">
+          <div style="flex: 1; max-width: 480px; height: 48px;">
+            <div class="skeleton-box" style="width: 100%; height: 48px; border-radius: 8px;"></div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div class="skeleton-box" style="width: 105px; height: 40px; border-radius: 8px;"></div>
+            <div class="skeleton-box" style="width: 90px; height: 40px; border-radius: 8px; background-color: #FFEDD5;"></div>
+          </div>
+        </div>
+        <!-- Split Structure (Filter Sidebar + Table) -->
+        <div class="skeleton-layout-split" style="flex: 1;">
+          <div class="skeleton-sidebar">
+            <div class="skeleton-box" style="width: 60%; height: 16px; margin-bottom: 8px;"></div>
+            <div class="skeleton-box" style="width: 90%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 75%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 85%; height: 14px; margin-top: 14px;"></div>
+            <div class="skeleton-box" style="width: 65%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 80%; height: 14px;"></div>
+          </div>
+          <div class="skeleton-table-body">
+            <!-- Table Header Row -->
+            <div style="display: flex; gap: 16px; padding-bottom: 12px; border-bottom: 2px solid #E2E8F0;">
+              <div class="skeleton-box" style="width: 40px; height: 16px;"></div>
+              <div class="skeleton-box" style="width: 25%; height: 16px;"></div>
+              <div class="skeleton-box" style="width: 20%; height: 16px;"></div>
+              <div class="skeleton-box" style="width: 18%; height: 16px;"></div>
+              <div class="skeleton-box" style="width: 15%; height: 16px;"></div>
+              <div class="skeleton-box" style="width: 12%; height: 16px;"></div>
+            </div>
+            <!-- Skeleton Rows -->
+            <div class="skeleton-row">
+              <div class="skeleton-box" style="width: 24px; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 28%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 18%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 22%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 14%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 10%; height: 14px;"></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="skeleton-box" style="width: 24px; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 32%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 15%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 20%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 12%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 11%; height: 14px;"></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="skeleton-box" style="width: 24px; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 24%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 22%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 16%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 15%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 8%; height: 14px;"></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="skeleton-box" style="width: 24px; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 30%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 17%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 25%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 11%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 10%; height: 14px;"></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="skeleton-box" style="width: 24px; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 20%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 25%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 18%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 14%; height: 14px;"></div>
+              <div class="skeleton-box" style="width: 12%; height: 14px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Generic form -->
+  <div class="modal-overlay" id="form-modal">
+    <div class="modal slide-over">
+      <div class="modal-header">
+        <div class="modal-title" id="form-modal-title" data-i18n="form.add_title">Add Record</div>
+        <button class="modal-close" onclick="handleFormClose('form-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="form-modal-body">
+        <!-- form injected here -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="handleFormClose('form-modal')"
+          data-i18n="form.cancel">Cancel</button>
+        <button class="btn btn-primary" id="form-modal-save" onclick="submitForm()" data-i18n="form.save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Confirm delete -->
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal confirm-dialog">
+      <div class="modal-header">
+        <div class="modal-title" data-i18n="modal.confirm_action">Confirm Action</div>
+        <button class="modal-close" onclick="closeModal('confirm-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-icon material-symbols-rounded">delete</div>
+        <div class="confirm-title" data-i18n="modal.delete_record">Delete Record?</div>
+        <div class="confirm-message" id="confirm-message" data-i18n="modal.cannot_undo">This action cannot be undone.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('confirm-modal')" data-i18n="form.cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok-btn" data-i18n="modal.delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="alert-modal">
+    <div class="modal confirm-dialog">
+      <div class="modal-body"
+        style="text-align:center; padding:24px; display:flex; flex-direction:column; align-items:center;">
+        <div id="alert-icon" class="material-symbols-rounded"
+          style="font-size:32px; margin-bottom:10px; color:var(--accent);">info</div>
+        <div id="alert-title" class="confirm-title" style="margin-bottom:6px;" data-i18n="modal.notification">
+          Notification</div>
+        <div id="alert-message" class="confirm-message" data-i18n="modal.action_completed">Action completed
+          successfully.</div>
+      </div>
+      <div class="modal-footer" style="justify-content:center; border:none; padding-bottom:24px;">
+        <button class="btn btn-primary" onclick="closeModal('alert-modal')"
+          style="min-width:100px; justify-content:center;" data-i18n="modal.ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Discard Changes Confirmation -->
+  <div class="modal-overlay" id="discard-modal">
+    <div class="modal confirm-dialog">
+      <div class="modal-header">
+        <div class="modal-title" data-i18n="modal.unsaved_changes">Unsaved Changes</div>
+        <button class="modal-close" onclick="closeModal('discard-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-icon material-symbols-rounded" style="color:#f59e0b;">warning</div>
+        <div class="confirm-title" data-i18n="modal.discard_title">Discard changes?</div>
+        <div class="confirm-message" data-i18n="modal.discard_message">Are you sure you want to close? Any unsaved
+          changes will be lost.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('discard-modal')" data-i18n="modal.keep_editing">Keep
+          Editing</button>
+        <button class="btn btn-danger" id="discard-ok-btn" data-i18n="modal.discard">Discard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Custom Prompt / Input Modal -->
+  <div class="modal-overlay" id="action-prompt-modal">
+    <div class="modal confirm-dialog">
+      <div class="modal-header">
+        <div class="modal-title" id="action-prompt-title" data-i18n="modal.action_input">Action Input</div>
+        <button class="modal-close" onclick="closeModal('action-prompt-modal')">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 15px;">
+        <label id="action-prompt-label"
+          style="font-weight: 600; font-size: 13px; color: var(--text); display: block; margin-bottom: 8px;"
+          data-i18n="modal.enter_value">Please enter value:</label>
+        <div id="action-prompt-input-container">
+          <input type="text" id="action-prompt-input" class="form-input" style="width: 100%;" />
+        </div>
+      </div>
+      <div class="modal-footer" style="padding-top: 15px;">
+        <button class="btn btn-secondary" id="action-prompt-cancel-btn" data-i18n="form.cancel">Cancel</button>
+        <button class="btn btn-primary" id="action-prompt-ok-btn" data-i18n="modal.confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Custom Confirm Dialog -->
+  <div class="modal-overlay" id="action-confirm-modal">
+    <div class="modal confirm-dialog">
+      <div class="modal-header">
+        <div class="modal-title" id="action-confirm-title" data-i18n="modal.confirm_action">Confirm Action</div>
+        <button class="modal-close" onclick="closeModal('action-confirm-modal')">✕</button>
+      </div>
+      <div class="modal-body" style="text-align: center; padding: 24px;">
+        <div class="confirm-icon material-symbols-rounded"
+          style="color: var(--accent); font-size: 36px; margin-bottom: 12px;">help_outline</div>
+        <div class="confirm-title" id="action-confirm-message-title" data-i18n="modal.are_you_sure">Are you sure?</div>
+        <div class="confirm-message" id="action-confirm-message" data-i18n="modal.requires_confirmation">This action
+          requires your confirmation.</div>
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 12px; border: none; padding-bottom: 24px;">
+        <button class="btn btn-secondary" id="action-confirm-cancel-btn" style="min-width: 100px;"
+          data-i18n="form.cancel">Cancel</button>
+        <button class="btn btn-primary" id="action-confirm-ok-btn" style="min-width: 100px;"
+          data-i18n="modal.yes">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Change Password -->
+  <div class="modal-overlay" id="change-password-modal">
+    <div class="modal confirm-dialog" style="max-width: 400px;">
+      <div class="modal-header">
+        <div class="modal-title" data-i18n="modal.change_password">Change Password</div>
+        <button class="modal-close" onclick="closeModal('change-password-modal')">✕</button>
+      </div>
+      <form id="change-password-form" onsubmit="submitChangePassword(event)">
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; text-align: left;">
+          <div>
+            <label style="font-weight: 600; font-size: 12px; color: var(--text); display: block; margin-bottom: 6px;" data-i18n="field.old_password">Old Password</label>
+            <input type="password" id="cp-old-password" class="form-input" style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px;" required />
+          </div>
+          <div>
+            <label style="font-weight: 600; font-size: 12px; color: var(--text); display: block; margin-bottom: 6px;" data-i18n="field.new_password">New Password</label>
+            <input type="password" id="cp-new-password" class="form-input" style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px;" required minlength="6" />
+          </div>
+          <div>
+            <label style="font-weight: 600; font-size: 12px; color: var(--text); display: block; margin-bottom: 6px;" data-i18n="field.confirm_password">Confirm Password</label>
+            <input type="password" id="cp-confirm-password" class="form-input" style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 13px;" required minlength="6" />
+          </div>
+          <div id="cp-error-msg" style="color: var(--accent-red, #EF4444); font-size: 12px; display: none; margin-top: 4px;"></div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('change-password-modal')" data-i18n="form.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-i18n="modal.confirm">Confirm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="i18n.js?v=1043"></script>
+  <script src="js/config/enums.js?v=1043"></script>
+  <script src="js/config/modules/organization.config.js?v=1043"></script>
+  <script src="js/config/modules/request.config.js?v=1043"></script>
+  <script src="js/config/modules/payment.config.js?v=1043"></script>
+  <script src="js/config/modules/invoice.config.js?v=1043"></script>
+  <script src="js/config/modules/expense.config.js?v=1043"></script>
+  <script src="js/config/modules/finance.config.js?v=1043"></script>
+  <script src="js/config/modules/contract.config.js?v=1043"></script>
+  <script src="js/config/modules/asset.config.js?v=1043"></script>
+  <script src="js/config/modules/service.config.js?v=1043"></script>
+  <script src="js/config/modules/target_table.config.js?v=1043"></script>
+  <script src="js/config/modules/support.config.js?v=1043"></script>
+  <script src="js/config/modules/system.config.js?v=1043"></script>
+  <script src="config.js?v=1043"></script>
+  <script src="js/core/uiHelpers.js?v=1043"></script>
+  <script src="app.js?v=1043"></script>
+  <script src="js/services/exportService.js?v=1043"></script>
+  <script src="js/views/kanbanView.js?v=1043"></script>
+  <script src="js/views/setupWizard.js?v=1043"></script>
+  <script src="js/components/userSwitcher.js?v=1043"></script>
+  <script src="js/components/searchableDropdown.js?v=1043"></script>
+  <script src="js/services/bulkActionService.js?v=1043"></script>
+  <script src="js/views/myViewsDashboard.js?v=1043"></script>
+  <script src="js/components/inlineComments.js?v=1043"></script>
+  <script src="js/services/deleteService.js?v=1043"></script>
+  <script src="js/views/financeSummary.js?v=1043"></script>
+  <script src="js/views/childTableView.js?v=1043"></script>
+  <script src="js/services/lookupService.js?v=1043"></script>
+  <script src="js/core/tabRouter.js?v=1043"></script>
+  <script src="js/views/automationView.js?v=1043"></script>
+  <script src="js/views/tableView.js?v=1043"></script>
+  <script src="js/views/detailView.js?v=1043"></script>
+  <script src="js/views/formModal.js?v=1043"></script>
+  <script src="js/views/fieldHandlers.js?v=1043"></script>
+  <script src="js/services/syncService.js?v=1043"></script>
+  <script src="js/services/recordPolicyService.js?v=1043"></script>
+  <script src="js/services/permissionService.js?v=1043"></script>
+  <script src="notifications.js?v=1043"></script>
+  <script src="dashboard.js?v=1043"></script>
+
+  <!-- iOS PWA Link Fix & Mobile Navigation Menu Closer -->
+  <script>
+    // iOS Safari has a bug where clicking <a href="#..."> in a PWA can open standard Safari instead of staying in the app.
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a');
+      if (a && a.getAttribute('href') && a.getAttribute('href').startsWith('#')) {
+        e.preventDefault();
+        window.location.hash = a.getAttribute('href');
+      }
+
+      // Auto close sidebar when a navigation link is clicked on mobile
+      const navItem = e.target.closest('.nav-item');
+      if (navItem) {
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (sidebar) sidebar.classList.remove('mobile-open');
+        if (backdrop) backdrop.classList.remove('active');
+      }
+    });
+
+    // Sidebar Settings Submenu Toggling
+    function toggleSettingsSubmenu(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const sidebar = document.querySelector('.sidebar');
+      if (!sidebar.classList.contains('expanded')) {
+        sidebar.classList.add('expanded');
+      }
+      const sub = document.getElementById('settings-submenu');
+      const arrow = document.querySelector('.settings-arrow');
+      if (sub.style.display === 'none') {
+        sub.style.display = 'flex';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+      } else {
+        sub.style.display = 'none';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    // Auto expand settings submenu if any child is active
+    function checkSettingsSubmenu() {
+      const submenu = document.getElementById('settings-submenu');
+      if (!submenu) return;
+      const activeChild = submenu.querySelector('.nav-item.active');
+      const arrow = document.querySelector('.settings-arrow');
+      if (activeChild) {
+        submenu.style.display = 'flex';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    window.addEventListener('hashchange', () => {
+      setTimeout(() => {
+        checkSettingsSubmenu();
+      }, 100);
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        checkSettingsSubmenu();
+      }, 500);
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crc-helpdesk-env
+  namespace: default
+stringData:
+  DATABASE_URL: "postgres://helpdesk_admin:Helpdesk123!%40%23@terax-postgres-service:5432/crc_helpdesk_db"
+  PORT: "5221"
+  JWT_SECRET: "f61b0048e7ecc1456badb69a872b51b6ad2f092041482dd5d19f3c3bafa8e25127aa6416bb88df3d0d44f157496184f195c31450"
+  CMS_HMAC_SECRET: "cms_hmac_secret_change_me_2026"
+  IS_HELPDESK: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crc-helpdesk-deployment
+  namespace: default
+  labels:
+    app: crc-helpdesk-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crc-helpdesk-app
+  template:
+    metadata:
+      labels:
+        app: crc-helpdesk-app
+    spec:
+      containers:
+        - name: crc-helpdesk-app
+          image: crc-helpdesk-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5221
+          envFrom:
+            - secretRef:
+                name: crc-helpdesk-env
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crc-helpdesk-service
+  namespace: default
+  labels:
+    app: crc-helpdesk-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: crc-helpdesk-app
+  ports:
+    - name: http
+      port: 5223
+      targetPort: 5221
+      protocol: TCP
+    - name: nodeport-http
+      port: 32223
+      targetPort: 5221
+      protocol: TCP

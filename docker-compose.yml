@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # 1. Web App (Node.js)
+  app:
+    build: .
+    container_name: crc_web_app
+    ports:
+      - "5221:5221"
+    env_file:
+      - .env
+    restart: always
+
+  # 2. Đường hầm Cloudflare
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: crc_tunnel
+    command: tunnel run
+    environment:
+      # SỬA DÒNG NÀY: Dán token bạn lấy được trên Cloudflare vào đây
+      - TUNNEL_TOKEN=eyJhIjoiN2NiYjQ2ZDllOTdkOGZlMmU2NTkwYWMwZTU1ODMzZTgiLCJ0IjoiNjZmMzE0MmEtZDk0YS00MzIyLWE3ZDQtMzFmMTdmOWU3N2EzIiwicyI6IllXTmxNRGMwWlRVdE9HWTVPQzAwTnpNMUxUaGlOamt0WVRrelpXVmtNVFExTVdReiJ9
+    restart: always
+    depends_on:
+      - app
+
+  # 3. Giao diện xem Log (Dozzle)
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: crc_dozzle
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: always

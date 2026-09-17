@@ -1,0 +1,25 @@
+node_modules
+.env
+.git
+.gitignore
+
+# Large data files — never in Docker image
+data/
+*.dump
+*.zip
+*.tar.gz
+*.xlsx
+
+# Dev scripts — not needed in container
+scripts/dev/
+
+# Docs
+docs/
+
+# Logs & OS
+logs/
+*.log
+.DS_Store
+Thumbs.db
+pm-debug.log
+.env
