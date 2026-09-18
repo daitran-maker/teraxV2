@@ -4,6 +4,10 @@ const pg = require('pg');
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (val) => {
   return val ? new Date(val + 'Z') : null;
 });
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (val) => {
+  return val ? new Date(val) : null;
+});
+pg.types.setTypeParser(pg.types.builtins.DATE, (val) => val);
 
 const { Pool } = require('pg');
 const DEBUG_SQL = process.env.DEBUG_SQL === 'true';
@@ -17,6 +21,11 @@ const pool = new Pool({
   idleTimeoutMillis: 30000, // Đóng kết nối nhàn rỗi sau 30 giây
   connectionTimeoutMillis: 10000, // Timeout nếu không kết nối được sau 10 giây
   ssl: needsSSL ? { rejectUnauthorized: false } : false
+});
+
+// Force UTC on all PostgreSQL connections
+pool.on('connect', (client) => {
+  client.query("SET timezone = 'UTC'").catch(() => {});
 });
 
 module.exports = pool;
@@ -2844,6 +2853,22 @@ async function runIncrementalMigrations() {
     await cleanupPolicyMultiSelectBrackets();
   } catch (e) {
     console.error('Failed to run cleanupPolicyMultiSelectBrackets migration:', e);
+  }
+  try {
+    await migrateUtc0Standardization();
+  } catch (e) {
+    console.error('Failed to run migrateUtc0Standardization migration:', e);
+  }
+}
+
+async function migrateUtc0Standardization() {
+  const fs = require('fs');
+  const path = require('path');
+  const migrationFile = path.join(__dirname, '..', 'migrations', '2026-09-18_utc0_standardization.sql');
+  if (fs.existsSync(migrationFile)) {
+    const sql = fs.readFileSync(migrationFile, 'utf8');
+    await pool.query(sql);
+    console.log('[Migration] 2026-09-18_utc0_standardization applied successfully.');
   }
 }
 

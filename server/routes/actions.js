@@ -1798,10 +1798,10 @@ router.post('/execute', async (req, res) => {
       const newPaymentStatusId = 31; // Ready for payment
       const newRequestType = '5'; // Payment Request type ID (5)
 
-      const vnDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-      const dd = String(vnDate.getDate()).padStart(2, '0');
-      const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
-      const yy = String(vnDate.getFullYear()).slice(-2);
+      const nowUtc = new Date();
+      const dd = String(nowUtc.getUTCDate()).padStart(2, '0');
+      const mm = String(nowUtc.getUTCMonth() + 1).padStart(2, '0');
+      const yy = String(nowUtc.getUTCFullYear()).slice(-2);
       const dateStr = `${dd}${mm}${yy}`;
 
       const requesterEmail = user.email || '';

@@ -3377,11 +3377,11 @@ router.post('/:tableName', async (req, res) => {
       // LOCK request table to prevent duplicate IDs during concurrent inserts
       await client.query('LOCK TABLE request IN SHARE ROW EXCLUSIVE MODE');
 
-      // Generate request_id in format: [Process] - [ddmmyy] - [Initials] - [Seq]
-      const vnDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-      const dd = String(vnDate.getDate()).padStart(2, '0');
-      const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
-      const yy = String(vnDate.getFullYear()).slice(-2);
+      // Generate request_id in format: [Process] - [ddmmyy] - [Initials] - [Seq] (UTC date)
+      const nowUtc = new Date();
+      const dd = String(nowUtc.getUTCDate()).padStart(2, '0');
+      const mm = String(nowUtc.getUTCMonth() + 1).padStart(2, '0');
+      const yy = String(nowUtc.getUTCFullYear()).slice(-2);
       const dateStr = `${dd}${mm}${yy}`;
 
       const requesterEmail = data.requester || userEmployeeId;
@@ -3409,10 +3409,10 @@ router.post('/:tableName', async (req, res) => {
       if (!data[pk]) {
         if (tableName === 'payment') {
           await client.query('LOCK TABLE payment IN SHARE ROW EXCLUSIVE MODE');
-          const vnDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-          const dd = String(vnDate.getDate()).padStart(2, '0');
-          const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
-          const yy = String(vnDate.getFullYear()).slice(-2);
+          const nowPayUtc = new Date();
+          const dd = String(nowPayUtc.getUTCDate()).padStart(2, '0');
+          const mm = String(nowPayUtc.getUTCMonth() + 1).padStart(2, '0');
+          const yy = String(nowPayUtc.getUTCFullYear()).slice(-2);
           const dateStr = `${dd}${mm}${yy}`;
 
           const requesterEmail = data.employee || userEmployeeId;

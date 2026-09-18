@@ -195,8 +195,13 @@ router.post('/init-tenant', async (req, res) => {
     super_admin_email,
     temp_password,
     username,
+    full_name,
     company_name,
     company_shortname,
+    tax_code,
+    address,
+    country,
+    timezone,
     logo,
     base_currency
   } = req.body;
@@ -207,9 +212,13 @@ router.post('/init-tenant', async (req, res) => {
 
   const adminUsername = username || (super_admin_email ? super_admin_email.split('@')[0] : 'admin');
   const adminEmail = super_admin_email || `${adminUsername}@tenant.local`;
+  const adminFullName = full_name || 'Super Admin';
   const hashedPassword = temp_password ? await bcrypt.hash(temp_password, 10) : null;
   const compFullName = company_name || 'My Company';
   const compShortName = company_shortname || company_name || 'My Company';
+  const compTaxCode = tax_code || null;
+  const compAddress = address || null;
+  const compCountry = country || 'Vietnam';
   const compLogo = logo || null;
   const compCurrency = base_currency || 'VND';
 
@@ -234,6 +243,9 @@ router.post('/init-tenant', async (req, res) => {
       ALTER TABLE public.my_company ADD COLUMN IF NOT EXISTS company_shortname TEXT;
       ALTER TABLE public.my_company ADD COLUMN IF NOT EXISTS company_fullname TEXT;
       ALTER TABLE public.my_company ADD COLUMN IF NOT EXISTS logo TEXT;
+      ALTER TABLE public.my_company ADD COLUMN IF NOT EXISTS tax_code TEXT;
+      ALTER TABLE public.my_company ADD COLUMN IF NOT EXISTS address TEXT;
+      ALTER TABLE public.my_company ADD COLUMN IF NOT EXISTS country TEXT;
     `);
 
     // 2. Upsert primary company record with signup branding & base currency
@@ -248,16 +260,18 @@ router.post('/init-tenant', async (req, res) => {
             company_shortname = $2,
             base_currency = $3,
             logo = COALESCE($4, logo),
+            tax_code = COALESCE($5, tax_code),
+            address = COALESCE($6, address),
+            country = COALESCE($7, country),
             status = COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67)
-        WHERE my_company_id = $5
-      `, [compFullName, compShortName, compCurrency, compLogo, primaryCompanyId]);
+        WHERE my_company_id = $8
+      `, [compFullName, compShortName, compCurrency, compLogo, compTaxCode, compAddress, compCountry, primaryCompanyId]);
     } else {
       await pool.query(`
-        INSERT INTO public.my_company (my_company_id, company_shortname, company_fullname, base_currency, logo, status)
-        VALUES ($1, $2, $3, $4, $5, COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67))
-      `, [primaryCompanyId, compShortName, compFullName, compCurrency, compLogo]);
+        INSERT INTO public.my_company (my_company_id, company_shortname, company_fullname, base_currency, logo, tax_code, address, country, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67))
+      `, [primaryCompanyId, compShortName, compFullName, compCurrency, compLogo, compTaxCode, compAddress, compCountry]);
     }
-
 
     // 3. Ensure EMPLOYEE table has required columns
     await pool.query(`
@@ -273,9 +287,9 @@ router.post('/init-tenant', async (req, res) => {
     // 5. Insert super admin record linked to primary company
     const { rows } = await pool.query(`
       INSERT INTO "employee" (employee_id, username, full_name, email, role, password, status, company_id)
-      VALUES ('EMP-001', $1, 'Super Admin', $2, 'Super Admin', $3, (SELECT COALESCE((SELECT id FROM status_catalog WHERE table_name='employee' AND status_key='active' LIMIT 1), 17)), $4)
-      RETURNING employee_id, username, email, role, status, company_id
-    `, [adminUsername, adminEmail, hashedPassword, primaryCompanyId]);
+      VALUES ('EMP-001', $1, $2, $3, 'Super Admin', $4, (SELECT COALESCE((SELECT id FROM status_catalog WHERE table_name='employee' AND status_key='active' LIMIT 1), 17)), $5)
+      RETURNING employee_id, username, full_name, email, role, status, company_id
+    `, [adminUsername, adminFullName, adminEmail, hashedPassword, primaryCompanyId]);
 
     // 6. Ensure cms_tenant_info has company metadata
     try {

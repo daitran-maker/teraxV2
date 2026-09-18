@@ -455,10 +455,10 @@ window.handleAssetTypeChange = function () {
       typePrefix = 'ELE';
     }
 
-    const vnDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-    const dd = String(vnDate.getDate()).padStart(2, '0');
-    const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
-    const yy = String(vnDate.getFullYear()).slice(-2);
+    const nowUtc = new Date();
+    const dd = String(nowUtc.getUTCDate()).padStart(2, '0');
+    const mm = String(nowUtc.getUTCMonth() + 1).padStart(2, '0');
+    const yy = String(nowUtc.getUTCFullYear()).slice(-2);
     const dateStr = `${dd}${mm}${yy}`;
 
     const rand = Math.floor(1000 + Math.random() * 9000);
@@ -506,10 +506,10 @@ window.handleServiceTypeChange = function () {
       typePrefix = 'TEC';
     }
 
-    const vnDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-    const dd = String(vnDate.getDate()).padStart(2, '0');
-    const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
-    const yy = String(vnDate.getFullYear()).slice(-2);
+    const nowUtc = new Date();
+    const dd = String(nowUtc.getUTCDate()).padStart(2, '0');
+    const mm = String(nowUtc.getUTCMonth() + 1).padStart(2, '0');
+    const yy = String(nowUtc.getUTCFullYear()).slice(-2);
     const dateStr = `${dd}${mm}${yy}`;
 
     const rand = Math.floor(1000 + Math.random() * 9000);

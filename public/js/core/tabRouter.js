@@ -18,9 +18,24 @@ window.appNavHistory = window.appNavHistory || [];
 
 function isRootPath(pathStr) {
   if (!pathStr) return true;
-  const cleanPath = pathStr.split('&')[0];
+  const cleanPath = pathStr.replace(/^#/, '').split('&')[0];
   const parts = cleanPath.split('/');
   return parts.length <= 1 || !parts[1];
+}
+
+function hasOpenDetailForRoot(rootHash, rootModule, allPanes) {
+  if (!rootHash) return false;
+  const cleanRoot = rootHash.replace(/^#/, '').split('&')[0];
+  const mod = rootModule || cleanRoot.split('/')[0];
+  const list = allPanes || Array.from(document.querySelectorAll('.main > .content, .main > [id^="pane-"]'));
+  return list.some(p => {
+    const pHash = (p.dataset.hash || p.id.replace('pane-', '').replace(/-/, '/')).replace(/^#/, '').split('&')[0];
+    if (isRootPath(pHash)) return false; // ignore root panes
+    if (p.dataset.parentRoot === cleanRoot || p.dataset.parentRoot === mod) return true;
+    const pMod = pHash.split('/')[0];
+    if (pMod === mod || pMod === cleanRoot) return true;
+    return false;
+  });
 }
 
 window.goBack = function (fallbackModule) {
@@ -41,7 +56,7 @@ window.closeTabPane = function (paneId, event) {
   if (isClosingActive) {
     const remainingPanes = Array.from(document.querySelectorAll('.main > .content, .main > [id^="pane-"]'));
     if (remainingPanes.length > 0) {
-      const targetPane = remainingPanes.find(p => isRootPath(p.dataset.hash || '')) || remainingPanes[0];
+      const targetPane = remainingPanes[remainingPanes.length - 1];
       window.location.hash = targetPane.dataset.hash || 'my_request';
     } else {
       window.location.hash = 'my_request';
@@ -323,15 +338,42 @@ function renderTabsBar() {
   if (!tabsBar) return;
   const panes = Array.from(document.querySelectorAll('.main > .content, .main > [id^="pane-"]'));
 
-  if (panes.length === 0) {
+  // Clean up any inactive root panes that have no open detail records
+  panes.forEach(p => {
+    if (p.id !== 'content') {
+      const pHash = (p.dataset.hash || p.id.replace('pane-', '').replace(/-/, '/')).split('&')[0];
+      if (isRootPath(pHash)) {
+        const pMod = pHash.split('/')[0];
+        const hasDetail = hasOpenDetailForRoot(pHash, pMod, panes);
+        if (!hasDetail) {
+          p.remove();
+        }
+      }
+    }
+  });
+
+  const validPanes = Array.from(document.querySelectorAll('.main > .content, .main > [id^="pane-"]'));
+  const hasDetailTabs = validPanes.some(p => !isRootPath(p.dataset.hash || p.id.replace('pane-', '').replace(/-/, '/')));
+
+  // If there are no detail tabs open (only 1 menu/root view), do not show tabs bar
+  if (!hasDetailTabs && validPanes.length <= 1) {
     tabsBar.innerHTML = '';
     tabsBar._lastRenderedHtml = '';
+    tabsBar.style.display = 'none';
+    hideTabsDropdown();
+    return;
+  }
+
+  if (validPanes.length === 0) {
+    tabsBar.innerHTML = '';
+    tabsBar._lastRenderedHtml = '';
+    tabsBar.style.display = 'none';
     hideTabsDropdown();
     return;
   }
 
   // Keep tab order stable based on DOM order so active tab doesn't jump to the start
-  const orderedPanes = panes;
+  const orderedPanes = validPanes;
 
   let listHtml = '';
   orderedPanes.forEach(p => {
@@ -453,7 +495,7 @@ async function handleHashChange() {
 
   // Prevent loading restricted modules if permissions map is loaded
   if (window.userPermissionsMap && window.userPermissionsMap[moduleKey] === false) {
-    if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey)) {
+    if (['my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(moduleKey)) {
       redirectToAccessDenied();
       return;
     }
@@ -489,18 +531,46 @@ async function handleHashChange() {
   if (oldHash && oldHash !== hash && oldPathForCheck !== pathForCheck) {
     const oldPane = document.getElementById('content');
     if (oldPane) {
-      const scrollEl = oldPane.querySelector('.table-container') || oldPane.querySelector('.detail-scroll') || oldPane;
-      oldPane.dataset.scrollTop = scrollEl ? scrollEl.scrollTop : (window.scrollY || 0);
-      oldPane.dataset.scrollLeft = scrollEl ? scrollEl.scrollLeft : (window.scrollX || 0);
-      oldPane.id = 'pane-' + oldPathForCheck.replace(/[^a-zA-Z0-9_-]/g, '-');
-      oldPane.style.display = 'none';
+      const oldIsRoot = isRootPath(oldPathForCheck);
+      const targetIsDetail = !isRootPath(pathForCheck);
+      const allPanesNow = Array.from(document.querySelectorAll('.main > .content, .main > [id^="pane-"]'));
+      const oldModule = oldPathForCheck.split('/')[0];
+      const hasOpenChildRecords = hasOpenDetailForRoot(oldPathForCheck, oldModule, allPanesNow);
+
+      if (oldIsRoot && !targetIsDetail && !hasOpenChildRecords) {
+        // Root menu view with NO open records, moving to another root view -> discard!
+        oldPane.remove();
+      } else {
+        // Either old pane is detail view, OR user is opening a record from this view, OR it has open records -> KEEP!
+        const scrollEl = oldPane.querySelector('.table-container') || oldPane.querySelector('.detail-scroll') || oldPane;
+        oldPane.dataset.scrollTop = scrollEl ? scrollEl.scrollTop : (window.scrollY || 0);
+        oldPane.dataset.scrollLeft = scrollEl ? scrollEl.scrollLeft : (window.scrollX || 0);
+        oldPane.id = 'pane-' + oldPathForCheck.replace(/[^a-zA-Z0-9_-]/g, '-');
+        oldPane.style.display = 'none';
+        if (targetIsDetail) {
+          oldPane.dataset.hasOpenedRecord = 'true';
+        }
+      }
     }
 
-    // Never remove the pane we are about to switch to; clean up older panes only if total pane count exceeds 25
+    // Clean up any other inactive root panes that have no open records
     const allPanes = Array.from(document.querySelectorAll('.main > [id^="pane-"]'));
+    const currentPanes = Array.from(document.querySelectorAll('.main > .content, .main > [id^="pane-"]'));
+    allPanes.forEach(p => {
+      const pHash = (p.dataset.hash || p.id.replace('pane-', '').replace(/-/, '/')).split('&')[0];
+      if (isRootPath(pHash)) {
+        const pMod = pHash.split('/')[0];
+        const hasDetail = hasOpenDetailForRoot(pHash, pMod, currentPanes);
+        if (!hasDetail && pHash !== pathForCheck) {
+          p.remove();
+        }
+      }
+    });
+
     const targetPaneId = 'pane-' + pathForCheck.replace(/[^a-zA-Z0-9_-]/g, '-');
-    if (allPanes.length > 25) {
-      const toRemove = allPanes.find(p => p.id !== targetPaneId);
+    const remainingPanes = Array.from(document.querySelectorAll('.main > [id^="pane-"]'));
+    if (remainingPanes.length > 25) {
+      const toRemove = remainingPanes.find(p => p.id !== targetPaneId);
       if (toRemove) toRemove.remove();
     }
   }
@@ -526,7 +596,7 @@ async function handleHashChange() {
     const [path] = hash.split('&');
     const parts = path.split('/');
     currentModule = parts[0];
-    currentView = parts[1] ? 'detail' : (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule) ? 'dashboard' : 'table');
+    currentView = parts[1] ? 'detail' : (['my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(currentModule) ? 'dashboard' : 'table');
 
     document.querySelectorAll('.nav-item').forEach(el => {
       el.classList.toggle('active', el.id === `nav-${currentModule}`);
@@ -560,10 +630,17 @@ async function handleHashChange() {
         newPane.className = 'content fade-in';
         newPane.id = 'content';
         newPane.dataset.hash = hash;
+        if (!isRootPath(pathForCheck) && oldPathForCheck) {
+          newPane.dataset.parentRoot = oldPathForCheck;
+        }
         const initialMeta = typeof getModuleMeta === 'function' ? getModuleMeta(moduleKey) : null;
         newPane.dataset.title = (initialMeta && initialMeta.title) ? initialMeta.title : (typeof MODULES !== 'undefined' && MODULES[moduleKey] ? MODULES[moduleKey].label : moduleKey);
         newPane.dataset.isRoot = isRootPath(hash) ? 'true' : 'false';
         mainContent.appendChild(newPane);
+      }
+    } else {
+      if (!isRootPath(pathForCheck) && oldPathForCheck && !existingContent.dataset.parentRoot) {
+        existingContent.dataset.parentRoot = oldPathForCheck;
       }
     }
   }
@@ -578,7 +655,7 @@ async function handleHashChange() {
     if (params.has('page')) urlPage = parseInt(params.get('page'));
   }
 
-  const DASHBOARD_VIEWS = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'];
+  const DASHBOARD_VIEWS = ['my_request', 'my_approval', 'my_process_owner', 'my_team'];
 
   if (moduleKey === 'automation') {
     if (pkVal) {
@@ -667,6 +744,7 @@ async function handleHashChange() {
 // Window Bridge for Tab Router
 window.getModuleMeta = getModuleMeta;
 window.isRootPath = isRootPath;
+window.hasOpenDetailForRoot = hasOpenDetailForRoot;
 window.renderTabsBar = renderTabsBar;
 window.updatePaneMeta = updatePaneMeta;
 window.handleHashChange = handleHashChange;

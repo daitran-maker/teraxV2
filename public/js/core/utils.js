@@ -40,36 +40,76 @@ function debounce(func, wait) {
 }
 window.debounce = debounce;
 
-// Date & Time Formatting
-function formatDateTime(val) {
+// User TimeZone & Date/Time Formatting
+function getUserTimeZone() {
+  return window.userTimeZone ||
+         (window.authUser && window.authUser.timezone) ||
+         (window.companyConfig && window.companyConfig.timezone) ||
+         (Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Ho_Chi_Minh');
+}
+window.getUserTimeZone = getUserTimeZone;
+
+function formatDateTime(val, customTimeZone) {
   if (!val || (typeof val === 'object' && !(val instanceof Date))) return '';
 
-  let date;
+  let d;
   if (val instanceof Date) {
-    date = val;
+    d = val;
   } else if (typeof val === 'string') {
+    const trimmed = val.trim();
     const legacyFormat = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/;
-    if (legacyFormat.test(val)) {
-      date = new Date(val + ' +07:00');
+    if (legacyFormat.test(trimmed)) {
+      d = new Date(trimmed + ' +07:00');
+    } else if (!trimmed.includes('Z') && !trimmed.includes('+') && !trimmed.includes('-') && trimmed.includes(':')) {
+      d = new Date(trimmed.replace(' ', 'T') + 'Z');
+    } else if (!trimmed.includes('Z') && !trimmed.includes('+') && trimmed.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/)) {
+      d = new Date(trimmed.replace(' ', 'T') + 'Z');
     } else {
-      date = new Date(val);
+      d = new Date(trimmed);
     }
   } else {
-    date = new Date(val);
+    d = new Date(val);
   }
 
-  if (isNaN(date.getTime())) return '';
+  if (isNaN(d.getTime())) return '';
 
-  const pad = (n) => String(n).padStart(2, '0');
-  const h = pad(date.getHours());
-  const m = pad(date.getMinutes());
-  const s = pad(date.getSeconds());
-  const D = pad(date.getDate());
-  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  const monthStr = months[date.getMonth()];
-  const Y = date.getFullYear();
+  const tz = customTimeZone || getUserTimeZone();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
 
-  return `${D}-${monthStr}-${Y} ${h}:${m}:${s}`;
+    const parts = formatter.formatToParts(d);
+    const p = {};
+    for (let i = 0; i < parts.length; i++) {
+      p[parts[i].type] = parts[i].value;
+    }
+    const day = p.day || '';
+    const month = (p.month || '').slice(0, 3).toUpperCase();
+    const year = p.year || '';
+    const hour = p.hour || '00';
+    const min = p.minute || '00';
+    const sec = p.second || '00';
+
+    return `${day}-${month}-${year} ${hour}:${min}:${sec}`;
+  } catch (err) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const h = pad(d.getUTCHours());
+    const m = pad(d.getUTCMinutes());
+    const s = pad(d.getUTCSeconds());
+    const D = pad(d.getUTCDate());
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const monthStr = months[d.getUTCMonth()];
+    const Y = d.getUTCFullYear();
+    return `${D}-${monthStr}-${Y} ${h}:${m}:${s}`;
+  }
 }
 window.formatDateTime = formatDateTime;
 

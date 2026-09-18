@@ -3822,8 +3822,8 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
 
   try {
     // Resolve the view param (same logic as detail view)
-    const viewParam = moduleKey; // my_request, my_approval, my_task, my_team
-    const isReq = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
+    const viewParam = moduleKey; // my_request, my_approval, my_process_owner, my_team
+    const isReq = ['my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(moduleKey);
     const resolvedTable = isReq ? 'request' : moduleKey;
 
     // Determine edit / delete permission
@@ -3835,18 +3835,16 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
       record = await ensureRowActionRecord(moduleKey, pkVal);
     }
 
-    const isChildUnderRequest = currentView === 'detail' && ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule);
-    if (isChildUnderRequest && !isChildTableActionAllowed(moduleKey, 'edit', currentModule)) {
-      closeRowActionDropdown();
-      return;
-    }
+    const isChildUnderRequest = currentView === 'detail' && ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(currentModule);
+    const canChildEdit = isChildUnderRequest ? (typeof isChildTableActionAllowed === 'function' && isChildTableActionAllowed(moduleKey, 'edit', currentModule)) : true;
+    const canChildDelete = isChildUnderRequest ? (typeof isChildTableActionAllowed === 'function' && isChildTableActionAllowed(moduleKey, 'delete', currentModule)) : true;
 
-    const canEdit = record && !record.deleted_at && canUserEditRecord(moduleKey, record) && (isChildUnderRequest ? isChildTableActionAllowed(moduleKey, 'edit', currentModule) : isActionAllowed(viewParam, 'edit'));
-    const canDelete = record && !record.deleted_at && canUserDeleteRecord(moduleKey, record) && (isChildUnderRequest ? isChildTableActionAllowed(moduleKey, 'delete', currentModule) : isActionAllowed(viewParam, 'delete'));
+    const canEdit = record && !record.deleted_at && canUserEditRecord(moduleKey, record) && canChildEdit && (isChildUnderRequest || isActionAllowed(viewParam, 'edit'));
+    const canDelete = record && !record.deleted_at && canUserDeleteRecord(moduleKey, record) && canChildDelete && (isChildUnderRequest || isActionAllowed(viewParam, 'delete'));
 
     // Fetch dynamic workflow actions
     let dynamicActions = [];
-    if (!isChildUnderRequest || isChildTableActionAllowed(moduleKey, 'edit', currentModule)) {
+    if (!isChildUnderRequest || canChildEdit) {
       try {
         dynamicActions = await apiGet(`/actions/${resolvedTable}/${pkVal}?view=${viewParam}`);
       } catch (e) { /* ignore */ }
@@ -3864,7 +3862,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
       `);
     }
 
-    const duplicateRestrictedViews = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'];
+    const duplicateRestrictedViews = ['my_request', 'my_approval', 'my_process_owner', 'my_team'];
     const nonDuplicableTables = ['logs', 'request_activity_log', 'history', 'request_rating', 'rating', 'feedback', 'comment', 'ticket_comment', 'finance', 'assigned_task'];
     let canDuplicate = false;
     if (!duplicateRestrictedViews.includes(moduleKey) && !nonDuplicableTables.includes(moduleKey)) {
