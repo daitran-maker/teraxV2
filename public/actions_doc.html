@@ -1,0 +1,3522 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Báo Cáo Chi Tiết Action Rules & Quy Tắc Phân Quyền</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(22, 28, 45, 0.6);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-color: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary-color: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-orange: #f59e0b;
+      --sidebar-bg: #111827;
+      --tag-bg: rgba(59, 130, 246, 0.15);
+      --tag-color: #60a5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar navigation */
+    .sidebar {
+      width: 280px;
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border);
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .nav-item {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-item:hover, .nav-item.active {
+      background-color: rgba(59, 130, 246, 0.1);
+      color: var(--primary-color);
+    }
+
+    .nav-item.active {
+      font-weight: 600;
+      border-left: 3px solid var(--primary-color);
+      border-radius: 0 8px 8px 0;
+      padding-left: 13px;
+    }
+
+    .badge-count {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-color);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .nav-item.active .badge-count {
+      background-color: var(--primary-color);
+    }
+
+    /* Main container */
+    .main-content {
+      margin-left: 280px;
+      flex-grow: 1;
+      padding: 3rem;
+      max-width: 1400px;
+    }
+
+    header {
+      margin-bottom: 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .title-area h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #ffffff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-area p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex-grow: 1;
+      min-width: 300px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      background-color: var(--sidebar-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.75rem 1.2rem;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .search-box input:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+    }
+
+    .filter-dropdown {
+      background-color: var(--sidebar-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.75rem 1.5rem;
+      color: var(--text-color);
+      outline: none;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    /* Actions grid/list */
+    .actions-section {
+      display: none;
+    }
+
+    .actions-section.active {
+      display: block;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .action-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .action-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(59, 130, 246, 0.3);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 1rem;
+    }
+
+    .card-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .action-badge-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-top: 0.25rem;
+    }
+
+    .action-id {
+      font-family: monospace;
+      color: var(--primary-color);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .action-vn-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .view-tag {
+      background-color: var(--tag-bg);
+      color: var(--tag-color);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-tag {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .status-tag.active {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+    }
+
+    .status-tag.disabled {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+    }
+
+    .card-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .card-body {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+    }
+
+    .info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .info-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .info-content {
+      background-color: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+    }
+
+    .info-content ul {
+      list-style-position: inside;
+      padding-left: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .info-content code {
+      font-family: monospace;
+      background-color: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #60a5fa;
+    }
+
+    .who-sub-specs {
+      margin-top: 0.75rem;
+      border-top: 1px dashed rgba(255, 255, 255, 0.08);
+      padding-top: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .who-sub-specs code {
+      color: #f59e0b;
+    }
+
+    .behavior-section {
+      grid-column: span 2;
+    }
+
+    @media (max-width: 900px) {
+      .behavior-section {
+        grid-column: span 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h2>CRC Actions Doc</h2>
+    <ul class="nav-list">
+      <li class="nav-item active" onclick="switchTab('custom', this)">
+        <span>Custom Workflows</span>
+        <span class="badge-count">21</span>
+      </li>
+      <li class="nav-item" onclick="switchTab('crud', this)">
+        <span>CRUD Permissions</span>
+        <span class="badge-count">78</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <header>
+      <div class="title-area">
+        <h1>Báo Cáo Hệ Thống Action & Quy Tắc Phân Quyền</h1>
+        <p>Tài liệu đặc tả các nút hành động (actions) cùng điều kiện hiển thị và nghiệp vụ tương ứng trong hệ thống CRC.</p>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Tìm kiếm theo Tên Action, ID hoặc Mô tả..." oninput="filterCards()">
+      </div>
+      <select id="view-filter" class="filter-dropdown" onchange="filterCards()">
+        <option value="">Tất cả View/Bảng</option>
+        <option value="account">account</option><option value="action_rules">action_rules</option><option value="comment">comment</option><option value="company">company</option><option value="contact">contact</option><option value="department">department</option><option value="employee">employee</option><option value="employee_active">employee_active</option><option value="exception_rules">exception_rules</option><option value="my_approval">my_approval</option><option value="my_company">my_company</option><option value="my_location">my_location</option><option value="my_request">my_request</option><option value="my_task">my_task</option><option value="my_team">my_team</option><option value="operation_program">operation_program</option><option value="opportunity_list">opportunity_list</option><option value="payment">payment</option><option value="permissions">permissions</option><option value="policy">policy</option><option value="request">request</option><option value="support">support</option>
+      </select>
+    </div>
+
+    <!-- CUSTOM WORKFLOW ACTIONS TAB -->
+    <div id="custom-section" class="actions-section active">
+      <div class="actions-grid">
+        
+        <div class="action-card" data-views="my_approval">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">approve_request</span>
+              <h3 class="action-vn-name">Phê duyệt yêu cầu (Approve)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_approval</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Phê duyệt yêu cầu. Điều kiện hiển thị: Status = 'Pending Approval' VÀ Người dùng là người phê duyệt của cấp hiện tại / Super Admin.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Người phê duyệt của cấp hiện tại</strong> (Duyệt theo cấp: <code>tier_1_approval</code>, <code>tier_2_approval</code>, hoặc <code>tier_3_approval</code> trong record)</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Trạng thái yêu cầu là <code>Pending Approval</code> hoặc <code>Submitted</code>. Bước duyệt của cấp hiện tại có trạng thái <code>Pending Approval</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">
+      Cập nhật trạng thái bước phê duyệt hiện tại thành <code>Approved</code>.
+      <ul>
+        <li><strong>Phê duyệt liên tiếp:</strong> Nếu người dùng là người phê duyệt cho nhiều cấp kế tiếp nhau, hệ thống tự động duyệt qua các cấp đó.</li>
+        <li><strong>Chuyển cấp tiếp theo:</strong> Đặt bước duyệt kế tiếp thành <code>Pending Approval</code>.</li>
+        <li><strong>Duyệt hoàn tất:</strong> Nếu đã duyệt qua tất cả các cấp, chuyển <code>sr_status = 'Approved'</code>.</li>
+        <li><strong>TỰ ĐỘNG HÓA:</strong> Khi yêu cầu được duyệt hoàn toàn:
+          <ul>
+            <li>Nếu là Yêu cầu thanh toán (Type '5' hoặc 'RPM'), tự động cập nhật trạng thái thanh toán tương ứng thành <code>Ready for payment</code>.</li>
+            <li>Nếu là Yêu cầu hóa đơn (Type '12'), tự động cập nhật trạng thái hóa đơn tương ứng thành <code>Ready to issue</code>.</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_approval">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">reject_request</span>
+              <h3 class="action-vn-name">Từ chối yêu cầu (Reject)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_approval</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Từ chối yêu cầu. Điều kiện hiển thị: Status = 'Pending Approval' VÀ Người dùng là người phê duyệt của cấp hiện tại / Super Admin.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Người phê duyệt của cấp hiện tại</strong></li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Trạng thái yêu cầu là <code>Pending Approval</code> hoặc <code>Submitted</code>. Bước duyệt của cấp hiện tại có trạng thái <code>Pending Approval</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Từ chối yêu cầu. Đổi trạng thái bước duyệt hiện tại thành <code>Rejected</code>, đổi trạng thái chung của yêu cầu <code>sr_status = 'Rejected'</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-03</span>
+              <h3 class="action-vn-name">Đánh giá yêu cầu (Rating)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Đánh giá yêu cầu đã hoàn thành. Điều kiện hiển thị: Process Status = 'Completed' VÀ Rating chưa được thiết lập (NULL) VÀ Status khác Closed.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Creator</strong> (Người tạo) hoặc <strong>Requester</strong> (Người yêu cầu)</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>process_status = 'Completed'</code> VÀ chưa có đánh giá (<code>rating == null</code>) VÀ <code>sr_status</code> khác <code>Closed</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Lưu điểm đánh giá (Rating) và đóng yêu cầu (<code>sr_status = 'Closed'</code>, <code>sr_close_date = CURRENT_TIMESTAMP</code>).</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-03-RE</span>
+              <h3 class="action-vn-name">Đánh giá lại yêu cầu (Rate again)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Thay đổi đánh giá của yêu cầu. Điều kiện hiển thị: Process Status = 'Completed' VÀ Rating đã được thiết lập VÀ Status = Closed.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Creator</strong> hoặc <strong>Requester</strong></li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>process_status = 'Completed'</code> VÀ đã có đánh giá (<code>rating != null</code>) VÀ <code>sr_status = 'Closed'</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cập nhật lại điểm đánh giá và ghi log.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-06</span>
+              <h3 class="action-vn-name">Đóng yêu cầu (Close)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Đóng yêu cầu sau khi xử lý xong. Điều kiện hiển thị: Status = 'Approved' VÀ Process Status = 'Completed'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Creator</strong> hoặc <strong>Requester</strong></li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status = 'Approved'</code> VÀ <code>process_status = 'Completed'</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Đóng yêu cầu (<code>sr_status = 'Closed'</code>, <code>sr_close_date = CURRENT_TIMESTAMP</code>, lưu rating nếu có).</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-09</span>
+              <h3 class="action-vn-name">Gửi yêu cầu đi phê duyệt (Submit)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Gửi yêu cầu đi phê duyệt. Điều kiện hiển thị: Status = 'Draft' hoặc 'Rejected'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Creator</strong> hoặc <strong>Requester</strong></li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status</code> là <code>Draft</code> hoặc <code>Rejected</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Khởi tạo luồng phê duyệt (approval flow), đặt cấp duyệt hiện tại <code>current_level = 1</code>, đổi trạng thái cấp duyệt đầu tiên thành <code>Pending Approval</code>, và cập nhật <code>sr_status = 'Pending Approval'</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">withdraw_request</span>
+              <h3 class="action-vn-name">Rút lại yêu cầu phê duyệt (Withdraw)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Rút lại yêu cầu đã gửi. Điều kiện hiển thị: Status khác Draft.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Creator</strong> hoặc <strong>Requester</strong></li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status</code> là <code>Pending Approval</code> hoặc <code>Submitted</code> (khác Draft).</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Thu hồi yêu cầu phê duyệt. Đưa trạng thái yêu cầu về <code>Draft</code>, <code>process_status = 'Not started yet'</code>, và đặt lại toàn bộ bước phê duyệt về <code>Not started yet</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request,my_task,my_team,my_approval,request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-016</span>
+              <h3 class="action-vn-name">Xem yêu cầu gốc (View Main Request)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span> <span class="view-tag">my_task</span> <span class="view-tag">my_team</span> <span class="view-tag">my_approval</span> <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Chuyển hướng xem chi tiết yêu cầu gốc. Điều kiện hiển thị: Request ID có chứa ký tự '-' VÀ có ít nhất 1 liên kết payment hoặc invoice.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Creator</strong>, <strong>Requester</strong>, <strong>SR Owner</strong>, hoặc <strong>Policy Lead</strong> của yêu cầu</li>
+        <li><strong>Người phê duyệt</strong> trong luồng duyệt (áp dụng cho view my_approval)</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu (Request ID) có ít nhất 1 liên kết payment hoặc invoice (tức là <code>request_id</code> có tồn tại trong bảng <code>payment</code> hoặc <code>invoice</code>).</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Chuyển hướng người dùng xem chi tiết yêu cầu gốc.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task,my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-02</span>
+              <h3 class="action-vn-name">Cập nhật thành phần liên kết (Elements)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span> <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Cập nhật các thành phần liên kết của yêu cầu. Điều kiện hiển thị: Status khác 'Draft' VÀ Process Status = 'Processing' hoặc 'Completed'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Policy Lead</strong> hoặc các <strong>SR Owner</strong> của yêu cầu</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status</code> khác <code>Draft</code> VÀ <code>process_status</code> là <code>Processing</code> hoặc <code>Completed</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cập nhật danh sách thành phần (Elements) của yêu cầu (ví dụ: ASSET, CONTRACT, SERVICE, vv.) và ghi log.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task,my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-04</span>
+              <h3 class="action-vn-name">Cập nhật lại trạng thái xử lý (Re-update Process Status)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span> <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Sửa đổi trạng thái xử lý của yêu cầu. Điều kiện hiển thị: Status = 'Approved' VÀ Process Status = 'Completed'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Policy Lead</strong> của yêu cầu</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status = 'Approved'</code> VÀ <code>process_status = 'Completed'</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cập nhật lại <code>process_status</code> thành một trong các trạng thái: <i>Not started yet</i>, <i>Processing</i>, <i>Completed</i>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task,my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-05</span>
+              <h3 class="action-vn-name">Hủy bỏ yêu cầu (Cancel)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span> <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Hủy bỏ yêu cầu. Điều kiện hiển thị: Status = 'Approved' VÀ Process Status = 'Processing' hoặc 'Not started yet'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Policy Lead</strong> hoặc các <strong>SR Owner</strong> của yêu cầu</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status = 'Approved'</code> VÀ <code>process_status</code> là <code>Processing</code> hoặc <code>Not started yet</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Hủy yêu cầu (cập nhật <code>sr_status = 'Cancelled'</code>, <code>sr_close_date = CURRENT_TIMESTAMP</code>).</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task,my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-07</span>
+              <h3 class="action-vn-name">Đánh dấu hoàn thành xử lý (Complete)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span> <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Đánh dấu yêu cầu đã hoàn thành xử lý. Điều kiện hiển thị: Status = 'Approved' VÀ Process Status = 'Processing'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Policy Lead</strong> hoặc các <strong>SR Owner</strong> của yêu cầu</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status = 'Approved'</code> VÀ <code>process_status = 'Processing'</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cập nhật trạng thái xử lý thành <code>Completed</code> và gán <code>process_end_date = CURRENT_TIMESTAMP</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task,my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">ACT-REQUEST-08</span>
+              <h3 class="action-vn-name">Bắt đầu xử lý yêu cầu (Start)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span> <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Bắt đầu xử lý yêu cầu. Điều kiện hiển thị: Status = 'Approved' VÀ Process Status = 'Not started yet'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Policy Lead</strong> hoặc các <strong>SR Owner</strong> của yêu cầu</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu có <code>sr_status = 'Approved'</code> VÀ <code>process_status = 'Not started yet'</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cập nhật trạng thái xử lý thành <code>Processing</code> và gán <code>process_start_date = CURRENT_TIMESTAMP</code>.<br><strong>TỰ ĐỘNG HÓA:</strong> Nếu yêu cầu thuộc loại Yêu cầu Thanh toán (Request Type là '5' hoặc 'RPM'), hệ thống tự động cập nhật trạng thái thanh toán liên kết thành <code>Ready for payment</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">change_sr_owner</span>
+              <h3 class="action-vn-name">Gán người sở hữu yêu cầu (Change SR Owner)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Cho phép Policy Lead / Super Admin gán/thay đổi người sở hữu yêu cầu. Điều kiện hiển thị: Status khác Closed, Cancelled VÀ Người dùng là Policy Lead của yêu cầu / Super Admin.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>Policy Lead</strong> của yêu cầu (trùng với <code>employee_id</code> của user)</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Yêu cầu (Request) có <code>sr_status</code> khác <code>Closed</code> và khác <code>Cancelled</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Thay đổi mảng <code>sr_owner</code> của yêu cầu và ghi nhật ký (audit log) chi tiết.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_change_mtr</span>
+              <h3 class="action-vn-name">Thay đổi giao dịch MTR (Change MTR)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Thay đổi MTR transaction cho payment đã thanh toán. Điều kiện hiển thị: Payment Status = 'Paid' VÀ đã liên kết Transaction ID.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Owner</strong> hoặc <strong>Policy Lead</strong> của yêu cầu gốc liên kết (Dot notation check: <code>[request.sr_owner]</code>, <code>[request.policy_lead]</code>)</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Trạng thái thanh toán hiện tại là <code>Paid</code> VÀ đã liên kết <code>Transaction ID</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thay đổi liên kết MTR transaction của thanh toán.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_paid</span>
+              <h3 class="action-vn-name">Đánh dấu đã thanh toán (Paid)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Đánh dấu đã thanh toán. Điều kiện hiển thị: Payment Status khác 'Paid'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Owner</strong> hoặc <strong>Policy Lead</strong> của yêu cầu gốc (Dot notation check: <code>[request.sr_owner]</code>, <code>[request.policy_lead]</code>)</li>
+        <li><strong>Super Admin</strong></li>
+        <li><strong>KIỂM TRA TÀI KHOẢN (CUSTOM):</strong> User (Employee ID/Email) phải thuộc danh sách <code>finance_control</code> hoặc <code>transaction_managed_by</code> của tài khoản (<code>account</code>) tương ứng với công ty (<code>my_company</code>) của Payment đó.</li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Trạng thái thanh toán (<code>payment_status</code>) KHÁC <code>Paid</code>. Đồng thời, user phải chọn giao dịch MTR hợp lệ mà mình có quyền thao tác.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cập nhật trạng thái thanh toán thành <code>Paid</code>, liên kết với MTR Transaction được chọn, tự động lấy ngày giao dịch của MTR làm ngày thanh toán (<code>payment_date</code>).</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_ready</span>
+              <h3 class="action-vn-name">Sẵn sàng thanh toán (Ready for Payment) - CHẠY NGẦM</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag disabled">
+                  BỊ TẮT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Sẵn sàng thanh toán (Luôn hiển thị).</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Ẩn trên giao diện người dùng (chỉ chạy ngầm tự động).</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Luôn trả về <code>false</code> để ẩn trên UI.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Hệ thống tự động cập nhật trạng thái thanh toán thành <code>Ready for payment</code> khi yêu cầu phê duyệt gốc được duyệt hoàn toàn.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_req_incoming_collection</span>
+              <h3 class="action-vn-name">Yêu cầu thu nợ (Request collection) - BỊ VÔ HIỆU HÓA</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag disabled">
+                  BỊ TẮT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Yêu cầu thu nợ cho khoản thu vào. Điều kiện hiển thị: Payment Type = 'Incoming' VÀ Payment Status = 'Pending payment'.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Bị vô hiệu hóa hoàn toàn trên hệ thống (cột display = false trong database).</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Khoản thanh toán có loại thu <code>payment_type = 'Incoming'</code> VÀ trạng thái <code>payment_status = 'Pending payment'</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Không có hành vi do nút bị tắt.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_req_incoming_status</span>
+              <h3 class="action-vn-name">Yêu cầu kiểm tra trạng thái thanh toán - BỊ VÔ HIỆU HÓA</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag disabled">
+                  BỊ TẮT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Yêu cầu kiểm tra trạng thái thanh toán. Điều kiện hiển thị: Payment Type = 'Incoming' VÀ Payment Status thuộc ('Draft', 'Not due yet', 'Pending payment', 'Collection working').</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Bị vô hiệu hóa hoàn toàn trên hệ thống (cột display = false trong database).</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Loại thu <code>payment_type = 'Incoming'</code> VÀ trạng thái thanh toán thuộc danh sách: <code>Draft</code>, <code>Not due yet</code>, <code>Pending payment</code>, <code>Collection working</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Không có hành vi do nút bị tắt.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_req_outgoing</span>
+              <h3 class="action-vn-name">Yêu cầu thanh toán khoản chi đi (Request payment)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Yêu cầu thanh toán cho khoản chi đi. Điều kiện hiển thị: Payment Type = 'Outgoing' VÀ Payment Status thuộc ('Draft', 'Not due yet', 'Overdue').</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Owner</strong>, <strong>Policy Lead</strong>, <strong>Requester</strong>, hoặc <strong>SR Creator</strong> của yêu cầu liên kết</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Khoản thanh toán có loại chi <code>payment_type = 'Outgoing'</code> VÀ trạng thái hiện tại <code>payment_status</code> thuộc <code>('Draft', 'Not due yet', 'Overdue')</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">
+      <ul>
+        <li>Cập nhật trạng thái thanh toán thành <code>Submitted for payment</code>.</li>
+        <li>Tạo một mã yêu cầu thanh toán mới (format: <code>RPM-DDMMYY-XX-SEQ</code>).</li>
+        <li>Tự động khởi tạo một yêu cầu mới trong bảng <code>request</code> với loại <code>RPM</code> (Payment Request), trạng thái <code>Pending Approval</code>, mô tả chi tiết giao dịch, đồng thời tự động tính toán luồng phê duyệt duyệt cấp tương ứng.</li>
+      </ul>
+    </div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="payment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">payment_update_transaction</span>
+              <h3 class="action-vn-name">Cập nhật thông tin giao dịch (Update Transaction)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">payment</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Cập nhật thông tin giao dịch. Điều kiện hiển thị: Payment Status = 'Paid' VÀ chưa liên kết Transaction ID.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">
+      <ul>
+        <li><strong>SR Owner</strong>, <strong>Policy Lead</strong>, <strong>Requester</strong>, hoặc <strong>SR Creator</strong> của yêu cầu liên kết</li>
+        <li><strong>Super Admin</strong></li>
+      </ul>
+    </div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Trạng thái thanh toán hiện tại là <code>Paid</code> VÀ chưa liên kết <code>Transaction ID</code>.</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Mở biểu mẫu cho phép cập nhật thông tin chi tiết giao dịch đã thanh toán.</div>
+            </div>
+          </div>
+        </div>
+  
+      </div>
+    </div>
+
+    <!-- CRUD ACTIONS TAB -->
+    <div id="crud-section" class="actions-section">
+      <div class="actions-grid">
+        
+        <div class="action-card" data-views="account">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_account</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Account)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">account</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new account records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>account</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="account">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_account</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Account)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">account</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete account records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>account</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="account">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_account</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Account)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">account</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit account records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>account</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="action_rules">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_action_rules</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Action Rule)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">action_rules</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new action rule records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>action_rules</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="action_rules">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_action_rules</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Action Rule)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">action_rules</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete action rule records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>action_rules</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="action_rules">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_action_rules</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Action Rule)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">action_rules</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit action rule records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>action_rules</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="comment">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_comment</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Comment)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">comment</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete a comment record</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>comment</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="company">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_company</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Company)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">company</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new company records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>company</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="company">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_company</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Company)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">company</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete company records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>company</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="company">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_company</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Company)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">company</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit company records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>company</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="contact">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_contact</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Contact)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">contact</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new contact records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>contact</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="contact">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_contact</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Contact)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">contact</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete contact records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>contact</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="contact">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_contact</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Contact)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">contact</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit contact records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>contact</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="department">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_department</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Department)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">department</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new department records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>department</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="department">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_department</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Department)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">department</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete department records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>department</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="department">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_department</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Department)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">department</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit department records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>department</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="employee">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_employee</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Employee)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">employee</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new employee records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>employee</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="employee">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_employee</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Employee)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">employee</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete employee records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>employee</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="employee">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_employee</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Employee)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">employee</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit employee records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>employee</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="employee_active">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_employee_active</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Active Employee)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">employee_active</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add active employee records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>employee_active</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="employee_active">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_employee_active</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Active Employee)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">employee_active</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete active employee records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>employee_active</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="employee_active">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_employee_active</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Active Employee)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">employee_active</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit employee records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>employee_active</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="exception_rules">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_exception_rules</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Menu Rule)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">exception_rules</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new menu exception rule records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>exception_rules</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="exception_rules">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_exception_rules</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Menu Rule)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">exception_rules</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete menu exception rule records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>exception_rules</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="exception_rules">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_exception_rules</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Menu Rule)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">exception_rules</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit menu exception rule records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>exception_rules</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_approval">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_my_approval</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Request (My Approval))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_approval</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add request from My Approval view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_approval</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_approval">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_my_approval</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Request (My Approval))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_approval</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete request in My Approval view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_approval</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_approval">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_my_approval</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Request (My Approval))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_approval</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit request in My Approval view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_approval</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_company">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_my_company</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Company (My Company))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_company</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new internal company records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_company</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_company">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_my_company</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Company (My Company))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_company</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete internal company records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_company</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_company">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_my_company</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Company (My Company))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_company</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit internal company records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_company</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_location">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_my_location</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Location)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_location</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new location records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_location</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_location">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_my_location</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Location)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_location</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete location records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_location</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_location">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_my_location</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Location)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_location</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit location records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_location</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_my_request</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Request (My Request))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Create a new request from My Requests</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_request</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Request)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new request records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content"><ul><li><strong>Động:</strong> Trường <code>sr_creater</code> trong record hiện tại</li><li><strong>Động:</strong> Trường <code>requester</code> trong record hiện tại</li></ul></div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_my_request</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Request (My Request))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete requests in My Request view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_request</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Request)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete request records. Chỉ hiển thị khi Status = Draft hoặc Cancelled.</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content"><ul><li><strong>Động:</strong> Trường <code>sr_creater</code> trong record hiện tại</li><li><strong>Động:</strong> Trường <code>requester</code> trong record hiện tại</li></ul></div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_my_request</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Request (My Request))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit requests in My Request view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_request,my_task,my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_request</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Request)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_request</span> <span class="view-tag">my_task</span> <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit request records. Hiển thị ở My Request (cho SR Creater/Requester), My Task/My Team (cho Policy Lead/SR Owner).</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_request,my_task,my_team</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_my_task</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Request (My Task))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add request from My Task view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_task</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_my_task</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Request (My Task))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete request in My Task view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_task</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_task">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_my_task</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Request (My Task))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_task</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit request in My Task view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_task</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_my_team</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Request (My Team))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_team</span>
+                <span class="status-tag disabled">
+                  BỊ TẮT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add request from My Team view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>my_team</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_my_team</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Request (My Team))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete request in My Team view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>my_team</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="my_team">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_my_team</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Request (My Team))</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">my_team</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit request in My Team view</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>my_team</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="operation_program">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_operation_program</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Program)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">operation_program</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new operation program records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>operation_program</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="operation_program">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_operation_program</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Program)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">operation_program</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete operation program records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>operation_program</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="operation_program">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_operation_program</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Program)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">operation_program</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit operation program records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>operation_program</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="opportunity_list">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_opportunity_list</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Opportunity)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">opportunity_list</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new opportunity records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>opportunity_list</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="opportunity_list">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_opportunity_list</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Opportunity)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">opportunity_list</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete opportunity records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>opportunity_list</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="opportunity_list">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_opportunity_list</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Opportunity)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">opportunity_list</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit opportunity records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>opportunity_list</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="permissions">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_permissions</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Column Permission)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">permissions</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new column permission records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>permissions</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="permissions">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_permissions</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Column Permission)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">permissions</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete column permission records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>permissions</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="permissions">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_permissions</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Column Permission)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">permissions</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit column permission records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>permissions</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="policy">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_policy</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Policy)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">policy</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new policy records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>policy</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="policy">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_policy</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Policy)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">policy</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete policy records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>policy</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="policy">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_policy</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Policy)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">policy</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit policy records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>policy</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_asset</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Asset)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new asset records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_expense</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Expense)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new expense records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_invoice</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Invoice)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new invoice records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_mtr</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Transaction)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new money transaction records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_payment</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Payment)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new payment records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content"><ul><li><strong>Động:</strong> Trường <code>Staff</code> trong record hiện tại</li></ul><div class="who-sub-specs"><div>Cấp độ nhân sự: <code>[Tier 1], [Top-Level], [Tier 2], [Tier 3]</code></div><div>Chức danh/Phòng ban: <code>[Technical]</code></div></div></div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_service</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Service)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Add new service records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_asset</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Asset)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete asset records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_expense</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Expense)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete expense records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_invoice</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Invoice)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete invoice records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_mtr</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Transaction)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete money transaction records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_payment</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Payment)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete payment records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">delete_service</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Delete Service)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Delete service records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác DELETE đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_asset</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Asset)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit asset records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_expense</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Expense)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit expense records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_invoice</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Invoice)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit invoice records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_mtr</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Transaction)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit money transaction records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_payment</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Payment)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit payment records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="request">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_service</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Service)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">request</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Edit service records</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>request</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="support">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">add_support</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Add Support Ticket)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">support</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Allow submitting support tickets</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác ADD đối với bảng dữ liệu <code>support</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+        <div class="action-card" data-views="support">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="action-id">edit_support</span>
+              <h3 class="action-vn-name">Hành động CRUD cơ bản (Edit Support Ticket)</h3>
+              <div class="action-badge-row">
+                <span class="view-tag">support</span>
+                <span class="status-tag active">
+                  ĐANG BẬT
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="action-desc" style="display:none">Allow editing support tickets</div>
+          <div class="card-body">
+            <div class="info-section">
+              <div class="info-title">Hiển thị với ai (Role / Phân quyền)</div>
+              <div class="info-content">Mọi người dùng</div>
+            </div>
+            <div class="info-section">
+              <div class="info-title">Điều kiện dữ liệu (Data Conditions)</div>
+              <div class="info-content">Không có điều kiện trạng thái dữ liệu (phụ thuộc phân quyền cột)</div>
+            </div>
+            <div class="info-section behavior-section">
+              <div class="info-title">Hành vi & Xử lý nghiệp vụ</div>
+              <div class="info-content">Cho phép thực hiện thao tác EDIT đối với bảng dữ liệu <code>support</code>.</div>
+            </div>
+          </div>
+        </div>
+  
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentTab = 'custom';
+
+    function switchTab(tab, element) {
+      currentTab = tab;
+      
+      // Update nav classes
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      element.classList.add('active');
+
+      // Update sections
+      document.querySelectorAll('.actions-section').forEach(sec => sec.classList.remove('active'));
+      document.getElementById(tab + '-section').classList.add('active');
+      
+      filterCards();
+    }
+
+    function filterCards() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      const viewFilter = document.getElementById('view-filter').value.toLowerCase();
+      
+      const activeSection = document.getElementById(currentTab + '-section');
+      const cards = activeSection.querySelectorAll('.action-card');
+
+      cards.forEach(card => {
+        const title = card.querySelector('.action-vn-name').textContent.toLowerCase();
+        const id = card.querySelector('.action-id').textContent.toLowerCase();
+        const desc = card.querySelector('.action-desc').textContent.toLowerCase();
+        const viewsStr = card.getAttribute('data-views').toLowerCase();
+
+        const matchQuery = title.includes(query) || id.includes(query) || desc.includes(query);
+        const matchView = viewFilter === '' || viewsStr.split(',').map(v => v.trim()).includes(viewFilter);
+
+        if (matchQuery && matchView) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

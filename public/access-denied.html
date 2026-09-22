@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access Denied</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #F8FAFC;
+      color: #0F172A;
+      font-family: Inter, Arial, sans-serif;
+    }
+    .panel {
+      width: min(520px, calc(100vw - 32px));
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    }
+    .icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #FEF2F2;
+      color: #DC2626;
+      font-size: 26px;
+      font-weight: 700;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+    p {
+      margin: 0 0 24px;
+      color: #64748B;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+      height: 40px;
+      padding: 0 18px;
+      border-radius: 8px;
+      background: #F97316;
+      color: #FFFFFF;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <div class="icon">!</div>
+    <h1>You do not have permission to view this content.</h1>
+    <p>Please contact your administrator if you believe this is a mistake.</p>
+    <a href="/#home">Back to Dashboard</a>
+  </main>
+</body>
+</html>

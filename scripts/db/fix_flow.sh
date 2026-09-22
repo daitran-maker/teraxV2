@@ -1,0 +1,2 @@
+#!/bin/bash
+echo 'Lee@122598' | sudo -S docker exec crc_db_standalone psql -U crc_user -d crc_db -c "UPDATE request SET approval_flow = json_build_object('total_levels', 3, 'current_level', 1, 'steps', json_build_array(json_build_object('tier', 1, 'approver', tier_1_approval, 'status', 'Pending Approval'), json_build_object('tier', 2, 'approver', tier_2_approval, 'status', 'Pending Approval'), json_build_object('tier', 3, 'approver', tier_3_approval, 'status', 'Pending Approval')), 'audit_log', json_build_array()) WHERE approval_flow IS NULL;"

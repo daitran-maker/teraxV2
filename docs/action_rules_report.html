@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>CRC Action Rules — Verification Report</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; margin: 0; padding: 24px; }
+  h1 { color: #58a6ff; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; margin-bottom: 32px; font-size: 14px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 12px; }
+  .badge-pass { background: #1a4731; color: #3fb950; border: 1px solid #238636; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .badge-fail { background: #4a1519; color: #f85149; border: 1px solid #da3633; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .card-label { font-weight: 600; font-size: 15px; flex: 1; }
+  .card-body { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .section-title { font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .btn-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn { padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+  .btn-visible { background: #1a4731; color: #3fb950; border: 1px solid #238636; }
+  .btn-expected-missing { background: #4a1519; color: #f85149; border: 1px dashed #da3633; }
+  .btn-unexpected { background: #4a1519; color: #f85149; border: 1px solid #da3633; }
+  .btn-neutral { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+  .db-info { grid-column: 1/-1; background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #8b949e; }
+  .db-info span { color: #e1e4e8; font-weight: 500; }
+  .summary { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 20px; }
+  .summary-big { font-size: 36px; font-weight: 700; }
+  .summary-big.pass { color: #3fb950; }
+  .summary-big.fail { color: #f85149; }
+</style>
+</head>
+<body>
+<h1>📋 CRC App — Action Rules Verification Report</h1>
+<p class="subtitle">Đối chiếu với action update.xlsx · 16:55:28 2/7/2026 · Login: leeanh1002@gmail.com</p>
+
+<div class="summary">
+  <div class="summary-big pass">6/6</div>
+  <div>
+    <div style="font-size:18px;font-weight:600">🎉 Tất cả test cases PASS!</div>
+    <div style="color:#8b949e;font-size:13px">Kiểm tra 6 trạng thái request × 13 action types</div>
+  </div>
+</div>
+
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-label">1. DRAFT → Submit</div>
+    <div>Request: <span style="color:#58a6ff;font-weight:600">E2E273734</span> · View: <span style="color:#e3b341">my_request</span></div>
+    <span class="badge-pass">✅ PASS</span>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="section-title">✅ Nút phải hiển thị (Expected)</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">✓ Submit</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🚫 Nút KHÔNG được hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-neutral">✓ Hidden Approve</span><span class="btn btn-neutral">✓ Hidden Request Start</span><span class="btn btn-neutral">✓ Hidden Request Closed</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">📊 Tất cả nút đang hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">▶ Submit</span>
+      </div>
+    </div>
+    <div class="db-info">
+      <strong>DB State:</strong> SR Status=<span>Draft</span> · Process=<span>?</span> · Rating=<span>null</span>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-label">2. PENDING → Withdraw (My Request)</div>
+    <div>Request: <span style="color:#58a6ff;font-weight:600">201612</span> · View: <span style="color:#e3b341">my_request</span></div>
+    <span class="badge-pass">✅ PASS</span>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="section-title">✅ Nút phải hiển thị (Expected)</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">✓ Withdraw</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🚫 Nút KHÔNG được hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-neutral">✓ Hidden Submit</span><span class="btn btn-neutral">✓ Hidden Approve</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">📊 Tất cả nút đang hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">▶ Rating (first)</span><span class="btn btn-visible">▶ Withdraw</span><span class="btn btn-visible">▶ Elements</span>
+      </div>
+    </div>
+    <div class="db-info">
+      <strong>DB State:</strong> SR Status=<span>Pending Approval</span> · Process=<span>Completed</span> · Rating=<span>null</span>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-label">3. PENDING → Approve/Reject (My Approval)</div>
+    <div>Request: <span style="color:#58a6ff;font-weight:600">APV689619</span> · View: <span style="color:#e3b341">my_approval</span></div>
+    <span class="badge-pass">✅ PASS</span>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="section-title">✅ Nút phải hiển thị (Expected)</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">✓ Approve</span><span class="btn btn-visible">✓ Reject</span><span class="btn btn-visible">✓ Change SR Owner</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🚫 Nút KHÔNG được hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-neutral">✓ Hidden Withdraw</span><span class="btn btn-neutral">✓ Hidden Submit</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">📊 Tất cả nút đang hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">▶ Reject</span><span class="btn btn-visible">▶ Change SR Owner</span><span class="btn btn-visible">▶ Approve</span>
+      </div>
+    </div>
+    <div class="db-info">
+      <strong>DB State:</strong> SR Status=<span>Pending Approval</span> · Process=<span>Not started yet</span> · Rating=<span>null</span>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-label">4. APPROVED+PROCESSING → Complete/Cancel (My Task)</div>
+    <div>Request: <span style="color:#58a6ff;font-weight:600">DBG501223</span> · View: <span style="color:#e3b341">my_task</span></div>
+    <span class="badge-pass">✅ PASS</span>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="section-title">✅ Nút phải hiển thị (Expected)</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">✓ Request Complete</span><span class="btn btn-visible">✓ Request Cancel</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🚫 Nút KHÔNG được hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-neutral">✓ Hidden Request Start</span><span class="btn btn-neutral">✓ Hidden Request Closed</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">📊 Tất cả nút đang hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">▶ Request Complete</span><span class="btn btn-visible">▶ Change SR Owner</span><span class="btn btn-visible">▶ Request Cancel</span><span class="btn btn-visible">▶ Elements</span>
+      </div>
+    </div>
+    <div class="db-info">
+      <strong>DB State:</strong> SR Status=<span>Approved</span> · Process=<span>Processing</span> · Rating=<span>null</span>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-label">5. APPROVED+COMPLETED → Closed/Rating (My Request)</div>
+    <div>Request: <span style="color:#58a6ff;font-weight:600">E2E843325</span> · View: <span style="color:#e3b341">my_request</span></div>
+    <span class="badge-pass">✅ PASS</span>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="section-title">✅ Nút phải hiển thị (Expected)</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">✓ Request Closed</span><span class="btn btn-visible">✓ Rating (first)</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🚫 Nút KHÔNG được hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-neutral">✓ Hidden Rate Again</span><span class="btn btn-neutral">✓ Hidden Submit</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">📊 Tất cả nút đang hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">▶ Rating (first)</span><span class="btn btn-visible">▶ Request Closed</span><span class="btn btn-visible">▶ Elements</span>
+      </div>
+    </div>
+    <div class="db-info">
+      <strong>DB State:</strong> SR Status=<span>Approved</span> · Process=<span>Completed</span> · Rating=<span>null</span>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-label">6. CLOSED → Rate Again (My Request)</div>
+    <div>Request: <span style="color:#58a6ff;font-weight:600">E2E284936</span> · View: <span style="color:#e3b341">my_request</span></div>
+    <span class="badge-pass">✅ PASS</span>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="section-title">✅ Nút phải hiển thị (Expected)</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">✓ Rate Again</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🚫 Nút KHÔNG được hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-neutral">✓ Hidden Rating (first)</span><span class="btn btn-neutral">✓ Hidden Submit</span><span class="btn btn-neutral">✓ Hidden Request Closed</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">📊 Tất cả nút đang hiển thị</div>
+      <div class="btn-list">
+        <span class="btn btn-visible">▶ Rate Again</span><span class="btn btn-visible">▶ Elements</span>
+      </div>
+    </div>
+    <div class="db-info">
+      <strong>DB State:</strong> SR Status=<span>Closed</span> · Process=<span>Completed</span> · Rating=<span>5</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
