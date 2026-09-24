@@ -4,6 +4,7 @@ const permissionsRouter = express.Router();
 const service = require('./identity.service');
 const repo = require('./identity.repository');
 const pool = require('../../../server/db');
+const { checkPermission, clearPermissionCache } = require('../../../server/helpers/permissionHelper');
 
 // ==================== AUTH CONTROLLER ====================
 
@@ -327,6 +328,235 @@ permissionsRouter.get('/exception-rules', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/permissions/my-slices
+permissionsRouter.get('/my-slices', async (req, res) => {
+  const user = req.user;
+  try {
+    const result = await pool.query('SELECT DISTINCT name FROM exception_rules');
+    const slices = result.rows.map(r => r.name);
+    const permissionsMap = {};
+    for (const sliceName of slices) {
+      permissionsMap[sliceName] = await checkPermission('exception_rules', sliceName, user);
+    }
+    res.json(permissionsMap);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/permissions/my-action-permissions
+permissionsRouter.get('/my-action-permissions', async (req, res) => {
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const rulesResult = await pool.query('SELECT * FROM action_rules ORDER BY id ASC');
+    const rules = rulesResult.rows;
+
+    const match = (allowedStr, userVal) => {
+      if (!allowedStr || !userVal) return false;
+      const cleanVal = String(userVal).trim().replace(/^\[|\]$/g, '').toLowerCase();
+      const allowed = (Array.isArray(allowedStr) ? allowedStr : allowedStr.split(','))
+        .map(s => String(s).trim().replace(/^\[|\]$/g, '').toLowerCase());
+      return allowed.includes(cleanVal);
+    };
+
+    const permissions = {};
+
+    for (const rule of rules) {
+      const rawActionId = (rule.action_id || '').trim();
+      if (!rawActionId) continue;
+
+      let hasAccess = false;
+      if (rule.display === false || String(rule.display).toLowerCase() === 'false') {
+        hasAccess = false;
+      } else if (user.role && user.role.toUpperCase() === 'SUPER ADMIN') {
+        hasAccess = true;
+      } else {
+        const exceptions = rule.exceptions ? rule.exceptions.split(',').map(s => s.trim()) : [];
+        const levels = rule.levels ? rule.levels.split(',').map(s => s.trim()) : [];
+        const positions = rule.positions ? rule.positions.split(',').map(s => s.trim()) : [];
+        const roles = rule.roles ? rule.roles.split(',').map(s => s.trim()) : [];
+
+        if (match(rule.exceptions, user.email) || match(rule.exceptions, user.employee_id) || match(rule.exceptions, user.username)) hasAccess = true;
+        else if (match(rule.roles, user.role)) hasAccess = true;
+        else if (rule.roles && (Array.isArray(rule.roles) ? rule.roles : rule.roles.split(',')).some(r => {
+          const clean = r.trim().toLowerCase();
+          return clean === '[requester]' || clean === '[sr_creater]' || clean === 'requester' || clean === 'sr_creater';
+        })) hasAccess = true;
+        else if (match(rule.levels, user.employee_level)) hasAccess = true;
+        else if (match(rule.positions, user.position)) hasAccess = true;
+        else if (exceptions.length === 0 && levels.length === 0 && positions.length === 0 && roles.length === 0) {
+          hasAccess = true;
+        }
+      }
+
+      // Detect CRUD action_id format: add_viewname, edit_viewname, delete_viewname
+      const crudMatch = rawActionId.match(/^(add|edit|delete)_(.+)$/i);
+      if (crudMatch) {
+        const verb = crudMatch[1].toLowerCase();      // 'add', 'edit', 'delete'
+        const viewSuffix = crudMatch[2].toLowerCase(); // e.g. 'employee', 'payment', 'request'
+
+        if (!permissions[verb]) permissions[verb] = {};
+
+        // Map the view_name column: it may differ from suffix (e.g. multi-view rules)
+        let views = [viewSuffix];
+        if (rule.view_name) {
+          views = rule.view_name.split(',').map(v => v.trim().replace(/^\[|\]$/g, '').toLowerCase());
+        }
+
+        const childTables = ['payment', 'invoice', 'mtr', 'service', 'asset', 'contract', 'target_table', 'assigned_task'];
+        for (const view of views) {
+          if (view === viewSuffix) {
+            if (permissions[verb][view] !== true) {
+              permissions[verb][view] = hasAccess;
+            }
+            const contextKey = `${viewSuffix}@${view}`;
+            if (permissions[verb][contextKey] !== true) {
+              permissions[verb][contextKey] = hasAccess;
+            }
+          } else {
+            // For child tables, store under viewSuffix (e.g., 'payment') instead of view (e.g., 'request')
+            if (childTables.includes(viewSuffix)) {
+              if (permissions[verb][viewSuffix] !== true) {
+                permissions[verb][viewSuffix] = hasAccess;
+              }
+            } else {
+              if (permissions[verb][view] !== true) {
+                permissions[verb][view] = hasAccess;
+              }
+              // Also populate viewSuffix (e.g., 'request') when rule is for virtual views like 'my_request'
+              if (permissions[verb][viewSuffix] !== true) {
+                permissions[verb][viewSuffix] = hasAccess;
+              }
+            }
+            const contextKey = `${viewSuffix}@${view}`;
+            if (permissions[verb][contextKey] !== true) {
+              permissions[verb][contextKey] = hasAccess;
+            }
+          }
+        }
+      } else {
+        // Custom action (e.g. ACT-REQUEST-03) — use action_id as key directly
+        const actionId = rawActionId.toLowerCase();
+
+        let views = ['*'];
+        if (rule.view_name) {
+          views = rule.view_name.split(',').map(v => v.trim().replace(/^\[|\]$/g, '').toLowerCase());
+        }
+
+        if (!permissions[actionId]) permissions[actionId] = {};
+
+        for (const view of views) {
+          if (permissions[actionId][view] === true) continue;
+          permissions[actionId][view] = hasAccess;
+        }
+      }
+    }
+
+    res.json(permissions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/permissions/my-columns
+permissionsRouter.get('/my-columns', async (req, res) => {
+  const user = req.user;
+
+  // If Super Admin, bypass all column restrictions (all columns allowed)
+  if (user && user.role && user.role.toUpperCase() === 'SUPER ADMIN') {
+    return res.json({});
+  }
+
+  try {
+    const cpResult = await pool.query('SELECT * FROM column_permissions WHERE deleted_at IS NULL');
+    const cols = cpResult.rows;
+
+    const levelsResult = await pool.query('SELECT * FROM permission_levels WHERE deleted_at IS NULL');
+    const positionsResult = await pool.query('SELECT * FROM permission_positions WHERE deleted_at IS NULL');
+    const rolesResult = await pool.query('SELECT * FROM permission_roles WHERE deleted_at IS NULL');
+    const exceptionsResult = await pool.query('SELECT * FROM permission_exceptions WHERE deleted_at IS NULL');
+
+    const levelsMap = {};
+    levelsResult.rows.forEach(r => {
+      if (!levelsMap[r.permission_id]) levelsMap[r.permission_id] = [];
+      levelsMap[r.permission_id].push(r.level);
+    });
+
+    const positionsMap = {};
+    positionsResult.rows.forEach(r => {
+      if (!positionsMap[r.permission_id]) positionsMap[r.permission_id] = [];
+      positionsMap[r.permission_id].push(r.position);
+    });
+
+    const rolesMap = {};
+    rolesResult.rows.forEach(r => {
+      if (!rolesMap[r.permission_id]) rolesMap[r.permission_id] = [];
+      rolesMap[r.permission_id].push(r.role);
+    });
+
+    const exceptionsMap = {};
+    exceptionsResult.rows.forEach(r => {
+      if (!exceptionsMap[r.permission_id]) exceptionsMap[r.permission_id] = [];
+      exceptionsMap[r.permission_id].push(r.email);
+    });
+
+    const deniedColumns = {};
+
+    const match = (allowedArr, userVal) => {
+      if (!allowedArr || !userVal) return false;
+      const cleanVal = String(userVal).trim().replace(/^\[|\]$/g, '').toLowerCase();
+      return allowedArr.map(s => String(s).trim().replace(/^\[|\]$/g, '').toLowerCase()).includes(cleanVal);
+    };
+
+    for (const col of cols) {
+      const pid = col.id;
+      const allowedLevels = levelsMap[pid] || [];
+      const allowedPositions = positionsMap[pid] || [];
+      const allowedRoles = rolesMap[pid] || [];
+      const allowedExceptions = exceptionsMap[pid] || [];
+
+      if (allowedLevels.length === 0 && allowedPositions.length === 0 && allowedRoles.length === 0 && allowedExceptions.length === 0) {
+        continue;
+      }
+
+      let hasAccess = false;
+      if (match(allowedExceptions, user.email) || match(allowedExceptions, user.employee_id) || match(allowedExceptions, user.username)) hasAccess = true;
+      else if (match(allowedRoles, user.role)) hasAccess = true;
+      else if (match(allowedLevels, user.employee_level)) hasAccess = true;
+      else if (match(allowedPositions, user.position)) hasAccess = true;
+
+      if (!hasAccess) {
+        if (!deniedColumns[col.table_name]) {
+          deniedColumns[col.table_name] = [];
+        }
+        deniedColumns[col.table_name].push(col.column_name);
+      }
+    }
+
+    res.json(deniedColumns);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/permissions/check-action/:actionId
+permissionsRouter.get('/check-action/:actionId', async (req, res) => {
+  const { actionId } = req.params;
+  const user = req.user;
+  const hasAccess = await checkPermission('action_rules', actionId, user);
+  res.json({ hasAccess });
+});
+
+// GET /api/permissions/check-slice/:sliceName
+permissionsRouter.get('/check-slice/:sliceName', async (req, res) => {
+  const { sliceName } = req.params;
+  const user = req.user;
+  const hasAccess = await checkPermission('exception_rules', sliceName, user);
+  res.json({ hasAccess });
 });
 
 module.exports = {

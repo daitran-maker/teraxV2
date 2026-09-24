@@ -138,7 +138,7 @@ router.get('/my-action-permissions', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const rulesResult = await pool.query('SELECT * FROM action_rules');
+    const rulesResult = await pool.query('SELECT * FROM action_rules ORDER BY id ASC');
     const rules = rulesResult.rows;
 
     const match = (allowedStr, userVal) => {
