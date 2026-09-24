@@ -97,18 +97,26 @@ function injectSetupStyles() {
   document.head.appendChild(style);
 }
 
-window.renderSetupContent = async function () {
+// ── Cache: chỉ fetch API khi cần thiết (lần đầu hoặc sau khi save) ──
+window._setupDataLoaded = false;
+
+window.renderSetupContent = async function (forceRefresh) {
   const contentEl = document.getElementById('content');
   if (!contentEl) return;
-  contentEl.innerHTML = '<div style="padding:40px;text-align:center;color:#374151;"><div class="spinner" style="margin:0 auto 12px;"></div> Đang tải thông tin thiết lập...</div>';
-  try {
-    const [statusRes, dataRes] = await Promise.all([apiGet('/system-setup/status'), apiGet('/system-setup/data')]);
-    window.setupCompleted = statusRes.setupCompleted;
-    window.setupTableCounts = statusRes.tableCounts || {};
-    window.setupWizardData = dataRes || {};
-  } catch (err) {
-    contentEl.innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;"><span class="material-symbols-rounded" style="font-size:43px;">error</span><div style="font-size:14px;font-weight:600;margin-top:10px;color:#111827;">Lỗi tải dữ liệu</div></div>';
-    return;
+
+  // Nếu chưa có data hoặc yêu cầu refresh (sau khi save) thì mới gọi API
+  if (!window._setupDataLoaded || forceRefresh) {
+    contentEl.innerHTML = '<div style="padding:40px;text-align:center;color:#374151;"><div class="spinner" style="margin:0 auto 12px;"></div> Đang tải thông tin thiết lập...</div>';
+    try {
+      const [statusRes, dataRes] = await Promise.all([apiGet('/system-setup/status'), apiGet('/system-setup/data')]);
+      window.setupCompleted = statusRes.setupCompleted;
+      window.setupTableCounts = statusRes.tableCounts || {};
+      window.setupWizardData = dataRes || {};
+      window._setupDataLoaded = true;
+    } catch (err) {
+      contentEl.innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;"><span class="material-symbols-rounded" style="font-size:43px;">error</span><div style="font-size:14px;font-weight:600;margin-top:10px;color:#111827;">Lỗi tải dữ liệu</div></div>';
+      return;
+    }
   }
   const counts = window.setupTableCounts || {};
   const comp = window.setupWizardData.company || {};
@@ -191,10 +199,12 @@ window.renderSetupContent = async function () {
 
   const mainBodyHTML = currentStep===6 ? renderStep6HTML(counts, comp) : renderCurrentStepHTML(currentStep, comp, window.setupWizardData.admin||{}, counts);
 
-  contentEl.innerHTML = '<div class="detail-scroll" style="max-width:1280px;margin:0 auto;width:100%;padding:20px 20px 60px;">'
-    + '<div style="margin-bottom:20px;">'
-    + '<h2 style="font-size:22px;font-weight:800;color:#F8FAFC;margin-bottom:4px;">Thiết lập TeraX cho doanh nghiệp của bạn</h2>'
-    + '<p style="font-size:13px;color:rgba(248,250,252,0.7);">Chỉ vài bước đơn giản để bắt đầu. Bạn có thể bỏ qua và bổ sung sau.</p>'
+  contentEl.innerHTML = '<div class="detail-scroll" style="max-width:1280px;margin:0 auto;width:100%;padding:16px 20px 60px;">'
+    // Title trong card - luôn đọc được, không chìm background
+    + '<div class="sw-card" style="padding:16px 22px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">'
+    + '<div><h2 style="font-size:17px;font-weight:800;color:#111827;margin-bottom:2px;">Thiết lập TeraX cho doanh nghiệp của bạn</h2>'
+    + '<p style="font-size:12px;color:#6B7280;">Chỉ vài bước đơn giản để bắt đầu. Bạn có thể bỏ qua và bổ sung sau.</p></div>'
+    + '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:11px;padding:4px 10px;border-radius:20px;background:#FFF7ED;color:#EA580C;border:1px solid #FED7AA;font-weight:600;">'+completedCount+'/5 bước</span></div>'
     + '</div>'
     + '<div style="display:flex;gap:20px;align-items:flex-start;">'
     + '<div style="flex:1;min-width:0;display:flex;flex-direction:column;">'
@@ -206,17 +216,19 @@ window.renderSetupContent = async function () {
     + '</div></div>';
 };
 
-window.setSetupStep = function(n){window.setupCurrentStep=Math.max(1,Math.min(6,n));renderSetupContent();};
+window.setSetupStep = function(n){window.setupCurrentStep=Math.max(1,Math.min(6,n));renderSetupContent();}; // dùng cache, không gọi API
+
 function renderCurrentStepHTML(step,comp,admin,counts){switch(step){case 1:return renderStep1HTML(comp);case 2:return renderStep2HTML(counts);case 3:return renderStep3HTML(counts);case 4:return renderStep4HTML(counts);case 5:return renderStep5HTML(comp,counts);default:return renderStep1HTML(comp);}}
 
 // ── Shared helpers ─────────────────────────────────────────────
 function swStepHeader(icon, num, title, sub) {
-  return '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #F3F4F6;">'
-    + '<div style="display:flex;align-items:center;gap:12px;">'
-    + '<div style="width:44px;height:44px;border-radius:12px;background:#FFF7ED;border:1px solid #FED7AA;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="font-size:22px;color:#f97316;">'+icon+'</span></div>'
-    + '<div><div style="font-size:11px;font-weight:600;color:#9CA3AF;margin-bottom:2px;">Bước '+num+'/5</div><h3 style="font-size:17px;font-weight:800;color:#111827;margin-bottom:3px;">'+title+'</h3><p style="font-size:12px;color:#6B7280;margin:0;">'+sub+'</p></div>'
+  // Đơn giản: chỉ title + subtitle, không có icon thừa hay nút Hướng dẫn
+  return '<div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #F3F4F6;">'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
+    + '<span style="font-size:10px;font-weight:700;color:#EA580C;background:#FFF7ED;border:1px solid #FED7AA;padding:2px 8px;border-radius:20px;">Bước '+num+'/5</span>'
     + '</div>'
-    + '<button style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;border:1px solid #E5E7EB;background:#F9FAFB;color:#374151;font-size:11.5px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">play_circle</span> Hướng dẫn</button>'
+    + '<h3 style="font-size:16px;font-weight:800;color:#111827;margin-bottom:3px;">'+title+'</h3>'
+    + '<p style="font-size:12px;color:#6B7280;margin:0;">'+sub+'</p>'
     + '</div>';
 }
 function swTabBar(tabs, activeKey, fn) {
@@ -270,7 +282,8 @@ window.saveStep1AndAdvance = async function(){
   const fn=document.getElementById('step1_fullname')?.value?.trim(),sn=document.getElementById('step1_shortname')?.value?.trim();
   if(!fn||!sn){showToast('Vui lòng điền tên đầy đủ và tên viết tắt','warning');return;}
   try{showToast('Đang lưu thông tin công ty...','info');const res=await apiPost('/system-setup/company',{company_fullname:fn,company_shortname:sn,tax_code:document.getElementById('step1_tax_code')?.value?.trim(),country:document.getElementById('step1_country')?.value,base_currency:document.getElementById('step1_currency')?.value,address:document.getElementById('step1_address')?.value?.trim(),website:document.getElementById('step1_website')?.value?.trim()});
-  if(res.success){showToast('Đã lưu thông tin công ty!','success');window.setupCurrentStep=2;await renderSetupContent();}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}
+  if(res.success){showToast('Đã lưu thông tin công ty!','success');window.setupCurrentStep=2;await renderSetupContent(true);}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}
+
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -310,11 +323,11 @@ window.addQuickDeptRow=function(){const c=document.getElementById('quick-dept-ro
 window.addCustomDeptToList=function(){const code=document.getElementById('custom_dept_code')?.value?.trim(),name=document.getElementById('custom_dept_name')?.value?.trim();if(!code||!name){showToast('Vui lòng điền đủ Mã và Tên phòng ban','warning');return;}showToast('Đã thêm phòng ban "'+name+'" ('+code+') vào danh sách','info');};
 window.saveStep2AndAdvance=async function(){
   const tab=window.setupStep2ActiveTab;
-  if(tab==='quick'){const codes=document.querySelectorAll('.qdept-code'),names=document.querySelectorAll('.qdept-name'),types=document.querySelectorAll('.qdept-type'),payload=[];codes.forEach((c,i)=>{const code=c.value.trim(),name=names[i]?.value?.trim(),type=types[i]?.value||'Operation';if(code&&name)payload.push({department_code:code,department_name:name,type});});if(!payload.length){window.setSetupStep(3);return;}try{const res=await apiPost('/system-setup/presets/departments',{departments:payload});if(res.success){showToast('Đã tạo '+res.count+' phòng ban!','success');window.setupCurrentStep=3;await renderSetupContent();}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}return;}
+  if(tab==='quick'){const codes=document.querySelectorAll('.qdept-code'),names=document.querySelectorAll('.qdept-name'),types=document.querySelectorAll('.qdept-type'),payload=[];codes.forEach((c,i)=>{const code=c.value.trim(),name=names[i]?.value?.trim(),type=types[i]?.value||'Operation';if(code&&name)payload.push({department_code:code,department_name:name,type});});if(!payload.length){window.setSetupStep(3);return;}try{const res=await apiPost('/system-setup/presets/departments',{departments:payload});if(res.success){showToast('Đã tạo '+res.count+' phòng ban!','success');window.setupCurrentStep=3;await renderSetupContent(true);}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}return;}
   const cbs=document.querySelectorAll('input[name="preset_dept"]:checked'),sels=Array.from(cbs).map(c=>c.value);
   if(!sels.length){window.setSetupStep(3);return;}
   const payload=PRESET_DEPARTMENTS.filter(d=>sels.includes(d.code)).map(d=>({department_code:d.code,department_name:d.name,type:d.type}));
-  try{showToast('Đang tạo '+payload.length+' phòng ban...','info');const res=await apiPost('/system-setup/presets/departments',{departments:payload});if(res.success){showToast('Đã tạo '+res.count+' phòng ban!','success');window.setupCurrentStep=3;await renderSetupContent();}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}
+  try{showToast('Đang tạo '+payload.length+' phòng ban...','info');const res=await apiPost('/system-setup/presets/departments',{departments:payload});if(res.success){showToast('Đã tạo '+res.count+' phòng ban!','success');window.setupCurrentStep=3;await renderSetupContent(true);}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -352,7 +365,7 @@ function renderStep3HTML(counts){
 window.addQuickEmpRow=function(){const c=document.getElementById('quick-emp-rows');if(!c)return;const d=document.createElement('div');d.style.cssText='display:grid;grid-template-columns:1fr 1fr 130px 130px auto;gap:8px;margin-bottom:8px;align-items:center;';d.innerHTML='<input type="text" class="sw-input qemp-name" placeholder="Họ và tên *"><input type="email" class="sw-input qemp-email" placeholder="Email *"><input type="text" class="sw-input qemp-dept" placeholder="Mã phòng ban"><input type="text" class="sw-input qemp-pos" placeholder="Chức danh"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button>';c.appendChild(d);};
 window.downloadEmployeeTemplate=function(){const h=['Họ và tên *','Email *','Phòng ban (Mã hoặc Tên)','Chức vụ','Email Quản lý trực tiếp'],data=[{'Họ và tên *':'Nguyễn Văn Quản Lý','Email *':'manager@company.com','Phòng ban (Mã hoặc Tên)':'KD','Chức vụ':'Trưởng phòng','Email Quản lý trực tiếp':''},{'Họ và tên *':'Trần Thị Nhân Viên','Email *':'staff@company.com','Phòng ban (Mã hoặc Tên)':'KD','Chức vụ':'Chuyên viên','Email Quản lý trực tiếp':'manager@company.com'}];const ws=XLSX.utils.json_to_sheet(data,{header:h});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'NhanVien');XLSX.writeFile(wb,'Mau_Nhan_Vien_5_Cot.xlsx');showToast('Đã tải xuống file mẫu','success');};
 window.handleEmployeeExcelUpload=function(event){const file=event.target.files[0];if(!file)return;const r=new FileReader();r.onload=(e)=>{try{const data=new Uint8Array(e.target.result),wb=XLSX.read(data,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows||!rows.length){showToast('File không có dòng dữ liệu','warning');return;}const mapped=[];for(const row of rows){const k=Object.keys(row),nk=k.find(x=>/tên|name|họ/i.test(x)),ek=k.find(x=>/email|thư/i.test(x)),dk=k.find(x=>/phòng|dept|ban/i.test(x)),pk=k.find(x=>/chức|vị trí|title|position/i.test(x)),mk=k.find(x=>/quản lý|manager/i.test(x)),fn=nk?String(row[nk]).trim():'',em=ek?String(row[ek]).trim():'';if(fn&&em)mapped.push({full_name:fn,email:em,department_code:dk?String(row[dk]).trim():'',position:pk?String(row[pk]).trim():'Nhân viên',direct_manager:mk?String(row[mk]).trim():''});}if(!mapped.length){showToast('Không tìm thấy dòng hợp lệ','warning');return;}window.setupParsedEmployees=mapped;showToast('Đã nhận diện '+mapped.length+' nhân viên','success');renderSetupContent();}catch(err){showToast('Lỗi đọc file: '+err.message,'error');}};r.readAsArrayBuffer(file);};
-window.saveStep3AndAdvance=async function(){const tab=window.setupStep3ActiveTab;if(tab==='quick'){const ns=document.querySelectorAll('.qemp-name'),es=document.querySelectorAll('.qemp-email'),ds=document.querySelectorAll('.qemp-dept'),ps=document.querySelectorAll('.qemp-pos'),p=[];ns.forEach((n,i)=>{const fn=n.value.trim(),em=es[i]?.value?.trim();if(fn&&em)p.push({full_name:fn,email:em,department_code:ds[i]?.value?.trim()||'',position:ps[i]?.value?.trim()||'Nhân viên',direct_manager:''});});if(!p.length){window.setSetupStep(4);return;}window.setupParsedEmployees=p;}const employees=window.setupParsedEmployees||[];if(!employees.length){window.setSetupStep(4);return;}try{showToast('Đang nhập '+employees.length+' nhân viên...','info');const res=await apiPost('/system-setup/import-employees',{employees});if(res.success){showToast('Đã nhập '+res.count+' nhân viên!','success');window.setupParsedEmployees=[];window.setupCurrentStep=4;await renderSetupContent();}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
+window.saveStep3AndAdvance=async function(){const tab=window.setupStep3ActiveTab;if(tab==='quick'){const ns=document.querySelectorAll('.qemp-name'),es=document.querySelectorAll('.qemp-email'),ds=document.querySelectorAll('.qemp-dept'),ps=document.querySelectorAll('.qemp-pos'),p=[];ns.forEach((n,i)=>{const fn=n.value.trim(),em=es[i]?.value?.trim();if(fn&&em)p.push({full_name:fn,email:em,department_code:ds[i]?.value?.trim()||'',position:ps[i]?.value?.trim()||'Nhân viên',direct_manager:''});});if(!p.length){window.setSetupStep(4);return;}window.setupParsedEmployees=p;}const employees=window.setupParsedEmployees||[];if(!employees.length){window.setSetupStep(4);return;}try{showToast('Đang nhập '+employees.length+' nhân viên...','info');const res=await apiPost('/system-setup/import-employees',{employees});if(res.success){showToast('Đã nhập '+res.count+' nhân viên!','success');window.setupParsedEmployees=[];window.setupCurrentStep=4;await renderSetupContent(true);}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
 
 // ─────────────────────────────────────────────────────────────
 //  STEP 4: QUY TRÌNH
@@ -414,7 +427,7 @@ function renderStep4HTML(counts){
   }
   return '<div class="sw-card">'+swStepHeader('policy',4,'Thiết lập quy trình','Chọn quy trình mẫu phù hợp hoặc tự tạo theo nhu cầu doanh nghiệp.')+swTabBar([{key:'library',label:'Chọn từ thư viện mẫu'},{key:'create',label:'Tạo quy trình mới'},{key:'excel',label:'Nhập từ Excel'},{key:'manage',label:'Quản lý'}],tab,'window.switchStep4Tab')+tc+swBottomNav(3,5,'Tạo các quy trình đã chọn','saveStep4AndAdvance()')+'</div>';
 }
-window.saveStep4AndAdvance=async function(){const tab=window.setupStep4ActiveTab;if(tab==='create'){const name=document.getElementById('new_policy_name')?.value?.trim();if(!name){showToast('Vui lòng nhập tên quy trình','warning');return;}const p=[{policy_name:name,policy_type:document.getElementById('new_policy_type')?.value||'Operation',description:document.getElementById('new_policy_desc')?.value?.trim()||name,elements:'ASSIGN_TASK',sla:parseInt(document.getElementById('new_policy_sla')?.value)||3}];try{const res=await apiPost('/system-setup/presets/policies',{policies:p});if(res.success){showToast('Đã tạo quy trình "'+name+'"!','success');window.setupCurrentStep=5;await renderSetupContent();}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}return;}const cbs=document.querySelectorAll('input[name="preset_policy"]:checked'),sels=Array.from(cbs).map(c=>c.value);if(!sels.length){window.setSetupStep(5);return;}const payload=PRESET_POLICIES_FULL.filter(p=>sels.includes(p.id)).map(p=>({policy_name:p.name,policy_type:p.type,description:p.descVi||p.name,elements:p.elements,sla:p.sla}));try{showToast('Đang khởi tạo '+payload.length+' quy trình...','info');const res=await apiPost('/system-setup/presets/policies',{policies:payload});if(res.success){showToast('Đã tạo '+res.count+' quy trình!','success');window.setupCurrentStep=5;await renderSetupContent();}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
+window.saveStep4AndAdvance=async function(){const tab=window.setupStep4ActiveTab;if(tab==='create'){const name=document.getElementById('new_policy_name')?.value?.trim();if(!name){showToast('Vui lòng nhập tên quy trình','warning');return;}const p=[{policy_name:name,policy_type:document.getElementById('new_policy_type')?.value||'Operation',description:document.getElementById('new_policy_desc')?.value?.trim()||name,elements:'ASSIGN_TASK',sla:parseInt(document.getElementById('new_policy_sla')?.value)||3}];try{const res=await apiPost('/system-setup/presets/policies',{policies:p});if(res.success){showToast('Đã tạo quy trình "'+name+'"!','success');window.setupCurrentStep=5;await renderSetupContent(true);}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}return;}const cbs=document.querySelectorAll('input[name="preset_policy"]:checked'),sels=Array.from(cbs).map(c=>c.value);if(!sels.length){window.setSetupStep(5);return;}const payload=PRESET_POLICIES_FULL.filter(p=>sels.includes(p.id)).map(p=>({policy_name:p.name,policy_type:p.type,description:p.descVi||p.name,elements:p.elements,sla:p.sla}));try{showToast('Đang khởi tạo '+payload.length+' quy trình...','info');const res=await apiPost('/system-setup/presets/policies',{policies:payload});if(res.success){showToast('Đã tạo '+res.count+' quy trình!','success');window.setupCurrentStep=5;await renderSetupContent(true);}else showToast(res.error||'Lỗi','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
 
 // ─────────────────────────────────────────────────────────────
 //  STEP 5: TÀI KHOẢN TIỀN
@@ -439,7 +452,7 @@ function renderStep5HTML(comp,counts){
     +'<div style="display:flex;gap:10px;align-items:center;"><button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(6)">Bỏ qua bước này</button><button type="submit" class="sw-btn-primary"><span>Lưu và xem tổng kết</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button></div>'
     +'</div></form></div>';
 }
-window.saveStep5AndAdvance=async function(){const an=document.getElementById('step5_account_name')?.value?.trim(),bn=document.getElementById('step5_bank_name')?.value?.trim(),num=document.getElementById('step5_account_number')?.value?.trim(),cur=document.getElementById('step5_currency')?.value||'VND',cc=document.getElementById('step5_create_cash')?.checked??true;try{showToast('Đang lưu tài khoản...','info');const res=await apiPost('/system-setup/quick-account',{account_name:an,bank_name:bn,account_number:num,currency:cur,create_cash:cc});if(res.success){showToast('Đã thiết lập tài khoản!','success');window.setupCurrentStep=6;await renderSetupContent();}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
+window.saveStep5AndAdvance=async function(){const an=document.getElementById('step5_account_name')?.value?.trim(),bn=document.getElementById('step5_bank_name')?.value?.trim(),num=document.getElementById('step5_account_number')?.value?.trim(),cur=document.getElementById('step5_currency')?.value||'VND',cc=document.getElementById('step5_create_cash')?.checked??true;try{showToast('Đang lưu tài khoản...','info');const res=await apiPost('/system-setup/quick-account',{account_name:an,bank_name:bn,account_number:num,currency:cur,create_cash:cc});if(res.success){showToast('Đã thiết lập tài khoản!','success');window.setupCurrentStep=6;await renderSetupContent(true);}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
 
 // ─────────────────────────────────────────────────────────────
 //  STEP 6: SUCCESS SCREEN
