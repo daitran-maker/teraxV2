@@ -534,13 +534,16 @@ function formatProcessLabel(r) {
     }
   }
   const pid = r.policy_id || r.ticket_type_id || r.id || '';
-  let name = r.policy_name || r.ticket_name || r.name || r.description || '';
+  let name = r.policy_name || r.ticket_name || r.name || '';
   if (typeof name === 'string' && name.toUpperCase().startsWith('OPPORTUNITY')) {
     name = 'Opportunity';
   }
   if (!name) {
     const contractTypeMap = { '69': 'Selling', '70': 'Buying', '71': 'Internal' };
-    name = contractTypeMap[pid] || pid;
+    name = contractTypeMap[pid] || '';
+  }
+  if (!name && r.description) {
+    name = r.description;
   }
   if (pid && name && String(pid) !== String(name)) {
     return `${pid} | ${name}`;

@@ -832,7 +832,9 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
       } else if (optionsFrom === 'my_company' || optionsFrom === 'company') {
         lbl = window.formatCompanyLabel ? window.formatCompanyLabel(o) : lbl;
       } else if (optionsFrom === 'policy' || optionsFrom === 'helpdesk_policy') {
-        lbl = window.formatProcessLabel ? window.formatProcessLabel(o) : lbl;
+        const pid = (typeof o === 'object' && o) ? (o.policy_id || o.ticket_type_id || o.id || '') : '';
+        const pName = (typeof o === 'object' && o) ? (o.policy_name || o.ticket_name || o.name || '') : '';
+        lbl = (pid && pName) ? `${pid} | ${pName}` : (window.formatProcessLabel ? window.formatProcessLabel(o) : lbl);
       }
       return { value: String(val).trim().replace(/^\[|\]$/g, ''), label: String(lbl) };
     });
@@ -1085,7 +1087,13 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         } else if (sourceKey === 'my_company' || sourceKey === 'company') {
           ol = window.formatCompanyLabel ? window.formatCompanyLabel(o) : ol;
         } else if (sourceKey === 'policy' || sourceKey === 'helpdesk_policy') {
-          ol = window.formatProcessLabel ? window.formatProcessLabel(o) : ol;
+          const pid = o.policy_id || o.ticket_type_id || o.id || '';
+          const pName = o.policy_name || o.ticket_name || o.name || '';
+          if (pid && pName) {
+            ol = `${pid} | ${pName}`;
+          } else {
+            ol = window.formatProcessLabel ? window.formatProcessLabel(o) : ol;
+          }
         } else if (sourceKey === 'operation_program' && MODULES[sourceKey] && MODULES[sourceKey].displayName) {
           ol = MODULES[sourceKey].displayName(o);
         } else if (sourceKey === 'oppotunity' || sourceKey === 'opportunity') {

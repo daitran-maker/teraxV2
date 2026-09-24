@@ -740,10 +740,11 @@ window.handleRequestCompanyChange = async function () {
 
     typeEl.innerHTML = '<option value="">-- Select --</option>' +
       filteredPolicies.map(p => {
-        const lbl = window.formatProcessLabel(p);
         const pType = p.policy_type || '';
         const pName = p.policy_name || p.ticket_name || p.name || '';
         const pDesc = p.description || '';
+        const pid = p.policy_id || p.id || '';
+        const lbl = (pid && pName) ? `${pid} | ${pName}` : (window.formatProcessLabel ? window.formatProcessLabel(p) : (pName || pid || ''));
         return `<option value="${p.policy_id}" data-type="${escapeHTML(pType)}" data-name="${escapeHTML(pName)}" data-desc="${escapeHTML(pDesc)}">${escapeHTML(lbl)}</option>`;
       }).join('');
 
