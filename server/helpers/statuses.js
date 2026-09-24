@@ -25,7 +25,8 @@ const STATUS = {
       draft: 30,
       ready_for_payment: 31,
       paid: 32,
-      deleted: 33
+      deleted: 33,
+      submitted_for_payment: 121
     },
     payment_type: {
       incoming: 60,
@@ -83,6 +84,7 @@ const STATUS = {
     status: {
       draft: 26,
       pending: 27,
+      active: 27,
       in_progress: 28,
       completed: 29,
       not_started_yet: 26,
@@ -234,7 +236,9 @@ function resolveStatusId(tableName, columnName, value) {
     lookupVal = 'active';
   } else if (lookupVal === 'processing') {
     if (col === 'sr_status' && table === 'ticket') lookupVal = 'in_progress';
-  } else if (lookupVal === 'submitted_for_payment' || lookupVal === 'ready_for_payment') {
+  } else if (lookupVal === 'submitted_for_payment') {
+    if (col === 'payment_status') lookupVal = 'submitted_for_payment';
+  } else if (lookupVal === 'ready_for_payment') {
     if (col === 'payment_status') lookupVal = 'ready_for_payment';
   } else if (lookupVal === 'pending_payment' || lookupVal === 'not_due_yet' || lookupVal === 'overdue') {
     if (col === 'payment_status') lookupVal = 'ready_for_payment';
@@ -362,6 +366,7 @@ const fallbackCatalog = {
   31: { key: 'ready_for_payment', color: '#3b82f6', table: 'payment', column: 'payment_status' },
   32: { key: 'paid', color: '#10b981', table: 'payment', column: 'payment_status' },
   33: { key: 'deleted', color: '#ef4444', table: 'payment', column: 'payment_status' },
+  121: { key: 'submitted_for_payment', color: '#f59e0b', table: 'payment', column: 'payment_status' },
 
   // invoice.invoice_status
   34: { key: 'draft', color: '#64748b', table: 'invoice', column: 'invoice_status' },

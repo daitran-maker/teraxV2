@@ -190,10 +190,13 @@ function handleRealTimeUpdate(payload) {
         if (targetTable === table) {
           isMatch = record && pkField && String(record[pkField]) === String(currentRecord[pkField]);
         } else if (isChildTable) {
-          const parentRef = record.request || record.parent_id || record[actualModule];
+          const parentRef = record.request || record.parent_id || record[actualModule] || record[actualModule + '_id'] || record.contract_id || record.contract;
           isMatch = parentRef && pkField && String(parentRef) === String(currentRecord[pkField]);
         }
         if (isMatch) {
+          if (isChildTable && typeof clearChildTableCache === 'function') {
+            clearChildTableCache(table, currentModule, currentRecord[pkField]);
+          }
           // Gently refresh detail view if user is not typing
           const activeEl = document.activeElement;
           if (!(activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable))) {

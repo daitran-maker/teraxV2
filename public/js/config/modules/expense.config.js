@@ -32,7 +32,7 @@
     fields: [
       { section: 'expense details' },
       { key: 'description', label: 'DESCRIPTION', type: 'textarea', full: true, required: true },
-      { key: 'id__request', label: 'REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', full: true, onchange: 'handleExpenseRequestChange()' },
+      { key: 'id__request', label: 'REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', full: true, onchange: 'handleExpenseRequestChange()', hidden: true },
       { key: 'id__employee', label: 'EMPLOYEE', type: 'select', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
       { key: 'id__my_company', label: 'MY COMPANY', labelKey: 'col.my_company', type: 'select', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname' },
       { section: 'financial values' },

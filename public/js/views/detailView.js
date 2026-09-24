@@ -3513,7 +3513,11 @@ function buildDetailViewHTML(moduleKey, record) {
             }
           }
         }
-        const initialObj = { [foreignKey]: foreignVal };
+        const initialObj = { 
+          [foreignKey]: foreignVal,
+          _parent_module: moduleKey,
+          _parent_foreign_key: foreignKey
+        };
         if (childKey === 'expense') {
           const reqDate = record?.sr_created_date || record?.created_date || record?.created_at;
           if (reqDate) {

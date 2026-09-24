@@ -54,6 +54,8 @@ function convertStatusFieldsToIds(tableName, data) {
         const resolvedId = resolveStatusId(table, columnName, data[columnName]);
         if (resolvedId !== null) {
           data[columnName] = resolvedId;
+        } else if (table === 'service' && columnName === 'status') {
+          data[columnName] = 26; // draft
         }
       }
     }
@@ -4290,12 +4292,32 @@ router.put('/:tableName/:id', async (req, res) => {
       const dynamicApprovalAutomationId = 'app_dynamic_request_approval_sync_payment_invoice';
       if (isNowApproved && !wasApproved && await isAutomationActive(dynamicApprovalAutomationId)) {
         const requestType = String(updatedRecord.request_type || '');
-        if (requestType === '5' || requestType === 'RPM') {
+        if (requestType === '5' || requestType.toUpperCase() === 'RPM') {
           try {
+            // Auto-complete request if not already completed
+            if (Number(updatedRecord.process_status) !== 9) {
+              await pool.query(
+                `UPDATE request SET process_status = 9, process_start_date = COALESCE(process_start_date, CURRENT_TIMESTAMP), process_end_date = CURRENT_TIMESTAMP WHERE request_id = $1`,
+                [updatedRecord.request_id]
+              );
+            }
             const automationRes = await pool.query(
-              `UPDATE "payment" SET payment_status = 31, updated_by = $2 WHERE payment_request = $1`,
+              `UPDATE "payment" 
+               SET payment_status = 31, updated_by = $2, updated_date = CURRENT_TIMESTAMP 
+               WHERE payment_request = $1 OR (request = $1 AND payment_status IN (30, 121))
+               RETURNING payment_id, request, contract_id`,
               [updatedRecord.request_id, userEmployeeId]
             );
+            automationRes.rows.forEach(pRow => {
+              try {
+                broadcastSSE('db_change', {
+                  action: 'update',
+                  table: 'payment',
+                  id: pRow.payment_id,
+                  record: { payment_id: pRow.payment_id, payment_status: 31, request: pRow.request || updatedRecord.request_id, contract_id: pRow.contract_id }
+                });
+              } catch (bErr) {}
+            });
             await logAutomationRun(dynamicApprovalAutomationId, {
               table_name: 'payment',
               record_id: updatedRecord.request_id,

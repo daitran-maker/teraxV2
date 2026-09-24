@@ -457,6 +457,11 @@ app.use('/api/backup', require('./routes/backup'));
 app.use('/api/automations', require('./routes/automations'));
 
 // Fallback: serve index.html for all non-API routes
+// 404 handler for unmatched API routes
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });

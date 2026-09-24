@@ -83,14 +83,14 @@ const paymentSchema = z.object({
 // Schema for Service validation
 const serviceSchema = z.object({
   service_name: z.string().optional().nullable(),
-  service_type: z.string().optional().nullable(),
+  service_type: z.union([z.string(), z.number()]).optional().nullable(),
   start_date: z.string().optional().nullable(),
   end_date: z.string().optional().nullable(),
   service_id: z.union([z.string(), z.number()]).optional().nullable(),
   request: z.union([z.string(), z.number()]).optional().nullable(),
   status: z.union([z.number(), z.string()]).optional().nullable(),
   note: z.string().optional().nullable(),
-  fy: z.string().optional().nullable(),
+  fy: z.union([z.string(), z.number()]).optional().nullable(),
   my_company: z.union([z.string(), z.number()]).optional().nullable()
 }).passthrough();
 

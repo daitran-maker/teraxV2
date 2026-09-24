@@ -1,4 +1,4 @@
-﻿const pool = require('../../db');
+const pool = require('../../db');
 
 class IdentityRepository {
   /**
@@ -33,6 +33,32 @@ class IdentityRepository {
   async updatePassword(employeeId, hashedPassword) {
     const query = `UPDATE employee SET password = $1 WHERE employee_id = $2 RETURNING employee_id`;
     const res = await pool.query(query, [hashedPassword, employeeId]);
+    return res.rows[0] || null;
+  }
+
+  async getActiveEmployeesForSwitch() {
+    const query = `
+      SELECT employee_id, username, full_name, email, role, position, employee_level
+      FROM employee
+      WHERE (status = 17 OR status IS NULL)
+        AND deleted_at IS NULL
+        AND COALESCE(app_user_enabled, true) = true
+      ORDER BY full_name NULLS LAST, employee_id
+    `;
+    const res = await pool.query(query);
+    return res.rows;
+  }
+
+  async findActiveEmployeeById(employeeId) {
+    const query = `
+      SELECT employee_id, username, full_name, nick_name, email, role, employee_level, position, department_id, company_id, app_user_enabled, status
+      FROM employee
+      WHERE employee_id = $1
+        AND (status = 17 OR status IS NULL)
+        AND deleted_at IS NULL
+      LIMIT 1
+    `;
+    const res = await pool.query(query, [employeeId]);
     return res.rows[0] || null;
   }
 

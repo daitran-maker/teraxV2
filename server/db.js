@@ -3286,6 +3286,7 @@ async function migrateStatusCatalogAndTypes() {
         (31, 'payment', 'payment_status', 'ready_for_payment', 'Sẵn sàng thanh toán', 'Ready for payment', '#3b82f6'),
         (32, 'payment', 'payment_status', 'paid', 'Đã thanh toán', 'Paid', '#10b981'),
         (33, 'payment', 'payment_status', 'deleted', 'Đã xóa', 'Deleted', '#ef4444'),
+        (121, 'payment', 'payment_status', 'submitted_for_payment', 'Chờ duyệt thanh toán', 'Submitted for payment', '#f59e0b'),
         (34, 'invoice', 'invoice_status', 'draft', 'Bản nháp', 'Draft', '#64748b'),
         (35, 'invoice', 'invoice_status', 'ready_to_issue', 'Sẵn sàng xuất', 'Ready to issue', '#3b82f6'),
         (36, 'invoice', 'invoice_status', 'issued', 'Đã xuất', 'Issued', '#3b82f6'),

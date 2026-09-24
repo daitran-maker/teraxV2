@@ -1,4 +1,4 @@
-﻿const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const repo = require('./identity.repository');
@@ -140,6 +140,42 @@ class IdentityService {
     const hashed = await bcrypt.hash(newPassword, 10);
     await repo.updatePassword(user.employee_id, hashed);
     return true;
+  }
+
+  async getSwitchUsers() {
+    return await repo.getActiveEmployeesForSwitch();
+  }
+
+  async switchUser(targetEmployeeId) {
+    if (!targetEmployeeId) {
+      throw new Error('Missing employee_id.');
+    }
+
+    const user = await repo.findActiveEmployeeById(targetEmployeeId);
+    if (!user) {
+      throw new Error('User not found or inactive.');
+    }
+
+    if (user.app_user_enabled === false) {
+      throw new Error('This account has been disabled.');
+    }
+
+    const token = this.createAuthToken(user);
+    return {
+      token,
+      user: {
+        employee_id: user.employee_id,
+        username: user.username,
+        full_name: user.full_name,
+        nick_name: user.nick_name,
+        email: user.email,
+        role: user.role,
+        employee_level: user.employee_level,
+        position: user.position,
+        company_id: user.company_id,
+        department_id: user.department_id
+      }
+    };
   }
 
   // Permission evaluation delegate

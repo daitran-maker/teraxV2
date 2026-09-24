@@ -304,7 +304,7 @@ const ACTION_LOGIC = {
     when: (r) => {
       const pType = getRecordStatusId(r, 'payment', 'payment_type');
       const pStatus = getRecordStatusId(r, 'payment', 'payment_status');
-      return pType === 61 && pStatus === 30; // 61=Outgoing, 30=Draft
+      return pType === 61 && pStatus === 30 && (!r.payment_request || String(r.payment_request).trim() === ''); // 61=Outgoing, 30=Draft, haven't submitted request yet
     }
   },
   'payment_paid': {

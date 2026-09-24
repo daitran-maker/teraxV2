@@ -1590,25 +1590,62 @@ router.post('/execute', async (req, res) => {
           updateClauses.push(`sr_status = $${valIdx++}`);
           values.push(finalSrStatusId);
 
+          const reqTypeStr = String(record.request_type || '');
+          const isPaymentReq = reqTypeStr === '5' || reqTypeStr.toUpperCase() === 'RPM';
+
+          // Approval-only requests (like Payment Request): auto-complete without requiring manual Start -> Completed
+          if (isPaymentReq && Number(finalSrStatusId) === 3) {
+            updateClauses.push(`process_status = 9`); // 9 = Completed
+            updateClauses.push(`process_start_date = COALESCE(process_start_date, CURRENT_TIMESTAMP)`);
+            updateClauses.push(`process_end_date = CURRENT_TIMESTAMP`);
+            logUpdates.push({ timestamp: new Date().toISOString(), user: user.employee_id, action: 'approved and auto-completed request' });
+          }
+
           // Automation: Update linked payment or invoice status when request is approved
-          const requestType = record.request_type;
-          if (requestType === '5' || requestType === 'RPM') {
+          if (isPaymentReq) {
             try {
-              await client.query(
-                `UPDATE "payment" SET payment_status = 31 WHERE request = $1 OR payment_request = $1`,
+              const payUpdateRes = await client.query(
+                `UPDATE "payment" 
+                 SET payment_status = 31, updated_date = CURRENT_TIMESTAMP 
+                 WHERE payment_request = $1 OR (request = $1 AND payment_status IN (30, 121))
+                 RETURNING payment_id, request, contract_id`,
                 [record.request_id]
               );
-              console.log(`[Automation] Updated payment for request ${record.request_id} to Ready for payment`);
+              console.log(`[Automation] Updated payment for request ${record.request_id} to Ready for payment (${payUpdateRes.rowCount} rows)`);
+              payUpdateRes.rows.forEach(pRow => {
+                try {
+                  broadcastSSE('db_change', {
+                    action: 'update',
+                    table: 'payment',
+                    id: pRow.payment_id,
+                    record: { payment_id: pRow.payment_id, payment_status: 31, request: pRow.request || record.request_id, contract_id: pRow.contract_id }
+                  });
+                } catch (bErr) {
+                  console.warn('Failed to broadcast SSE for payment status update:', bErr);
+                }
+              });
             } catch (e) {
               console.error('[Automation Error] Payment update failed:', e);
             }
-          } else if (requestType === '12') {
+          } else if (reqTypeStr === '12' || reqTypeStr.toUpperCase() === 'INV') {
             try {
-              await client.query(
-                `UPDATE "invoice" SET invoice_status = 35 WHERE request = $1 OR invoice_request = $1`,
+              const invUpdateRes = await client.query(
+                `UPDATE "invoice" SET invoice_status = 35, updated_date = CURRENT_TIMESTAMP WHERE request = $1 OR invoice_request = $1 RETURNING invoice_id, request`,
                 [record.request_id]
               );
-              console.log(`[Automation] Updated invoice for request ${record.request_id} to Ready to issue`);
+              console.log(`[Automation] Updated invoice for request ${record.request_id} to Ready to issue (${invUpdateRes.rowCount} rows)`);
+              invUpdateRes.rows.forEach(iRow => {
+                try {
+                  broadcastSSE('db_change', {
+                    action: 'update',
+                    table: 'invoice',
+                    id: iRow.invoice_id,
+                    record: { invoice_id: iRow.invoice_id, invoice_status: 35, request: iRow.request || record.request_id }
+                  });
+                } catch (bErr) {
+                  console.warn('Failed to broadcast SSE for invoice status update:', bErr);
+                }
+              });
             } catch (e) {
               console.error('[Automation Error] Invoice update failed:', e);
             }
@@ -1648,6 +1685,32 @@ router.post('/execute', async (req, res) => {
           `UPDATE request SET ${updateClauses.join(', ')} WHERE request_id = $1`,
           rejectValues
         );
+
+        // If Payment Request is rejected, revert linked payment back to Draft (30) and clear payment_request so user can edit and re-submit
+        const reqTypeStr = String(record.request_type || '');
+        if (reqTypeStr === '5' || reqTypeStr.toUpperCase() === 'RPM') {
+          try {
+            const payRevertRes = await client.query(
+              `UPDATE "payment" 
+               SET payment_status = 30, payment_request = NULL, updated_date = CURRENT_TIMESTAMP 
+               WHERE payment_request = $1
+               RETURNING payment_id, request, contract_id`,
+              [record.request_id]
+            );
+            payRevertRes.rows.forEach(pRow => {
+              try {
+                broadcastSSE('db_change', {
+                  action: 'update',
+                  table: 'payment',
+                  id: pRow.payment_id,
+                  record: { payment_id: pRow.payment_id, payment_status: 30, payment_request: null, request: pRow.request, contract_id: pRow.contract_id }
+                });
+              } catch (e) {}
+            });
+          } catch (e) {
+            console.error('[Reject Automation Error] Payment revert failed:', e);
+          }
+        }
       }
     } else if (action_id === 'ACT-REQUEST-05') {
       // Cancel
@@ -1657,6 +1720,32 @@ router.post('/execute', async (req, res) => {
         `UPDATE request SET sr_status = 5, process_status = 117, sr_close_date = CURRENT_TIMESTAMP, log = COALESCE(log, '[]'::jsonb) || $2::jsonb WHERE request_id = $1`,
         [record_id, JSON.stringify([logEntry])]
       );
+
+      // If Payment Request is cancelled, revert linked payment back to Draft (30) and clear payment_request
+      const reqTypeStr = String(record.request_type || '');
+      if (reqTypeStr === '5' || reqTypeStr.toUpperCase() === 'RPM') {
+        try {
+          const payRevertRes = await client.query(
+            `UPDATE "payment" 
+             SET payment_status = 30, payment_request = NULL, updated_date = CURRENT_TIMESTAMP 
+             WHERE payment_request = $1
+             RETURNING payment_id, request, contract_id`,
+            [record_id]
+          );
+          payRevertRes.rows.forEach(pRow => {
+            try {
+              broadcastSSE('db_change', {
+                action: 'update',
+                table: 'payment',
+                id: pRow.payment_id,
+                record: { payment_id: pRow.payment_id, payment_status: 30, payment_request: null, request: pRow.request, contract_id: pRow.contract_id }
+              });
+            } catch (e) {}
+          });
+        } catch (e) {
+          console.error('[Cancel Automation Error] Payment revert failed:', e);
+        }
+      }
     } else if (action_id === 'ACT-REQUEST-06') {
       // Closed — also saves rating if provided via req.body.data
       const closedData = req.body.data || {};
@@ -1825,12 +1914,23 @@ router.post('/execute', async (req, res) => {
       });
       const newPaymentReqId = `${prefix}${maxSeq + 1}`;
 
-      // Update payment status và payment_request ID
+      // Update payment status (121: Submitted for payment) và payment_request ID
       await client.query(`
         UPDATE payment 
-        SET payment_status = $1, payment_request = $2 
-        WHERE payment_id = $3
-      `, [newPaymentStatusId, newPaymentReqId, record_id]);
+        SET payment_status = 121, payment_request = $1, updated_date = CURRENT_TIMESTAMP 
+        WHERE payment_id = $2
+      `, [newPaymentReqId, record_id]);
+
+      try {
+        broadcastSSE('db_change', {
+          action: 'update',
+          table: 'payment',
+          id: record_id,
+          record: { payment_id: record_id, payment_status: 121, payment_request: newPaymentReqId, request: record.request, contract_id: record.contract_id }
+        });
+      } catch (sseErr) {
+        console.warn('Failed to broadcast SSE for payment status update:', sseErr);
+      }
 
       // Tạo request mới cho payment này
       let partyName = '';

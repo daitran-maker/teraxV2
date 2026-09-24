@@ -622,6 +622,7 @@ window.duplicateRecord = async function (moduleKey, pkVal) {
   } else if (moduleKey === 'expense') {
     delete initialData.expense_id;
   } else if (moduleKey === 'asset') {
+    delete initialData.office_asset_id;
     delete initialData.asset_id;
   } else if (moduleKey === 'service') {
     delete initialData.service_id;

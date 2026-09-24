@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const authRouter = express.Router();
 const permissionsRouter = express.Router();
 const service = require('./identity.service');
@@ -36,6 +36,26 @@ authRouter.post('/google-login', async (req, res) => {
   }
 });
 
+function getTokenFromReq(req) {
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) return authHeader.split(' ')[1];
+  return req.query.token || null;
+}
+
+function requireCurrentToken(req, res) {
+  const token = getTokenFromReq(req);
+  if (!token) {
+    res.status(401).json({ error: 'Auth token missing' });
+    return null;
+  }
+  const decoded = service.verifyToken(token);
+  if (!decoded) {
+    res.status(401).json({ error: 'Invalid or expired token' });
+    return null;
+  }
+  return decoded;
+}
+
 // GET /api/auth/me
 authRouter.get('/me', async (req, res) => {
   try {
@@ -67,17 +87,129 @@ authRouter.get('/me', async (req, res) => {
   }
 });
 
+// GET /api/auth/switch-users
+authRouter.get('/switch-users', async (req, res) => {
+  if (!requireCurrentToken(req, res)) return;
+
+  try {
+    const users = await service.getSwitchUsers();
+    res.json({ data: users });
+  } catch (err) {
+    console.error('Switch users list error:', err);
+    res.status(500).json({ error: 'Could not load users.' });
+  }
+});
+
+// POST /api/auth/switch-user
+authRouter.post('/switch-user', async (req, res) => {
+  if (!requireCurrentToken(req, res)) return;
+
+  const { employee_id } = req.body || {};
+  if (!employee_id) {
+    return res.status(400).json({ error: 'Missing employee_id.' });
+  }
+
+  try {
+    const result = await service.switchUser(employee_id);
+    res.json(result);
+  } catch (err) {
+    console.error('Switch user error:', err);
+    const status = err.message.includes('not found') ? 404 : (err.message.includes('disabled') ? 403 : 500);
+    res.status(status).json({ error: err.message || 'Could not switch user.' });
+  }
+});
+
 // POST /api/auth/change-password
 authRouter.post('/change-password', async (req, res) => {
   try {
-    const user = req.user;
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const user = req.user || requireCurrentToken(req, res);
+    if (!user) return;
 
-    const { old_password, new_password } = req.body;
-    await service.changePassword(user.employee_id, old_password, new_password);
+    const oldPassword = req.body.oldPassword || req.body.old_password;
+    const newPassword = req.body.newPassword || req.body.new_password;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp mật khẩu cũ và mật khẩu mới.' });
+    }
+
+    await service.changePassword(user.employee_id, oldPassword, newPassword);
     res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/auth/magic-login
+authRouter.get('/magic-login', async (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(400).json({ error: 'Magic link token missing' });
+  }
+
+  try {
+    const decoded = service.verifyToken(token);
+    if (!decoded || !decoded.email) {
+      return res.status(401).json({ error: 'Invalid or expired magic link' });
+    }
+
+    const user = await repo.findEmployeeForAuth(decoded.email);
+    if (!user) {
+      return res.status(404).json({ error: 'User for magic link not found' });
+    }
+
+    const authToken = service.createAuthToken(user);
+    res.json({
+      message: 'Magic Link login successful',
+      token: authToken,
+      user
+    });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid or expired magic link' });
+  }
+});
+
+// GET /api/auth/google/sso-callback
+authRouter.get('/google/sso-callback', async (req, res) => {
+  const { sso_token } = req.query;
+  if (!sso_token) {
+    return res.status(400).send('<h3>SSO Token missing</h3>');
+  }
+
+  try {
+    const ssoData = JSON.parse(Buffer.from(sso_token, 'base64').toString('utf-8'));
+    const targetEmail = ssoData.email;
+
+    if (!targetEmail) {
+      return res.status(400).send('<h3>Invalid SSO Payload</h3>');
+    }
+
+    const user = await repo.findEmployeeForAuth(targetEmail);
+    if (!user || (user.status && user.status !== 17 && user.status !== '17' && user.status !== 'Active')) {
+      return res.status(401).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+          <h2 style="color: #EF4444;">Tài Khoản Chưa Được Cấp Quyền</h2>
+          <p>Email <strong>${targetEmail}</strong> chưa được tạo trong hệ thống của công ty này.</p>
+          <a href="/login.html" style="color: #2563EB;">Quay lại trang đăng nhập</a>
+        </div>
+      `);
+    }
+
+    const authToken = service.createAuthToken(user);
+    const userPayload = encodeURIComponent(JSON.stringify({
+      employee_id: user.employee_id,
+      username: user.username,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      employee_level: user.employee_level,
+      position: user.position,
+      company_id: user.company_id,
+      department_id: user.department_id
+    }));
+    res.redirect(`/#token=${encodeURIComponent(authToken)}&user=${userPayload}`);
+  } catch (err) {
+    console.error('SSO Callback error:', err);
+    res.status(500).send(`<h3>Lỗi xác thực SSO: ${err.message}</h3>`);
   }
 });
 

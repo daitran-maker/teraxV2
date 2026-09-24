@@ -206,7 +206,7 @@ async function openAddModal(moduleKey, initialData = null) {
   // Auto-inject my_company and status defaults for service module
   if (moduleKey === 'service') {
     if (!initialData.status) {
-      initialData.status = 'Active';
+      initialData.status = 26; // 26 = Draft
     }
     if (!initialData.my_company && authUser && authUser.company_id) {
       try {
@@ -358,7 +358,10 @@ async function openAddModal(moduleKey, initialData = null) {
   } else if (moduleKey === 'invoice') {
     if (typeof handleInvoiceValueChange === 'function') handleInvoiceValueChange();
   } else if (moduleKey === 'asset') {
+    if (typeof handleAssetTypeChange === 'function') handleAssetTypeChange();
     if (typeof handleAssetValueChange === 'function') handleAssetValueChange();
+  } else if (moduleKey === 'service') {
+    if (typeof handleServiceTypeChange === 'function') handleServiceTypeChange();
   } else if (moduleKey === 'expense') {
     if (typeof handleExpenseValueChange === 'function') handleExpenseValueChange();
   } else if (moduleKey === 'contract') {
@@ -518,6 +521,38 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
     field.label = 'Contract';
     field.labelKey = 'col.contract';
     field.optionsFrom = 'contract';
+  }
+
+  // If this form modal was opened from a parent record (child element creation), hide the parent reference field
+  if (record) {
+    const parentKey = record._parent_foreign_key;
+    const parentMod = record._parent_module;
+    if (parentKey && field.key === parentKey) {
+      field.hidden = true;
+    }
+    if (parentMod && (field.key === parentMod || field.key === `${parentMod}_id` || field.key === `id__${parentMod}`)) {
+      field.hidden = true;
+    }
+    if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(parentMod)) {
+      if (['request', 'id__request', 'id_request', 'request_id'].includes(field.key)) {
+        field.hidden = true;
+      }
+    }
+    if (parentMod === 'contract') {
+      if (['contract_id', 'contract', 'contractspood'].includes(field.key)) {
+        field.hidden = true;
+      }
+    }
+    if (parentMod === 'account') {
+      if (['account', 'account_id', 'id_account'].includes(field.key)) {
+        field.hidden = true;
+      }
+    }
+    if (parentMod === 'company' || parentMod === 'my_company') {
+      if (['company_id', 'my_company', 'company_entity', 'id__my_company', 'contractor', 'company'].includes(field.key)) {
+        field.hidden = true;
+      }
+    }
   }
 
   const isEdit = record && mod && mod.pk && record[mod.pk] !== undefined && record[mod.pk] !== null && String(record[mod.pk]).trim() !== '' && String(record[mod.pk]).toLowerCase() !== 'auto-generated';
