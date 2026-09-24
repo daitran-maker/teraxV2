@@ -1,6 +1,73 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const https = require('https');
+const http = require('http');
+
+const CMS_BASE_URL = process.env.CMS_BASE_URL || 'http://cms.terax.ai';
+
+// Helper: fetch from CMS with timeout
+function cmsGet(path) {
+  return new Promise((resolve, reject) => {
+    const url = CMS_BASE_URL + path;
+    const lib = url.startsWith('https') ? https : http;
+    const req = lib.get(url, { timeout: 5000 }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch(e) { reject(new Error('Invalid JSON from CMS')); }
+      });
+    });
+    req.on('timeout', () => { req.destroy(); reject(new Error('CMS timeout')); });
+    req.on('error', reject);
+  });
+}
+
+// GET /api/system-setup/lookups/countries  → proxy CMS
+router.get('/lookups/countries', async (req, res) => {
+  try {
+    const result = await cmsGet('/api/public/countries?popular=true');
+    return res.json(result);
+  } catch (err) {
+    console.warn('[Setup] CMS countries fallback:', err.message);
+    // Fallback hardcoded popular
+    return res.json({ data: [
+      {code:'VN', name:'Việt Nam', display_name:'VN - Việt Nam', popular:true},
+      {code:'US', name:'United States', display_name:'US - United States', popular:true},
+      {code:'SG', name:'Singapore', display_name:'SG - Singapore', popular:true},
+      {code:'JP', name:'Japan', display_name:'JP - Japan', popular:true},
+      {code:'KR', name:'South Korea', display_name:'KR - South Korea', popular:true},
+      {code:'CN', name:'China', display_name:'CN - China', popular:true},
+      {code:'TH', name:'Thailand', display_name:'TH - Thailand', popular:true},
+      {code:'MY', name:'Malaysia', display_name:'MY - Malaysia', popular:true},
+      {code:'DE', name:'Germany', display_name:'DE - Germany', popular:true},
+      {code:'GB', name:'United Kingdom', display_name:'GB - United Kingdom', popular:true},
+    ]});
+  }
+});
+
+// GET /api/system-setup/lookups/currencies → proxy CMS
+router.get('/lookups/currencies', async (req, res) => {
+  try {
+    const result = await cmsGet('/api/public/currencies?popular=true');
+    return res.json(result);
+  } catch (err) {
+    console.warn('[Setup] CMS currencies fallback:', err.message);
+    return res.json({ data: [
+      {code:'VND', label:'VND', popular:true},
+      {code:'USD', label:'USD', popular:true},
+      {code:'EUR', label:'EUR', popular:true},
+      {code:'SGD', label:'SGD', popular:true},
+      {code:'JPY', label:'JPY', popular:true},
+      {code:'CNY', label:'CNY', popular:true},
+      {code:'THB', label:'THB', popular:true},
+      {code:'GBP', label:'GBP', popular:true},
+      {code:'AUD', label:'AUD', popular:true},
+      {code:'KRW', label:'KRW', popular:true},
+    ]});
+  }
+});
 
 // Helper to ensure setup table and default values exist
 async function ensureSetupTable() {
@@ -21,6 +88,7 @@ async function ensureSetupTable() {
 
 const { generateSequentialId } = require('../helpers/idGenerator');
 const { broadcastSSE } = require('../helpers/sseHelper');
+
 
 // GET /api/system-setup/status
 router.get('/status', async (req, res) => {

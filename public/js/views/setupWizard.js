@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TeraX – Setup Wizard (Light Theme)
  * Màu sắc điều chỉnh phù hợp với glassmorphism light theme của app
  */
@@ -252,14 +252,38 @@ function swLabel(text, req) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Cache lookups to avoid repeated API calls
+window._setupLookupCache = {};
+async function fetchLookup(key, apiPath) {
+  if (window._setupLookupCache[key]) return window._setupLookupCache[key];
+  try { const res = await apiGet(apiPath); window._setupLookupCache[key] = res.data || []; }
+  catch(e) { window._setupLookupCache[key] = []; }
+  return window._setupLookupCache[key];
+}
 //  STEP 1
 // ─────────────────────────────────────────────────────────────
 function renderStep1HTML(comp) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Ho_Chi_Minh';
-  const curs=['VND','USD','EUR','SGD','JPY','CNY','THB','GBP','AUD','KRW'];
-  const ctrs=[{c:'Vietnam',n:'Việt Nam'},{c:'United States',n:'Hoa Kỳ'},{c:'Singapore',n:'Singapore'},{c:'Japan',n:'Nhật Bản'},{c:'Korea',n:'Hàn Quốc'},{c:'China',n:'Trung Quốc'},{c:'Thailand',n:'Thái Lan'},{c:'Malaysia',n:'Malaysia'},{c:'Germany',n:'Đức'},{c:'United Kingdom',n:'Vương Quốc Anh'}];
-  let copts='';for(const c of ctrs)copts+='<option value="'+c.c+'" '+((comp.country||'Vietnam').toLowerCase()===c.c.toLowerCase()?'selected':'')+'>'+c.n+'</option>';
-  let cuopts='';for(const cur of curs){const names={'VND':'Việt Nam Đồng','USD':'Đô la Mỹ','EUR':'Euro','SGD':'Đô la Singapore','JPY':'Yên Nhật'};cuopts+='<option value="'+cur+'" '+((comp.base_currency||'VND').toUpperCase()===cur?'selected':'')+'>'+cur+(names[cur]?' – '+names[cur]:'')+'</option>';}
+  const _INIT_CUR = (comp.base_currency || 'VND').toUpperCase();
+  const _INIT_CTR = comp.country || 'Vietnam';
+  setTimeout(async () => {
+    const [countries, currencies] = await Promise.all([
+      fetchLookup('countries', '/system-setup/lookups/countries'),
+      fetchLookup('currencies', '/system-setup/lookups/currencies')
+    ]);
+    const selC = document.getElementById('step1_country');
+    const selCur = document.getElementById('step1_currency');
+    if (selC && countries.length) {
+      selC.innerHTML = countries.map(c =>
+        <option value="" ></option>
+      ).join('');
+    }
+    if (selCur && currencies.length) {
+      selCur.innerHTML = currencies.map(c =>
+        <option value="" ></option>
+      ).join('');
+    }
+  }, 0);
   return '<div class="sw-card">'
     + swStepHeader('apartment',1,'Thông tin công ty','Tạo cơ sở dữ liệu nền tảng cho doanh nghiệp. Có thể chỉnh sửa sau.')
     + '<form id="form-step1" onsubmit="event.preventDefault();saveStep1AndAdvance();">'
@@ -267,8 +291,8 @@ function renderStep1HTML(comp) {
     + '<div class="form-group" style="grid-column:span 2;">'+swLabel('Tên đầy đủ công ty / doanh nghiệp',true)+swInput('step1_fullname','VD: CÔNG TY CỔ PHẦN CÔNG NGHỆ TERAX',escapeHTML(comp.company_fullname||''))+'</div>'
     + '<div class="form-group">'+swLabel('Tên viết tắt / Brand Name',true)+swInput('step1_shortname','VD: TERAX',escapeHTML(comp.company_shortname||''))+'</div>'
     + '<div class="form-group">'+swLabel('Mã số thuế',false)+swInput('step1_tax_code','VD: 0101234567',escapeHTML(comp.tax_code||''))+'</div>'
-    + '<div class="form-group">'+swLabel('Quốc gia',true)+'<select id="step1_country" class="sw-select">'+copts+'</select></div>'
-    + '<div class="form-group">'+swLabel('Đơn vị tiền tệ chính',true)+'<select id="step1_currency" class="sw-select">'+cuopts+'</select></div>'
+    + '<div class="form-group">'+swLabel('Quốc gia',true)+'<select id="step1_country" class="sw-select"><option>Loading...</option></select></div>'
+    + '<div class="form-group">'+swLabel('Đơn vị tiền tệ chính',true)+'<select id="step1_currency" class="sw-select">'><option value="">Loading...</option></select></div>'
     + '<div class="form-group" style="grid-column:span 2;">'+swLabel('Địa chỉ trụ sở chính',false)+swInput('step1_address','VD: Tầng 5, Tòa nhà Landmark, Hà Nội',escapeHTML(comp.address||''))+'</div>'
     + '<div class="form-group">'+swLabel('Website',false)+swInput('step1_website','https://terax.ai',escapeHTML(comp.website||''))+'</div>'
     + '<div class="form-group">'+swLabel('Múi giờ hệ thống',false)+'<input type="text" readonly class="sw-input" style="background:#F9FAFB;color:#9CA3AF;cursor:default;" value="'+tz+'"></div>'
@@ -297,8 +321,17 @@ function renderStep2HTML(counts){
   let tc='';
   if(tab==='choose'){
     let cards='';
-    for(const d of PRESET_DEPARTMENTS){const m=DEPT_ICONS[d.code]||{icon:'business',color:'#EA580C',bg:'#FFF7ED'};
-      cards+='<label class="sw-preset-card"><input type="checkbox" name="preset_dept" value="'+d.code+'" '+(d.checked?'checked':'')+' style="margin-top:2px;accent-color:#f97316;width:16px;height:16px;flex-shrink:0;"><div style="flex:1;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><div style="width:30px;height:30px;border-radius:8px;background:'+m.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="font-size:17px;color:'+m.color+';">'+m.icon+'</span></div><span style="font-size:13px;font-weight:700;color:#111827;">'+d.name+'</span></div><div style="font-size:11px;color:#6B7280;line-height:1.4;">'+d.desc+'</div></div></label>';}
+    for(const d of PRESET_DEPARTMENTS){
+      // Giản lược: chỉ checkbox + tên + mô tả, không có icon box
+      cards+=`<label class="sw-preset-card">
+        <input type="checkbox" name="preset_dept" value="${d.code}" ${d.checked?'checked':''} style="margin-top:2px;accent-color:#f97316;width:16px;height:16px;flex-shrink:0;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:3px;">${d.name}</div>
+          <div style="font-size:11px;color:#6B7280;line-height:1.4;">${d.desc}</div>
+        </div>
+      </label>`;
+    }
+
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">Chọn các phòng ban phù hợp với doanh nghiệp. Có thể chỉnh sửa sau.</p>'
       +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">'+cards+'</div>'
       +'<button onclick="showCustomDeptForm()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px dashed #D1D5DB;background:#F9FAFB;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> Thêm phòng ban tùy chỉnh</button>'
@@ -445,14 +478,13 @@ function renderStep5HTML(comp,counts){
     +'<div>'+swLabel('Ngân hàng',false)+'<select id="step5_bank_name" class="sw-select">'+bopts+'</select></div>'
     +'<div>'+swLabel('Số tài khoản',false)+swInput('step5_account_number','VD: 0011001234567','')+'</div>'
     +'<div>'+swLabel('Loại tiền tệ',false)+'<input type="text" id="step5_currency" readonly class="sw-input" style="background:#F9FAFB;color:#9CA3AF;" value="'+cur+'"></div>'
-    +'<div style="grid-column:span 2;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;background:#F9FAFB;border:1px solid #E5E7EB;"><input type="checkbox" id="step5_create_cash" checked style="accent-color:#f97316;width:18px;height:18px;flex-shrink:0;"><label for="step5_create_cash" style="cursor:pointer;font-size:13px;color:#374151;">Tự động tạo kèm <strong style="color:#111827;">Quỹ tiền mặt ('+cur+')</strong> — ghi nhận chi tiền mặt nội bộ</label></div>'
     +'</div>'+acctInfo
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:16px;border-top:1px solid #F3F4F6;">'
     +'<button type="button" class="sw-btn-back" onclick="window.setSetupStep(4)"><span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span> Quay lại</button>'
     +'<div style="display:flex;gap:10px;align-items:center;"><button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(6)">Bỏ qua bước này</button><button type="submit" class="sw-btn-primary"><span>Lưu và xem tổng kết</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button></div>'
     +'</div></form></div>';
 }
-window.saveStep5AndAdvance=async function(){const an=document.getElementById('step5_account_name')?.value?.trim(),bn=document.getElementById('step5_bank_name')?.value?.trim(),num=document.getElementById('step5_account_number')?.value?.trim(),cur=document.getElementById('step5_currency')?.value||'VND',cc=document.getElementById('step5_create_cash')?.checked??true;try{showToast('Đang lưu tài khoản...','info');const res=await apiPost('/system-setup/quick-account',{account_name:an,bank_name:bn,account_number:num,currency:cur,create_cash:cc});if(res.success){showToast('Đã thiết lập tài khoản!','success');window.setupCurrentStep=6;await renderSetupContent(true);}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
+window.saveStep5AndAdvance=async function(){const an=document.getElementById('step5_account_name')?.value?.trim(),bn=document.getElementById('step5_bank_name')?.value?.trim(),num=document.getElementById('step5_account_number')?.value?.trim(),cur=document.getElementById('step5_currency')?.value||'VND';try{showToast('Đang lưu tài khoản...','info');const res=await apiPost('/system-setup/quick-account',{account_name:an,bank_name:bn,account_number:num,currency:cur});if(res.success){showToast('Đã thiết lập tài khoản!','success');window.setupCurrentStep=6;await renderSetupContent(true);}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}};
 
 // ─────────────────────────────────────────────────────────────
 //  STEP 6: SUCCESS SCREEN
