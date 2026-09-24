@@ -272,7 +272,7 @@ function renderDashboardView(viewKey, data) {
         <!-- Table Actions Inline -->
         <div class="table-actions-wrapper" id="table-actions-${viewKey}" style="display:flex; gap:8px; align-items:center;">
           <button class="btn dashboard-filter-toggle" id="dashboard-filter-toggle-${viewKey}" type="button" aria-expanded="${!window.dashboardFilterSidebarHidden[viewKey]}" onclick="toggleDashboardFilterSidebar('${viewKey}')"><span class="material-symbols-rounded">filter_list</span><span class="dashboard-filter-toggle-label">${window.dashboardFilterSidebarHidden[viewKey] ? t('table.show_filter', 'Hiện filter') : t('table.hide_filter', 'Ẩn filter')}</span></button>
-          ${isActionAllowed(viewKey, 'add') && !['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(viewKey) ?
+          ${viewKey === 'my_request' && (isActionAllowed('my_request', 'add') || isActionAllowed('request', 'add')) ?
       `<button class="btn" onclick="openAddModal('request')" style="background:#FF6A00 !important; color:#ffffff !important; border:none !important; border-radius:8px !important; padding:8px 24px !important; font-weight:600 !important; font-size:13px !important; height:40px !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; box-shadow: 0 4px 12px rgba(255, 106, 0, 0.15) !important; transition: all 0.2s ease !important;" onmouseover="this.style.background='#ea580c !important'" onmouseout="this.style.background='#FF6A00 !important'">+ ${t('table.add', 'Add')}</button>` : ''
     }
         </div>

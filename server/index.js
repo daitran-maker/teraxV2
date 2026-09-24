@@ -107,6 +107,15 @@ app.use(express.static(path.join(__dirname, '../public'), {
   }
 }));
 
+// Serve modular domain frontend files
+app.use('/modules', express.static(path.join(__dirname, '../modules'), {
+  setHeaders: (res, filepath) => {
+    if (filepath.endsWith('.js') || filepath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
+    }
+  }
+}));
+
 // Public API Routes — apply rate limiters to prevent brute-force
 app.use('/api/auth/login', authLimiter);
 

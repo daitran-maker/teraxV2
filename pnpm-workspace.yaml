@@ -1,3 +1,7 @@
+packages:
+  - '.'
+  - 'modules/*'
+
 allowBuilds:
   cpu-features: set this to true or false
   puppeteer: set this to true or false

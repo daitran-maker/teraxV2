@@ -40,6 +40,12 @@ window.isActionAllowed = function (viewName, actionId) {
     if (actionRules[viewKey] !== undefined) {
       return actionRules[viewKey];
     }
+    // Fallback for virtual views mapped to request
+    if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(viewKey)) {
+      if (actionRules['request'] !== undefined) {
+        return actionRules['request'];
+      }
+    }
     return false;
   }
 
