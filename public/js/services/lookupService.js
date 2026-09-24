@@ -534,18 +534,18 @@ function formatProcessLabel(r) {
     }
   }
   const pid = r.policy_id || r.ticket_type_id || r.id || '';
-  let desc = r.description || r.policy_name || r.ticket_name || r.name || '';
-  if (typeof desc === 'string' && desc.toUpperCase().startsWith('OPPORTUNITY')) {
-    desc = 'Opportunity';
+  let name = r.policy_name || r.ticket_name || r.name || r.description || '';
+  if (typeof name === 'string' && name.toUpperCase().startsWith('OPPORTUNITY')) {
+    name = 'Opportunity';
   }
-  if (!desc) {
+  if (!name) {
     const contractTypeMap = { '69': 'Selling', '70': 'Buying', '71': 'Internal' };
-    desc = contractTypeMap[pid] || pid;
+    name = contractTypeMap[pid] || pid;
   }
-  if (pid && desc && String(pid) !== String(desc)) {
-    return `${pid} | ${desc}`;
+  if (pid && name && String(pid) !== String(name)) {
+    return `${pid} | ${name}`;
   }
-  return desc || String(pid) || '';
+  return name || String(pid) || '';
 }
 window.formatProcessLabel = formatProcessLabel;
 

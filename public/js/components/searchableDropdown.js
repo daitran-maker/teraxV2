@@ -456,12 +456,15 @@ window.initializeSearchableDropdowns = function (container = document) {
           return;
         }
 
+        const q = query.toLowerCase();
         const filtered = Array.from(select.options).filter(opt => {
           if (opt.value === '') return false;
-          const labelMatch = opt.textContent.toLowerCase().includes(query.toLowerCase());
-          const valueMatch = opt.value.toLowerCase().includes(query.toLowerCase());
-          const typeMatch = (opt.dataset.type || '').toLowerCase().includes(query.toLowerCase());
-          return labelMatch || valueMatch || typeMatch;
+          const labelMatch = opt.textContent.toLowerCase().includes(q);
+          const valueMatch = opt.value.toLowerCase().includes(q);
+          const typeMatch = (opt.dataset.type || '').toLowerCase().includes(q);
+          const nameMatch = (opt.dataset.name || '').toLowerCase().includes(q);
+          const descMatch = (opt.dataset.desc || '').toLowerCase().includes(q);
+          return labelMatch || valueMatch || typeMatch || nameMatch || descMatch;
         });
 
         if (filtered.length === 0) {

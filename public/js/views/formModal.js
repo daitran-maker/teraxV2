@@ -1095,7 +1095,8 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         if (sourceKey === 'policy' || sourceKey === 'helpdesk_policy') {
           const pType = o.policy_type || o.ticket_type || '';
           const pName = o.policy_name || o.ticket_name || o.name || '';
-          typeAttrs = ` data-type="${escapeHTML(pType)}" data-name="${escapeHTML(pName)}"`;
+          const pDesc = o.description || '';
+          typeAttrs = ` data-type="${escapeHTML(pType)}" data-name="${escapeHTML(pName)}" data-desc="${escapeHTML(pDesc)}"`;
         }
         return `<option value="${ov}"${typeAttrs} ${String(val) === String(ov) ? 'selected' : ''}>${ol}</option>`;
       }).join('');

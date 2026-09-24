@@ -743,7 +743,8 @@ window.handleRequestCompanyChange = async function () {
         const lbl = window.formatProcessLabel(p);
         const pType = p.policy_type || '';
         const pName = p.policy_name || p.ticket_name || p.name || '';
-        return `<option value="${p.policy_id}" data-type="${escapeHTML(pType)}" data-name="${escapeHTML(pName)}">${escapeHTML(lbl)}</option>`;
+        const pDesc = p.description || '';
+        return `<option value="${p.policy_id}" data-type="${escapeHTML(pType)}" data-name="${escapeHTML(pName)}" data-desc="${escapeHTML(pDesc)}">${escapeHTML(lbl)}</option>`;
       }).join('');
 
     if (currentVal && filteredPolicies.some(p => String(p.policy_id) === String(currentVal))) {

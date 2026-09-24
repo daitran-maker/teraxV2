@@ -18,25 +18,16 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}==================================================================${NC}"
-echo -e "${BLUE}  🚀 TRIEN KHAI DEV CODE MOI LEN KUBERNETES (crc-dev-deployment)  ${NC}"
-echo -e "${BLUE}==================================================================${NC}"
+echo "=== [1/3] Building Docker image for terax_ver2 ==="
+docker build -t terax-ver2-app:latest /opt/app/terax_ver2
 
-echo -e "\n📦 ${BLUE}[Buoc 1/2] Build lai Docker Image tu code moi...${NC}"
-docker build -t crc-dev-app:latest /opt/app/dev/crc_app
-docker build -t crc-web-app:latest /opt/app/dev/crc_app
+echo "=== [2/3] Importing image into k3s containerd ==="
+docker save terax-ver2-app:latest | sudo /usr/local/bin/k3s ctr -n k8s.io images import -
 
-echo -e "\n📦 [Buoc 1.5] Nap anh Docker vao cache containerd cua K3s..."
-docker save crc-dev-app:latest | sudo /usr/local/bin/k3s ctr -n k8s.io images import -
-docker save crc-web-app:latest | sudo /usr/local/bin/k3s ctr -n k8s.io images import -
+echo "=== [3/3] Applying k8s-dev2.yaml and rolling out ==="
+kubectl apply -f /opt/app/terax_ver2/k8s-dev2.yaml
+kubectl rollout restart deployment/crc-dev2-deployment || true
+kubectl rollout status deployment/crc-dev2-deployment
 
-echo -e "\n🚀 ${BLUE}[Buoc 2/2] Ap dung cau hinh k8s va khoi dong lai ca 2 Pod...${NC}"
-kubectl apply -f /opt/app/dev/crc_app/k8s-dev-cms.yaml
-kubectl rollout restart deployment/crc-dev-deployment
-kubectl rollout status deployment/crc-dev-deployment
-
-kubectl rollout restart deployment/crc-app-deployment || true
-kubectl rollout status deployment/crc-app-deployment || true
-
-echo -e "\n${GREEN}✅ HOAN TAT: Da build va rollout restart ca 2 deployment (Port 5221 & Port 5222 / dev.terax.ai) thanh cong!${NC}"
+echo "=== Done! ==="
 
