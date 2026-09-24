@@ -171,6 +171,19 @@ router.post('/company', async (req, res) => {
     logo
   } = req.body;
 
+  let logoParam = null;
+  if (logo) {
+    try {
+      if (typeof logo === 'string' && logo.startsWith('data:')) {
+        logoParam = Buffer.from(logo.split(',')[1], 'base64');
+      } else {
+        logoParam = logo;
+      }
+    } catch (e) {
+      logoParam = logo;
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -191,12 +204,12 @@ router.post('/company', async (req, res) => {
             logo = COALESCE($8, logo),
             status = COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67)
         WHERE my_company_id = $9
-      `, [company_fullname, company_shortname, tax_code, country, address, website, base_currency, logo, compId]);
+      `, [company_fullname, company_shortname, tax_code, country, address, website, base_currency, logoParam, compId]);
     } else {
       await client.query(`
         INSERT INTO my_company (my_company_id, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logo, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67))
-      `, [compId, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logo]);
+      `, [compId, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logoParam]);
     }
 
     const saved = await client.query('SELECT * FROM my_company WHERE my_company_id = $1', [compId]);

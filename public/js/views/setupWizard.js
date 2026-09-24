@@ -284,18 +284,54 @@ function renderStep1HTML(comp) {
     + '<div class="form-group" style="grid-column:span 2;">'+swLabel('Địa chỉ trụ sở chính',false)+swInput('step1_address','VD: Tầng 5, Tòa nhà Landmark, Hà Nội',escapeHTML(comp.address||''))+'</div>'
     + '<div class="form-group">'+swLabel('Website',false)+swInput('step1_website','https://terax.ai',escapeHTML(comp.website||''))+'</div>'
     + '<div class="form-group">'+swLabel('Múi giờ hệ thống',false)+'<input type="text" readonly class="sw-input" style="background:#F9FAFB;color:#9CA3AF;cursor:default;" value="'+tz+'"></div>'
+    + '<div class="form-group" style="grid-column:span 2;">'+swLabel('Logo thương hiệu công ty',false)
+    + '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;">'
+    + '<div id="step1_logo_preview" style="width:48px;height:48px;border-radius:8px;background:#FFFFFF;border:1px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">'
+    + (comp.logo ? '<img src="'+(comp.logo.startsWith('data:')?comp.logo:'data:image/png;base64,'+comp.logo)+'" style="width:100%;height:100%;object-fit:contain;">' : '<span class="material-symbols-rounded" style="color:#9CA3AF;font-size:24px;">image</span>')
+    + '</div>'
+    + '<div style="flex:1;">'
+    + '<input type="file" id="step1_logo_file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="window.handleStep1Logo(event)" style="font-size:12px;color:#4B5563;">'
+    + '<div style="font-size:11px;color:#9CA3AF;margin-top:3px;">Khuyến nghị ảnh định dạng PNG nền trong suốt, dung lượng tối đa 1MB.</div>'
+    + '</div></div></div>'
     + '</div>'
     + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6;">'
     + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(2)">Bỏ qua bước này</button>'
     + '<button type="submit" class="sw-btn-primary"><span>Lưu và tiếp tục</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
     + '</div></form></div>';
 }
+
+window.step1LogoBase64 = null;
+window.handleStep1Logo = function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  if(file.size > 1024 * 1024){ showToast('Kích thước ảnh quá lớn! Tối đa 1MB','warning'); e.target.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    window.step1LogoBase64 = evt.target.result;
+    const prev = document.getElementById('step1_logo_preview');
+    if(prev) prev.innerHTML = '<img src="'+evt.target.result+'" style="width:100%;height:100%;object-fit:contain;">';
+  };
+  reader.readAsDataURL(file);
+};
+
 window.saveStep1AndAdvance = async function(){
   const fn=document.getElementById('step1_fullname')?.value?.trim(),sn=document.getElementById('step1_shortname')?.value?.trim();
   if(!fn||!sn){showToast('Vui lòng điền tên đầy đủ và tên viết tắt','warning');return;}
-  try{showToast('Đang lưu thông tin công ty...','info');const res=await apiPost('/system-setup/company',{company_fullname:fn,company_shortname:sn,tax_code:document.getElementById('step1_tax_code')?.value?.trim(),country:document.getElementById('step1_country')?.value,base_currency:document.getElementById('step1_currency')?.value,address:document.getElementById('step1_address')?.value?.trim(),website:document.getElementById('step1_website')?.value?.trim()});
-  if(res.success){showToast('Đã lưu thông tin công ty!','success');window.setupCurrentStep=2;await renderSetupContent(true);}else showToast(res.error||'Lưu thất bại','error');}catch(err){showToast('Lỗi: '+err.message,'error');}
-
+  try{
+    showToast('Đang lưu thông tin công ty...','info');
+    const res=await apiPost('/system-setup/company',{
+      company_fullname:fn,
+      company_shortname:sn,
+      tax_code:document.getElementById('step1_tax_code')?.value?.trim(),
+      country:document.getElementById('step1_country')?.value,
+      base_currency:document.getElementById('step1_currency')?.value,
+      address:document.getElementById('step1_address')?.value?.trim(),
+      website:document.getElementById('step1_website')?.value?.trim(),
+      logo: window.step1LogoBase64 || null
+    });
+    if(res.success){showToast('Đã lưu thông tin công ty!','success');window.setupCurrentStep=2;await renderSetupContent(true);}
+    else showToast(res.error||'Lưu thất bại','error');
+  }catch(err){showToast('Lỗi: '+err.message,'error');}
 };
 
 // ─────────────────────────────────────────────────────────────
