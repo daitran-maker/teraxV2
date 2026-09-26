@@ -287,4 +287,10 @@ router.get('/currencies', async (req, res) => {
   }
 });
 
+router.getCachedCountries = getCachedCountries;
+router.getCachedCurrencies = getCachedCurrencies;
+router.getCachedProvinces = getCachedProvinces;
+
 module.exports = router;
+
+

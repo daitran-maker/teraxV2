@@ -247,7 +247,7 @@ router.get('/my-action-permissions', async (req, res) => {
 
 router.get('/my-columns', async (req, res) => {
   const user = req.user;
-  
+
   // If Super Admin, bypass all column restrictions (all columns allowed)
   if (user.role && user.role.toUpperCase() === 'SUPER ADMIN') {
     return res.json({});
@@ -333,7 +333,7 @@ router.get('/check-action/:actionId', async (req, res) => {
   const { actionId } = req.params;
   const user = req.user; // from authenticate middleware
   const { checkPermission } = require('../helpers/permissionHelper');
-  
+
   const hasAccess = await checkPermission('action_rules', actionId, user);
   res.json({ hasAccess });
 });
@@ -342,7 +342,7 @@ router.get('/check-slice/:sliceName', async (req, res) => {
   const { sliceName } = req.params;
   const user = req.user;
   const { checkPermission } = require('../helpers/permissionHelper');
-  
+
   const hasAccess = await checkPermission('exception_rules', sliceName, user);
   res.json({ hasAccess });
 });

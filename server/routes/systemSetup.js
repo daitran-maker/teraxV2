@@ -24,13 +24,36 @@ function cmsGet(path) {
   });
 }
 
-// GET /api/system-setup/lookups/countries  → proxy CMS
+const cmsLookups = require('./cmsLookups');
+
+const POPULAR_5_COUNTRIES = ['VN', 'US', 'SG', 'JP', 'KR'];
+const POPULAR_5_CURRENCIES = ['VND', 'USD', 'EUR', 'SGD', 'JPY'];
+
+// GET /api/system-setup/lookups/countries  → proxy CMS DB
 router.get('/lookups/countries', async (req, res) => {
   try {
-    const result = await cmsGet('/api/public/countries?popular=true');
-    return res.json(result);
-  } catch (err) {
-    console.warn('[Setup] CMS countries fallback:', err.message);
+    let list = [];
+    if (typeof cmsLookups.getCachedCountries === 'function') {
+      list = await cmsLookups.getCachedCountries();
+    }
+    if (!list || !list.length) {
+      const result = await cmsGet('/api/public/countries?popular=true').catch(() => null);
+      list = (result && result.data) ? result.data : [];
+    }
+    if (list && list.length) {
+      const pMap = new Map(POPULAR_5_COUNTRIES.map((c, i) => [c.toUpperCase(), i]));
+      list = [...list].sort((a, b) => {
+        const aCode = String(a.code || '').toUpperCase().trim();
+        const bCode = String(b.code || '').toUpperCase().trim();
+        const aHas = pMap.has(aCode);
+        const bHas = pMap.has(bCode);
+        if (aHas && bHas) return pMap.get(aCode) - pMap.get(bCode);
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      return res.json({ data: list });
+    }
     // Fallback hardcoded popular
     return res.json({ data: [
       {code:'VN', name:'Việt Nam', display_name:'VN - Việt Nam', popular:true},
@@ -38,34 +61,48 @@ router.get('/lookups/countries', async (req, res) => {
       {code:'SG', name:'Singapore', display_name:'SG - Singapore', popular:true},
       {code:'JP', name:'Japan', display_name:'JP - Japan', popular:true},
       {code:'KR', name:'South Korea', display_name:'KR - South Korea', popular:true},
-      {code:'CN', name:'China', display_name:'CN - China', popular:true},
-      {code:'TH', name:'Thailand', display_name:'TH - Thailand', popular:true},
-      {code:'MY', name:'Malaysia', display_name:'MY - Malaysia', popular:true},
-      {code:'DE', name:'Germany', display_name:'DE - Germany', popular:true},
-      {code:'GB', name:'United Kingdom', display_name:'GB - United Kingdom', popular:true},
     ]});
+  } catch (err) {
+    console.warn('[Setup] CMS countries error:', err.message);
+    return res.json({ data: [] });
   }
 });
 
-// GET /api/system-setup/lookups/currencies → proxy CMS
+// GET /api/system-setup/lookups/currencies → proxy CMS DB
 router.get('/lookups/currencies', async (req, res) => {
   try {
-    const result = await cmsGet('/api/public/currencies?popular=true');
-    return res.json(result);
-  } catch (err) {
-    console.warn('[Setup] CMS currencies fallback:', err.message);
+    let list = [];
+    if (typeof cmsLookups.getCachedCurrencies === 'function') {
+      list = await cmsLookups.getCachedCurrencies();
+    }
+    if (!list || !list.length) {
+      const result = await cmsGet('/api/public/currencies?popular=true').catch(() => null);
+      list = (result && result.data) ? result.data : [];
+    }
+    if (list && list.length) {
+      const pMap = new Map(POPULAR_5_CURRENCIES.map((c, i) => [c.toUpperCase(), i]));
+      list = [...list].sort((a, b) => {
+        const aCode = String(a.code || '').toUpperCase().trim();
+        const bCode = String(b.code || '').toUpperCase().trim();
+        const aHas = pMap.has(aCode);
+        const bHas = pMap.has(bCode);
+        if (aHas && bHas) return pMap.get(aCode) - pMap.get(bCode);
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        return (a.code || '').localeCompare(b.code || '');
+      });
+      return res.json({ data: list });
+    }
     return res.json({ data: [
       {code:'VND', label:'VND', popular:true},
       {code:'USD', label:'USD', popular:true},
       {code:'EUR', label:'EUR', popular:true},
       {code:'SGD', label:'SGD', popular:true},
       {code:'JPY', label:'JPY', popular:true},
-      {code:'CNY', label:'CNY', popular:true},
-      {code:'THB', label:'THB', popular:true},
-      {code:'GBP', label:'GBP', popular:true},
-      {code:'AUD', label:'AUD', popular:true},
-      {code:'KRW', label:'KRW', popular:true},
     ]});
+  } catch (err) {
+    console.warn('[Setup] CMS currencies error:', err.message);
+    return res.json({ data: [] });
   }
 });
 
@@ -242,6 +279,7 @@ router.post('/presets/departments', async (req, res) => {
       const code = (d.department_code || '').trim();
       const name = (d.department_name || '').trim();
       const type = (d.type || 'Operation').trim();
+      const managerEmail = (d.manager_email || d.manager || '').trim() || null;
 
       // Check if code or name already exists for company
       const check = await client.query(
@@ -252,10 +290,10 @@ router.post('/presets/departments', async (req, res) => {
       if (check.rows.length === 0) {
         const id = await generateSequentialId('department', client);
         await client.query(`
-          INSERT INTO department (department_id, department_name, department_code, type, company_id)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [id, name, code, type, companyId]);
-        created.push({ department_id: id, department_name: name, department_code: code, type });
+          INSERT INTO department (department_id, department_name, department_code, type, manager_email, company_id)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [id, name, code, type, managerEmail, companyId]);
+        created.push({ department_id: id, department_name: name, department_code: code, type, manager_email: managerEmail });
       }
     }
 
@@ -294,6 +332,10 @@ router.post('/presets/policies', async (req, res) => {
       const pType = (p.policy_type || 'Operation').trim();
       const desc = (p.description || name).trim();
       const elements = p.elements || 'ASSIGN_TASK';
+      const tier1 = (p.tier1_approval || 'Direct Manager').trim();
+      const tier2 = (p.tier2_approval || '').trim() || null;
+      const tier3 = (p.tier3_approval || '').trim() || null;
+      const approvalLevel = (p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
 
       const check = await client.query(
         'SELECT policy_id FROM POLICY_AND_PROGRAM WHERE LOWER(policy_name) = LOWER($1)',
@@ -305,23 +347,25 @@ router.post('/presets/policies', async (req, res) => {
         await client.query(`
           INSERT INTO POLICY_AND_PROGRAM (
             policy_id, policy_name, policy_type, description,
-            tier1_approval, approval_level, policy_lead, sr_owner,
-            elements, company_id, sla
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            tier1_approval, tier2_approval, tier3_approval, approval_level,
+            policy_lead, sr_owner, elements, company_id, sla
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         `, [
           id,
           name,
           pType,
           desc,
-          'Direct Manager', // Tier 1 Direct Manager
-          'Tier 1',
+          tier1,
+          tier2,
+          tier3,
+          approvalLevel,
           defaultLead,
           defaultLead,
           elements,
           companyId,
           p.sla || 3
         ]);
-        created.push({ policy_id: id, policy_name: name });
+        created.push({ policy_id: id, policy_name: name, approval_level: approvalLevel });
       }
     }
 
@@ -424,8 +468,13 @@ router.post('/import-employees', async (req, res) => {
       if (check.rows.length > 0) continue;
 
       const empId = await generateSequentialId('employee', client);
-      const username = email.split('@')[0];
+      const username = (emp.username || '').trim() || email.split('@')[0];
       const position = (emp.position || '').trim() || 'Nhân viên';
+      const startDate = (emp.start_date || '').trim() || new Date().toISOString().split('T')[0];
+      const emgName = (emp.emergency_contact_name || '').trim() || null;
+      const emgPhone = (emp.emergency_contact_phone || '').trim() || null;
+      const directMgr = (emp.direct_manager || '').trim() || null;
+      const headMgr = (emp.head_manager || '').trim() || null;
 
       // Map department
       let deptId = null;
@@ -433,28 +482,47 @@ router.post('/import-employees', async (req, res) => {
         deptId = deptMap.get(emp.department_code.trim().toLowerCase());
       } else if (emp.department_name && deptMap.has(emp.department_name.trim().toLowerCase())) {
         deptId = deptMap.get(emp.department_name.trim().toLowerCase());
+      } else if (emp.department_id) {
+        deptId = emp.department_id;
       }
 
       await client.query(`
         INSERT INTO employee (
           employee_id, username, full_name, email, position,
-          department_id, company_id, role, status, start_date
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Staff', 17, CURRENT_DATE)
-      `, [empId, username, fullName, email, position, deptId, companyId]);
+          department_id, company_id, role, status, start_date,
+          emergency_contact_name, emergency_contact_phone
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Staff', 17, $8, $9, $10)
+      `, [empId, username, fullName, email, position, deptId, companyId, startDate, emgName, emgPhone]);
 
-      created.push({ employee_id: empId, full_name: fullName, email, direct_manager_raw: emp.direct_manager });
+      created.push({
+        employee_id: empId,
+        full_name: fullName,
+        email,
+        direct_manager_raw: directMgr,
+        head_manager_raw: headMgr
+      });
     }
 
-    // Second pass: Link direct managers by email or full name if provided
+    // Second pass: Link direct managers and head managers by email or full name if provided
     for (const c of created) {
       if (c.direct_manager_raw) {
         const mgrKey = String(c.direct_manager_raw).trim().toLowerCase();
         const mgrRes = await client.query(
-          'SELECT employee_id FROM employee WHERE LOWER(email) = $1 OR LOWER(full_name) = $1 LIMIT 1',
+          'SELECT employee_id FROM employee WHERE LOWER(email) = $1 OR LOWER(full_name) = $1 OR LOWER(employee_id) = $1 LIMIT 1',
           [mgrKey]
         );
         if (mgrRes.rows.length > 0) {
           await client.query('UPDATE employee SET direct_manager = $1 WHERE employee_id = $2', [mgrRes.rows[0].employee_id, c.employee_id]);
+        }
+      }
+      if (c.head_manager_raw) {
+        const hrKey = String(c.head_manager_raw).trim().toLowerCase();
+        const hrRes = await client.query(
+          'SELECT employee_id FROM employee WHERE LOWER(email) = $1 OR LOWER(full_name) = $1 OR LOWER(employee_id) = $1 LIMIT 1',
+          [hrKey]
+        );
+        if (hrRes.rows.length > 0) {
+          await client.query('UPDATE employee SET head_manager = $1 WHERE employee_id = $2', [hrRes.rows[0].employee_id, c.employee_id]);
         }
       }
     }
