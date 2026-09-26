@@ -97,6 +97,11 @@ app.use(express.static(path.join(__dirname, '../public'), {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+    } else if (filepath.endsWith('setupWizard.js')) {
+      // Setup Wizard changes frequently during setup/onboarding dev, bypass cache
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     } else if (filepath.endsWith('.js') || filepath.endsWith('.css')) {
       // Versioned JS & CSS files (cached for 1 day, reducing repeat load times to 0ms)
       res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
