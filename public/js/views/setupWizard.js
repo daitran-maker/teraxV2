@@ -502,9 +502,9 @@ function renderStep2HTML(counts){
       +'<button onclick="showCustomDeptForm()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px dashed #D1D5DB;background:#F9FAFB;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_custom', 'Thêm phòng ban tùy chỉnh') + '</button>'
       +'<div id="custom-dept-form" style="display:none;margin-top:12px;padding:16px;border-radius:12px;border:1px solid #E5E7EB;background:#F9FAFB;">'
       +'<div style="display:grid;grid-template-columns:120px 1fr 1fr auto;gap:10px;align-items:end;">'
-      +'<div>'+swLabel(swT('sw.step2_dept_code', 'Mã phòng ban'), true)+swInput('custom_dept_code','VD: MKT','')+'</div>'
-      +'<div>'+swLabel(swT('sw.step2_dept_name', 'Tên phòng ban'), true)+swInput('custom_dept_name','VD: Marketing','')+'</div>'
-      +'<div>'+swLabel(swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)'), false)+swInput('custom_dept_mgr','VD: manager@company.com','')+'</div>'
+      +'<div>'+swLabel(swT('sw.step2_dept_code', 'Mã phòng ban'), true)+swInput('custom_dept_code', swT('sw.step2_dept_code_ph', 'VD: MKT'), '')+'</div>'
+      +'<div>'+swLabel(swT('sw.step2_dept_name', 'Tên phòng ban'), true)+swInput('custom_dept_name', swT('sw.step2_dept_name_ph', 'VD: Marketing'), '')+'</div>'
+      +'<div>'+swLabel(swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)'), false)+swInput('custom_dept_mgr', swT('sw.step2_dept_mgr_ph', 'VD: manager@company.com'), '')+'</div>'
       +'<div><button onclick="addCustomDeptToList()" class="sw-btn-primary" style="padding:10px 16px;">+ ' + swT('common.add', 'Thêm') + '</button></div>'
       +'</div></div></div>';
   } else if(tab==='excel'){
@@ -599,7 +599,7 @@ function renderStep3HTML(counts){
     // Full Name *, Username *, Email *, Department, Position, Start Date *, Direct Mgr *, HR Mgr *, Emergency Contact Name *, Emergency Contact Phone *
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step3_sample_desc', 'File mẫu nhân viên chuẩn TeraX gồm đầy đủ các cột bắt buộc: Họ tên, Tên đăng nhập, Email, Phòng ban, Chức vụ, Ngày bắt đầu, Quản lý trực tiếp, Quản lý nhân sự, Người liên hệ khẩn cấp và SĐT.') + '</p>'
       +'<div id="quick-emp-container">'
-      +renderQuickEmpCard(0, {full_name:'', username:'', email:'', dept:'', pos:'Nhân viên', start_date:todayStr, direct_mgr:'Super Admin', hr_mgr:'Super Admin', emg_name:'', emg_phone:''})
+      +renderQuickEmpCard(0, {full_name:'', username:'', email:'', dept:'', pos:'', start_date:todayStr, direct_mgr:'Super Admin', hr_mgr:'Super Admin', emg_name:'', emg_phone:''})
       +'</div>'
       +'<button onclick="addQuickEmpCard()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:1px dashed #D1D5DB;background:transparent;color:#374151;font-size:12px;cursor:pointer;margin-top:6px;"><span class="material-symbols-rounded" style="font-size:16px;">person_add</span> ' + swT('sw.step3_add_emp', 'Thêm nhân viên') + '</button>'
       +'</div>';
@@ -620,41 +620,42 @@ function renderStep3HTML(counts){
           +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.start_date||todayStr)+'</td>'
           +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.direct_manager||'–')+'</td>'
           +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.emergency_contact_name ? e.emergency_contact_name + (e.emergency_contact_phone ? ' (' + e.emergency_contact_phone + ')' : '') : '–')+'</td>'
-          +'<td style="padding:7px 10px;">'+(v?'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">Hợp lệ</span>':'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">Lỗi</span>')+'</td></tr>';
+          +'<td style="padding:7px 10px;">'+(v?'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>':'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Lỗi') + '</span>')+'</td></tr>';
       }
-      prev='<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;"><span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:#111827;">File nhân viên</div><div style="font-size:11px;color:#6B7280;">'+parsed.length+' dòng dữ liệu ('+vc+' hợp lệ)</div></div><button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button></div>'
-        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:240px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Họ và tên</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Username</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Email</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Phòng ban</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Chức vụ</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Ngày bắt đầu</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Quản lý trực tiếp</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Liên hệ khẩn cấp</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Trạng thái</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+      prev='<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;"><span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên') + '</div><div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' ('+vc+' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div><button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button></div>'
+        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:240px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
     }
     tc='<div><div class="sw-upload-zone" style="margin-bottom:16px;"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:14px;">(.xlsx, .xls, .csv)</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="downloadEmployeeTemplate()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleEmployeeExcelUpload(event)"></label></div></div>'+prev+'</div>';
   } else {
     tc='<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:14px;padding:24px;text-align:center;"><div style="width:56px;height:56px;border-radius:14px;background:#EDE9FE;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;"><span class="material-symbols-rounded" style="font-size:28px;color:#7C3AED;">description</span></div><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;line-height:1.6;">' + swT('sw.step3_sample_desc', 'File mẫu nhân viên chuẩn TeraX gồm đầy đủ các cột bắt buộc: Họ tên, Tên đăng nhập, Email, Phòng ban, Chức vụ, Ngày bắt đầu, Quản lý trực tiếp, Quản lý nhân sự, Người liên hệ khẩn cấp và SĐT.') + '</div><button onclick="downloadEmployeeTemplate()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;font-size:13px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:17px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + ' (.xlsx)</button></div>';
   }
-  const btnLabel = parsed.length>0 ? ('Nhập ' + parsed.length + ' nhân viên') : swT('sw.btn_continue', 'Tiếp tục bước tiếp theo');
+  const btnLabel = parsed.length>0 ? (swT('sw.step3_imported', 'Nhập {{count}} nhân viên').replace('{{count}}', parsed.length)) : swT('sw.btn_continue', 'Tiếp tục bước tiếp theo');
   return '<div class="sw-card">'+swStepHeader('group', 3, swT('sw.step3_header', 'Thiết lập nhân viên'), swT('sw.step3_desc', 'Nhập danh sách nhân sự. Có thể nhập từ Excel, thêm nhanh hoặc dùng dữ liệu mẫu.'))+'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">'+modeCards+'</div>'+tc+swBottomNav(2,4,btnLabel,'saveStep3AndAdvance()')+'</div>';
 }
 
 function renderQuickEmpCard(idx, data) {
   const d = data || {};
+  const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
   return '<div class="sw-emp-card qemp-card" data-idx="'+idx+'">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #F3F4F6;">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F3F4F6;">'
     + '<div style="font-size:12px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:5px;"><span class="material-symbols-rounded" style="font-size:16px;">badge</span> ' + swT('sw.step3_name', 'Nhân viên') + ' #' + (idx+1) + '</div>'
     + '<button onclick="this.closest(\'.sw-emp-card\').remove()" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:14px;">close</span></button>'
     + '</div>'
-    // Row 1: Core credentials
-    + '<div style="display:grid;grid-template-columns:1.2fr 1fr 1.2fr 1fr 1fr;gap:10px;margin-bottom:10px;">'
-    + '<div>'+swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name', 'Họ và tên') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true)+'<input type="text" class="sw-input qemp-username" placeholder="john.doe" value="'+escapeHTML(d.username||'')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="john@company.com" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false)+'<input type="text" class="sw-input qemp-dept" placeholder="Mã PB / Tên PB" value="'+escapeHTML(d.dept||'')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="Chức danh" value="'+escapeHTML(d.pos||'Nhân viên')+'"></div>'
-    + '</div>'
-    // Row 2: Management & Compliance
-    + '<div style="display:grid;grid-template-columns:1fr 1.2fr 1.2fr 1.2fr 1fr;gap:10px;">'
+    // 4 inputs per row, orderly and cleanly aligned
+    + '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;align-items:start;">'
+    // Row 1 (4 inputs)
+    + '<div>'+swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name_ph', 'Họ và tên đầy đủ') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true)+'<input type="text" class="sw-input qemp-username" placeholder="' + swT('sw.step3_emp_username_ph', 'john.doe') + '" value="'+escapeHTML(d.username||'')+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="' + swT('sw.step3_emp_email_ph', 'john@company.com') + '" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false)+'<input type="text" class="sw-input qemp-dept" placeholder="' + swT('sw.step3_emp_dept_ph', 'Mã PB / Tên PB') + '" value="'+escapeHTML(d.dept||'')+'"></div>'
+    // Row 2 (4 inputs)
+    + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
     + '<div>'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true)+'<input type="text" class="sw-input qemp-direct-mgr" placeholder="Email / Tên QL" value="'+escapeHTML(d.direct_mgr||'Super Admin')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), true)+'<input type="text" class="sw-input qemp-hr-mgr" placeholder="Email / Tên HR" value="'+escapeHTML(d.hr_mgr||'Super Admin')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-name" placeholder="Tên người thân" value="'+escapeHTML(d.emg_name||'')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="0901234567" value="'+escapeHTML(d.emg_phone||'')+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true)+'<input type="text" class="sw-input qemp-direct-mgr" placeholder="' + swT('sw.step3_emp_direct_mgr_ph', 'Email / Tên QL') + '" value="'+escapeHTML(d.direct_mgr||'Super Admin')+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), true)+'<input type="text" class="sw-input qemp-hr-mgr" placeholder="' + swT('sw.step3_emp_hr_mgr_ph', 'Email / Tên HR') + '" value="'+escapeHTML(d.hr_mgr||'Super Admin')+'"></div>'
+    // Row 3 (2 inputs spanning 2 columns each)
+    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-name" placeholder="' + swT('sw.step3_emp_emg_name_ph', 'Tên người thân') + '" value="'+escapeHTML(d.emg_name||'')+'"></div>'
+    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="' + swT('sw.step3_emp_emg_phone_ph', '0901234567') + '" value="'+escapeHTML(d.emg_phone||'')+'"></div>'
     + '</div>'
     + '</div>';
 }
@@ -687,7 +688,7 @@ window.addQuickEmpCard = function(){
   if (!c) return;
   const idx = c.querySelectorAll('.qemp-card').length;
   const div = document.createElement('div');
-  div.innerHTML = renderQuickEmpCard(idx, {full_name:'', username:'', email:'', dept:'', pos:'Nhân viên', start_date:new Date().toISOString().split('T')[0], direct_mgr:'Super Admin', hr_mgr:'Super Admin', emg_name:'', emg_phone:''});
+  div.innerHTML = renderQuickEmpCard(idx, {full_name:'', username:'', email:'', dept:'', pos:'', start_date:new Date().toISOString().split('T')[0], direct_mgr:'Super Admin', hr_mgr:'Super Admin', emg_name:'', emg_phone:''});
   c.appendChild(div.firstElementChild);
 };
 
@@ -787,7 +788,7 @@ window.handleEmployeeExcelUpload = function(event){
         return;
       }
       window.setupParsedEmployees = mapped;
-      showToast('Đã nhận diện ' + mapped.length + ' nhân viên','success');
+      showToast(swT('sw.step3_parsed_count', 'Đã nhận diện {{count}} nhân viên').replace('{{count}}', mapped.length),'success');
       renderSetupContent();
     } catch(err) {
       showToast('Lỗi đọc file: ' + err.message,'error');
@@ -801,13 +802,14 @@ window.saveStep3AndAdvance = async function(){
   let employeesToSave = [];
 
   if (tab === 'quick') {
+    const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
     const cards = document.querySelectorAll('.qemp-card');
     cards.forEach(c => {
       const fn = c.querySelector('.qemp-name')?.value?.trim();
       const em = c.querySelector('.qemp-email')?.value?.trim();
       const un = c.querySelector('.qemp-username')?.value?.trim() || (em ? em.split('@')[0] : '');
       const dp = c.querySelector('.qemp-dept')?.value?.trim();
-      const pos = c.querySelector('.qemp-pos')?.value?.trim() || 'Nhân viên';
+      const pos = c.querySelector('.qemp-pos')?.value?.trim() || defaultPos;
       const sd = c.querySelector('.qemp-start-date')?.value || new Date().toISOString().split('T')[0];
       const dm = c.querySelector('.qemp-direct-mgr')?.value?.trim();
       const hm = c.querySelector('.qemp-hr-mgr')?.value?.trim();
@@ -843,10 +845,10 @@ window.saveStep3AndAdvance = async function(){
   }
 
   try {
-    showToast('Đang nhập ' + employeesToSave.length + ' nhân viên...','info');
+    showToast(swT('sw.step3_importing', 'Đang nhập {{count}} nhân viên...').replace('{{count}}', employeesToSave.length),'info');
     const res = await apiPost('/system-setup/import-employees', { employees: employeesToSave });
     if (res.success) {
-      showToast('Đã nhập ' + res.count + ' nhân viên!','success');
+      showToast(swT('sw.step3_imported', 'Đã nhập {{count}} nhân viên!').replace('{{count}}', res.count),'success');
       window.setupParsedEmployees = [];
       window.setupCurrentStep = 4;
       await renderSetupContent(true);
@@ -862,25 +864,25 @@ window.saveStep3AndAdvance = async function(){
 //  STEP 4: QUY TRÌNH (Cho phép cấu hình các bậc duyệt: Tier 0, 1, 2, 3)
 // ─────────────────────────────────────────────────────────────
 const PRESET_POLICIES_FULL=[
-  {id:'P-LEAVE',name:'Xin nghỉ phép',type:'Operation',cat:'Nhan su',nameVi:'Xin nghỉ phép',descVi:'Quy trình nhân viên xin nghỉ phép (ngày, dài ngày)',tags:['Phổ biến'],elements:'ASSIGN_TASK',sla:1,checked:true},
-  {id:'P-RECRUIT',name:'Tuyen dung',type:'Operation',cat:'Nhan su',nameVi:'Tuyển dụng',descVi:'Đề xuất và phê duyệt tuyển dụng nhân sự',tags:['Phổ biến'],elements:'ASSIGN_TASK',sla:3,checked:true},
-  {id:'P-ONBOARD',name:'Onboarding',type:'Operation',cat:'Nhan su',nameVi:'Onboarding',descVi:'Quy trình tiếp nhận nhân viên mới',tags:['Mới'],elements:'ASSIGN_TASK',sla:2,checked:false},
-  {id:'P-OFFBOARD',name:'Offboarding',type:'Operation',cat:'Nhan su',nameVi:'Offboarding',descVi:'Nghỉ việc và bàn giao công việc',tags:[],elements:'ASSIGN_TASK',sla:3,checked:false},
-  {id:'P-SALARY',name:'Dieu chinh luong',type:'Finance',cat:'Nhan su',nameVi:'Điều chỉnh lương',descVi:'Đề xuất điều chỉnh lương, thưởng',tags:[],elements:'ASSIGN_TASK',sla:5,checked:false},
-  {id:'P-STATION',name:'Mua VPP',type:'Operation',cat:'Hanh chinh',nameVi:'Mua văn phòng phẩm',descVi:'Đề xuất mua sắm văn phòng phẩm',tags:['Phổ biến'],elements:'EXPENSE',sla:2,checked:false},
-  {id:'P-ASSET',name:'Cap phat TS',type:'Operation',cat:'Hanh chinh',nameVi:'Cấp phát tài sản',descVi:'Yêu cầu cấp phát thiết bị, tài sản công ty',tags:[],elements:'ASSIGN_TASK',sla:2,checked:false},
-  {id:'P-VEHICLE',name:'Dat xe',type:'Operation',cat:'Hanh chinh',nameVi:'Đặt xe / Di chuyển',descVi:'Đặt xe công tác, di chuyển nội bộ',tags:[],elements:'ASSIGN_TASK',sla:1,checked:false},
-  {id:'P-ADVANCE',name:'Tam ung',type:'Finance',cat:'Tai chinh',nameVi:'Đề nghị tạm ứng',descVi:'Tạm ứng công tác phí và hoàn ứng chứng từ',tags:['Phổ biến'],elements:'EXPENSE',sla:2,checked:true},
-  {id:'P-PAYMENT',name:'Thanh toan',type:'Finance',cat:'Tai chinh',nameVi:'Thanh toán chi phí',descVi:'Phê duyệt thanh toán hóa đơn, chi phí phát sinh',tags:['Phổ biến'],elements:'EXPENSE',sla:3,checked:false},
-  {id:'P-BUDGET',name:'Ngan sach',type:'Finance',cat:'Tai chinh',nameVi:'Đề xuất ngân sách',descVi:'Lập và phê duyệt ngân sách dự án, phòng ban',tags:[],elements:'EXPENSE',sla:5,checked:false},
-  {id:'P-CONTRACT',name:'Hop dong',type:'Finance',cat:'Tai chinh',nameVi:'Ký kết hợp đồng',descVi:'Phê duyệt và ký kết hợp đồng kinh tế',tags:[],elements:'ASSIGN_TASK',sla:5,checked:false},
-  {id:'P-IT-ACC',name:'Tai khoan IT',type:'Technical',cat:'CNTT',nameVi:'Cấp tài khoản IT',descVi:'Yêu cầu cấp tài khoản phần mềm, hệ thống',tags:['Mới'],elements:'ASSIGN_TASK',sla:1,checked:false},
-  {id:'P-IT-ISSUE',name:'Bao loi',type:'Technical',cat:'CNTT',nameVi:'Báo lỗi hệ thống',descVi:'Báo cáo sự cố kỹ thuật và xử lý',tags:[],elements:'ASSIGN_TASK',sla:1,checked:false},
-  {id:'P-PURCHASE',name:'Mua hang',type:'Operation',cat:'Mua hang',nameVi:'Đề nghị mua hàng',descVi:'Đề xuất và phê duyệt mua sắm vật tư, thiết bị',tags:['Phổ biến'],elements:'EXPENSE',sla:3,checked:false},
-  {id:'P-DEAL',name:'Bao gia',type:'Sale and MKT',cat:'Kinh doanh',nameVi:'Phê duyệt báo giá',descVi:'Phê duyệt báo giá, đề xuất thương mại',tags:['Phổ biến'],elements:'ASSIGN_TASK',sla:2,checked:false},
-  {id:'P-WFH',name:'WFH',type:'Operation',cat:'Khac',nameVi:'Làm việc từ xa (WFH)',descVi:'Xin phép làm việc tại nhà / từ xa',tags:['Mới'],elements:'ASSIGN_TASK',sla:1,checked:false},
-  {id:'P-OT',name:'Tang ca',type:'Operation',cat:'Khac',nameVi:'Tăng ca / Làm thêm giờ',descVi:'Đăng ký và phê duyệt làm thêm giờ',tags:[],elements:'ASSIGN_TASK',sla:1,checked:false},
-  {id:'P-BUSINESS',name:'Cong tac',type:'Operation',cat:'Khac',nameVi:'Công tác / Xuất ngoại',descVi:'Phê duyệt công tác, đi nước ngoài',tags:[],elements:'ASSIGN_TASK',sla:2,checked:false}
+  {id:'P-LEAVE',name:'Leave Request',nameEn:'Leave Request',type:'Operation',cat:'Nhan su',nameVi:'Xin nghỉ phép',descEn:'Staff leave application (annual, sick, personal)',descVi:'Quy trình nhân viên xin nghỉ phép (ngày, dài ngày)',tags:['Phổ biến'],elements:'ASSIGN_TASK',sla:1,checked:true},
+  {id:'P-RECRUIT',name:'Recruitment',nameEn:'Recruitment',type:'Operation',cat:'Nhan su',nameVi:'Tuyển dụng',descEn:'Hiring proposal and candidate recruitment approval',descVi:'Đề xuất và phê duyệt tuyển dụng nhân sự',tags:['Phổ biến'],elements:'ASSIGN_TASK',sla:3,checked:true},
+  {id:'P-ONBOARD',name:'Onboarding',nameEn:'Onboarding',type:'Operation',cat:'Nhan su',nameVi:'Onboarding',descEn:'New employee onboarding checklist and setup',descVi:'Quy trình tiếp nhận nhân viên mới',tags:['Mới'],elements:'ASSIGN_TASK',sla:2,checked:false},
+  {id:'P-OFFBOARD',name:'Offboarding',nameEn:'Offboarding',type:'Operation',cat:'Nhan su',nameVi:'Offboarding',descEn:'Handover and resignation process',descVi:'Nghỉ việc và bàn giao công việc',tags:[],elements:'ASSIGN_TASK',sla:3,checked:false},
+  {id:'P-SALARY',name:'Salary Adjustment',nameEn:'Salary Adjustment',type:'Finance',cat:'Nhan su',nameVi:'Điều chỉnh lương',descEn:'Compensation & salary adjustment proposal',descVi:'Đề xuất điều chỉnh lương, thưởng',tags:[],elements:'ASSIGN_TASK',sla:5,checked:false},
+  {id:'P-STATION',name:'Office Supplies',nameEn:'Office Supplies',type:'Operation',cat:'Hanh chinh',nameVi:'Mua văn phòng phẩm',descEn:'Office stationery and supplies request',descVi:'Đề xuất mua sắm văn phòng phẩm',tags:['Phổ biến'],elements:'EXPENSE',sla:2,checked:false},
+  {id:'P-ASSET',name:'Asset Allocation',nameEn:'Asset Allocation',type:'Operation',cat:'Hanh chinh',nameVi:'Cấp phát tài sản',descEn:'Equipment & company asset allocation',descVi:'Yêu cầu cấp phát thiết bị, tài sản công ty',tags:[],elements:'ASSIGN_TASK',sla:2,checked:false},
+  {id:'P-VEHICLE',name:'Vehicle Booking',nameEn:'Vehicle Booking',type:'Operation',cat:'Hanh chinh',nameVi:'Đặt xe / Di chuyển',descEn:'Business trip transport & vehicle booking',descVi:'Đặt xe công tác, di chuyển nội bộ',tags:[],elements:'ASSIGN_TASK',sla:1,checked:false},
+  {id:'P-ADVANCE',name:'Cash Advance',nameEn:'Cash Advance',type:'Finance',cat:'Tai chinh',nameVi:'Đề nghị tạm ứng',descEn:'Business travel and petty cash advance',descVi:'Tạm ứng công tác phí và hoàn ứng chứng từ',tags:['Phổ biến'],elements:'EXPENSE',sla:2,checked:true},
+  {id:'P-PAYMENT',name:'Payment Request',nameEn:'Payment Request',type:'Finance',cat:'Tai chinh',nameVi:'Thanh toán chi phí',descEn:'Invoice and operational payment approval',descVi:'Phê duyệt thanh toán hóa đơn, chi phí phát sinh',tags:['Phổ biến'],elements:'EXPENSE',sla:3,checked:false},
+  {id:'P-BUDGET',name:'Budget Proposal',nameEn:'Budget Proposal',type:'Finance',cat:'Tai chinh',nameVi:'Đề xuất ngân sách',descEn:'Department and project budget proposal',descVi:'Lập và phê duyệt ngân sách dự án, phòng ban',tags:[],elements:'EXPENSE',sla:5,checked:false},
+  {id:'P-CONTRACT',name:'Contract Signing',nameEn:'Contract Signing',type:'Finance',cat:'Tai chinh',nameVi:'Ký kết hợp đồng',descEn:'Commercial and economic contract approval',descVi:'Phê duyệt và ký kết hợp đồng kinh tế',tags:[],elements:'ASSIGN_TASK',sla:5,checked:false},
+  {id:'P-IT-ACC',name:'IT Account Request',nameEn:'IT Account Request',type:'Technical',cat:'CNTT',nameVi:'Cấp tài khoản IT',descEn:'Software, system and email account provisioning',descVi:'Yêu cầu cấp tài khoản phần mềm, hệ thống',tags:['Mới'],elements:'ASSIGN_TASK',sla:1,checked:false},
+  {id:'P-IT-ISSUE',name:'IT Support Ticket',nameEn:'IT Support Ticket',type:'Technical',cat:'CNTT',nameVi:'Báo lỗi hệ thống',descEn:'Technical incident report and troubleshooting',descVi:'Báo cáo sự cố kỹ thuật và xử lý',tags:[],elements:'ASSIGN_TASK',sla:1,checked:false},
+  {id:'P-PURCHASE',name:'Purchase Request',nameEn:'Purchase Request',type:'Operation',cat:'Mua hang',nameVi:'Đề nghị mua hàng',descEn:'Material and equipment purchasing proposal',descVi:'Đề xuất và phê duyệt mua sắm vật tư, thiết bị',tags:['Phổ biến'],elements:'EXPENSE',sla:3,checked:false},
+  {id:'P-DEAL',name:'Quotation Approval',nameEn:'Quotation Approval',type:'Sale and MKT',cat:'Kinh doanh',nameVi:'Phê duyệt báo giá',descEn:'Commercial proposal and quotation approval',descVi:'Phê duyệt báo giá, đề xuất thương mại',tags:['Phổ biến'],elements:'ASSIGN_TASK',sla:2,checked:false},
+  {id:'P-WFH',name:'Work From Home',nameEn:'Work From Home',type:'Operation',cat:'Khac',nameVi:'Làm việc từ xa (WFH)',descEn:'Remote work / WFH permission request',descVi:'Xin phép làm việc tại nhà / từ xa',tags:['Mới'],elements:'ASSIGN_TASK',sla:1,checked:false},
+  {id:'P-OT',name:'Overtime Registration',nameEn:'Overtime Registration',type:'Operation',cat:'Khac',nameVi:'Tăng ca / Làm thêm giờ',descEn:'Overtime work registration and compensation',descVi:'Đăng ký và phê duyệt làm thêm giờ',tags:[],elements:'ASSIGN_TASK',sla:1,checked:false},
+  {id:'P-BUSINESS',name:'Business Travel',nameEn:'Business Travel',type:'Operation',cat:'Khac',nameVi:'Công tác / Xuất ngoại',descEn:'Domestic and international business travel approval',descVi:'Phê duyệt công tác, đi nước ngoài',tags:[],elements:'ASSIGN_TASK',sla:2,checked:false}
 ];
 const STEP4_CATS=[{key:'all',label:'Tất cả',count:19},{key:'Nhan su',label:'Nhân sự',count:5},{key:'Hanh chinh',label:'Hành chính',count:3},{key:'Tai chinh',label:'Tài chính',count:4},{key:'CNTT',label:'CNTT',count:2},{key:'Mua hang',label:'Mua hàng',count:1},{key:'Kinh doanh',label:'Kinh doanh',count:1},{key:'Khac',label:'Khác',count:3}];
 const P_CAT_ICONS={'Nhan su':'group','Hanh chinh':'admin_panel_settings','Tai chinh':'account_balance','CNTT':'computer','Mua hang':'shopping_cart','Kinh doanh':'trending_up','Khac':'more_horiz','all':'apps'};
@@ -893,8 +895,18 @@ window.setStep4Category=function(c){window.setupStep4Category=c;renderSetupConte
 window.setStep4Search=function(v){window.setupStep4Search=v;renderSetupContent();};
 window.setStep4ApprovalLevel=function(lvl){
   window.setupStep4ApprovalLevel=lvl;
+  document.querySelectorAll('.sw-tier-btn').forEach(btn => {
+    const isCur = btn.dataset.lvl === lvl;
+    btn.style.borderColor = isCur ? '#ea580c' : '#D1D5DB';
+    btn.style.backgroundColor = isCur ? '#ea580c' : '#FFFFFF';
+    btn.style.color = isCur ? '#FFFFFF' : '#374151';
+  });
+  const t0=document.getElementById('new_policy_tier0_note');
+  const t1=document.getElementById('new_policy_tier1_container');
   const t2=document.getElementById('new_policy_tier2_container');
   const t3=document.getElementById('new_policy_tier3_container');
+  if(t0) t0.style.display=(lvl==='Tier 0')?'block':'none';
+  if(t1) t1.style.display=(lvl==='Tier 0')?'none':'block';
   if(t2) t2.style.display=(lvl==='Tier 2'||lvl==='Tier 3')?'block':'none';
   if(t3) t3.style.display=(lvl==='Tier 3')?'block':'none';
 };
@@ -906,21 +918,37 @@ function renderStep4HTML(counts){
     const cat=window.setupStep4Category||'all',search=(window.setupStep4Search||'').toLowerCase();
     let filtered=PRESET_POLICIES_FULL;
     if(cat!=='all')filtered=filtered.filter(p=>p.cat===cat);
-    if(search)filtered=filtered.filter(p=>p.nameVi.toLowerCase().includes(search)||p.descVi.toLowerCase().includes(search));
+    if(search)filtered=filtered.filter(p=>p.nameVi.toLowerCase().includes(search)||p.descVi.toLowerCase().includes(search)||(p.nameEn||'').toLowerCase().includes(search)||(p.descEn||'').toLowerCase().includes(search));
+    
+    const catLabels = {
+      'all': swT('sw.cat_all', 'Tất cả'),
+      'Nhan su': swT('sw.cat_hr', 'Nhân sự'),
+      'Hanh chinh': swT('sw.cat_admin', 'Hành chính'),
+      'Tai chinh': swT('sw.cat_finance', 'Tài chính'),
+      'CNTT': swT('sw.cat_it', 'CNTT'),
+      'Mua hang': swT('sw.cat_procure', 'Mua hàng'),
+      'Kinh doanh': swT('sw.cat_sales', 'Kinh doanh'),
+      'Khac': swT('sw.cat_other', 'Khác')
+    };
     let catBtns='';
     for(const c of STEP4_CATS){
       const isAct=cat===c.key;
-      catBtns+='<button onclick="window.setStep4Category(\''+c.key+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:9px;border:none;cursor:pointer;text-align:left;transition:var(--transition);width:100%;background:'+(isAct?P_CAT_BGS[c.key]||'#FFF7ED':'transparent')+';"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:'+(isAct?'700':'500')+';color:'+(isAct?P_CAT_COLORS[c.key]||'#EA580C':'#374151')+';"><span class="material-symbols-rounded" style="font-size:15px;color:'+(isAct?P_CAT_COLORS[c.key]||'#EA580C':'#9CA3AF')+'">'+(P_CAT_ICONS[c.key]||'folder')+'</span>'+c.label+'</div><span style="font-size:11px;padding:1px 6px;border-radius:10px;background:#F3F4F6;color:#6B7280;font-weight:600;">'+c.count+'</span></button>';
+      const clabel = catLabels[c.key] || c.label;
+      catBtns+='<button onclick="window.setStep4Category(\''+c.key+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:9px;border:none;cursor:pointer;text-align:left;transition:var(--transition);width:100%;background:'+(isAct?P_CAT_BGS[c.key]||'#FFF7ED':'transparent')+';"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:'+(isAct?'700':'500')+';color:'+(isAct?P_CAT_COLORS[c.key]||'#EA580C':'#374151')+';"><span class="material-symbols-rounded" style="font-size:15px;color:'+(isAct?P_CAT_COLORS[c.key]||'#EA580C':'#9CA3AF')+'">'+(P_CAT_ICONS[c.key]||'folder')+'</span>'+clabel+'</div><span style="font-size:11px;padding:1px 6px;border-radius:10px;background:#F3F4F6;color:#6B7280;font-weight:600;">'+c.count+'</span></button>';
     }
     let pCards='';
+    const isVi = (window.currentLocale || localStorage.getItem('crc_locale') || 'vi') === 'vi';
     for(const p of filtered){
       let tgs='';
       for(const tag of p.tags){
         const s=P_TAG_STYLES[tag]||{bg:'#F3F4F6',color:'#374151',border:'#E5E7EB'};
-        tgs+='<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:'+s.bg+';color:'+s.color+';border:1px solid '+s.border+';font-weight:600;">'+tag+'</span>';
+        const tagLabel = tag === 'Phổ biến' ? swT('sw.tag_popular', 'Phổ biến') : (tag === 'Mới' ? swT('sw.tag_new', 'Mới') : tag);
+        tgs+='<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:'+s.bg+';color:'+s.color+';border:1px solid '+s.border+';font-weight:600;">'+tagLabel+'</span>';
       }
       const catColor=P_CAT_COLORS[p.cat]||'#EA580C',catBg=P_CAT_BGS[p.cat]||'#FFF7ED';
-      pCards+='<label class="sw-policy-card '+(p.checked?'checked':'')+'" onclick="this.querySelector(\'input\').click();this.classList.toggle(\'checked\')"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;"><div style="width:32px;height:32px;border-radius:9px;background:'+catBg+';display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:17px;color:'+catColor+'">'+(P_CAT_ICONS[p.cat]||'policy')+'</span></div><input type="checkbox" name="preset_policy" value="'+p.id+'" '+(p.checked?'checked':'')+' style="accent-color:#f97316;width:16px;height:16px;flex-shrink:0;" onclick="event.stopPropagation()"></div><div style="font-size:12.5px;font-weight:700;color:#111827;margin-bottom:4px;">'+p.nameVi+'</div><div style="font-size:11px;color:#6B7280;line-height:1.4;flex:1;margin-bottom:8px;">'+p.descVi+'</div><div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;gap:4px;">'+tgs+'</div><span style="font-size:10.5px;color:#9CA3AF;">SLA: '+p.sla+'d</span></div></label>';
+      const pName = isVi ? p.nameVi : (p.nameEn || p.name);
+      const pDesc = isVi ? p.descVi : (p.descEn || p.descVi);
+      pCards+='<label class="sw-policy-card '+(p.checked?'checked':'')+'" onclick="this.querySelector(\'input\').click();this.classList.toggle(\'checked\')"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;"><div style="width:32px;height:32px;border-radius:9px;background:'+catBg+';display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:17px;color:'+catColor+'">'+(P_CAT_ICONS[p.cat]||'policy')+'</span></div><input type="checkbox" name="preset_policy" value="'+p.id+'" '+(p.checked?'checked':'')+' style="accent-color:#f97316;width:16px;height:16px;flex-shrink:0;" onclick="event.stopPropagation()"></div><div style="font-size:12.5px;font-weight:700;color:#111827;margin-bottom:4px;">'+escapeHTML(pName)+'</div><div style="font-size:11px;color:#6B7280;line-height:1.4;flex:1;margin-bottom:8px;">'+escapeHTML(pDesc)+'</div><div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;gap:4px;">'+tgs+'</div><span style="font-size:10.5px;color:#9CA3AF;">SLA: '+p.sla+'d</span></div></label>';
     }
     if(!pCards) pCards='<div style="grid-column:span 3;text-align:center;padding:30px;color:#9CA3AF;font-size:13px;">' + swT('form.no_results', 'Không tìm thấy quy trình phù hợp') + '</div>';
     tc='<div style="display:flex;gap:16px;">'
@@ -934,35 +962,41 @@ function renderStep4HTML(counts){
     const currentLvl = window.setupStep4ApprovalLevel || 'Tier 1';
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:16px;">' + swT('sw.step4_desc', 'Tự định nghĩa quy trình theo nhu cầu riêng của doanh nghiệp.') + '</p>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      +'<div style="grid-column:span 2;">'+swLabel(swT('sw.step4_policy_name', 'Tên quy trình'), true)+swInput('new_policy_name', 'VD: Quy trình phê duyệt hợp đồng dịch vụ', '')+'</div>'
+      +'<div style="grid-column:span 2;">'+swLabel(swT('sw.step4_policy_name', 'Tên quy trình'), true)+swInput('new_policy_name', swT('sw.step4_policy_name_ph', 'VD: Quy trình phê duyệt hợp đồng dịch vụ'), '')+'</div>'
       +'<div>'+swLabel(swT('sw.step4_policy_type', 'Loại'), false)+'<select id="new_policy_type" class="sw-select"><option>Operation</option><option>Finance</option><option>Technical</option><option>Sale and MKT</option></select></div>'
       +'<div>'+swLabel(swT('sw.step4_sla', 'SLA (ngày)'), false)+'<input id="new_policy_sla" type="number" class="sw-input" min="1" value="3"></div>'
-      +'<div style="grid-column:span 2;">'+swLabel(swT('sw.step4_desc_field', 'Mô tả'), false)+'<textarea id="new_policy_desc" class="sw-input" rows="2" style="resize:vertical;" placeholder="Mô tả ngắn gọn về mục đích quy trình..."></textarea></div>'
+      +'<div style="grid-column:span 2;">'+swLabel(swT('sw.step4_desc_field', 'Mô tả'), false)+'<textarea id="new_policy_desc" class="sw-input" rows="2" style="resize:vertical;" placeholder="' + swT('sw.step4_policy_desc_ph', 'Mô tả ngắn gọn về mục đích quy trình...') + '"></textarea></div>'
 
       // Approval Level Selection
       +'<div style="grid-column:span 2;padding:14px;border:1px solid #E5E7EB;border-radius:12px;background:#F9FAFB;">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
       +'<div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step4_approval_level', 'Cấp độ duyệt') + '</div>'
       +'<div style="display:flex;gap:6px;">'
-      +['Tier 0', 'Tier 1', 'Tier 2', 'Tier 3'].map(lvl => '<button type="button" onclick="window.setStep4ApprovalLevel(\''+lvl+'\')" style="padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid '+(currentLvl===lvl?'#ea580c':'#D1D5DB')+';background:'+(currentLvl===lvl?'#ea580c':'#FFFFFF')+';color:'+(currentLvl===lvl?'#FFFFFF':'#374151')+';">'+lvl+'</button>').join('')
+      +['Tier 0', 'Tier 1', 'Tier 2', 'Tier 3'].map(lvl => '<button type="button" class="sw-tier-btn" data-lvl="'+lvl+'" onclick="window.setStep4ApprovalLevel(\''+lvl+'\')" style="padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid '+(currentLvl===lvl?'#ea580c':'#D1D5DB')+';background:'+(currentLvl===lvl?'#ea580c':'#FFFFFF')+';color:'+(currentLvl===lvl?'#FFFFFF':'#374151')+';">'+lvl+'</button>').join('')
       +'</div></div>'
 
+      // Tier 0 note (Auto approved)
+      +'<div id="new_policy_tier0_note" style="display:'+(currentLvl==='Tier 0'?'block':'none')+';padding:10px 14px;border-radius:8px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:12px;margin-top:10px;">'
+      +'<span class="material-symbols-rounded" style="vertical-align:middle;font-size:16px;margin-right:4px;">check_circle</span>'
+      +swT('sw.step4_tier0_desc', 'Tự động phê duyệt (không yêu cầu bước duyệt)')
+      +'</div>'
+
       // Tier 1 approver
-      +'<div id="new_policy_tier1_container" style="margin-top:10px;">'
+      +'<div id="new_policy_tier1_container" style="margin-top:10px;display:'+(currentLvl==='Tier 0'?'none':'block')+';">'
       +swLabel(swT('sw.step4_tier1', 'Bậc 1 (Tier 1)'), true)
-      +'<input type="text" id="new_policy_tier1" class="sw-input" value="Direct Manager" placeholder="Direct Manager / Email / Tên người duyệt">'
+      +'<input type="text" id="new_policy_tier1" class="sw-input" value="Direct Manager" placeholder="' + swT('sw.step4_tier1_ph', 'Direct Manager / Email / Tên người duyệt') + '">'
       +'</div>'
 
       // Tier 2 approver (shown for Tier 2 and Tier 3)
       +'<div id="new_policy_tier2_container" style="margin-top:10px;display:'+(currentLvl==='Tier 2'||currentLvl==='Tier 3'?'block':'none')+';">'
       +swLabel(swT('sw.step4_tier2', 'Bậc 2 (Tier 2)'), true)
-      +'<input type="text" id="new_policy_tier2" class="sw-input" placeholder="VD: Trưởng phòng / HR Manager / Finance Lead / Email">'
+      +'<input type="text" id="new_policy_tier2" class="sw-input" placeholder="' + swT('sw.step4_tier2_ph', 'VD: Trưởng phòng / HR Manager / Finance Lead / Email') + '">'
       +'</div>'
 
       // Tier 3 approver (shown for Tier 3)
       +'<div id="new_policy_tier3_container" style="margin-top:10px;display:'+(currentLvl==='Tier 3'?'block':'none')+';">'
       +swLabel(swT('sw.step4_tier3', 'Bậc 3 (Tier 3)'), true)
-      +'<input type="text" id="new_policy_tier3" class="sw-input" placeholder="VD: Ban Giám đốc / Tổng giám đốc / Email">'
+      +'<input type="text" id="new_policy_tier3" class="sw-input" placeholder="' + swT('sw.step4_tier3_ph', 'VD: Ban Giám đốc / Tổng giám đốc / Email') + '">'
       +'</div>'
 
       +'<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">'
@@ -973,7 +1007,7 @@ function renderStep4HTML(counts){
   } else if(tab==='excel'){
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;"><button onclick="downloadSetupTemplate(\'policy\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="importSetupFile(event,\'policy\')"></label></div></div>';
   } else {
-    tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step4_header', 'Thiết lập quy trình') + ': <strong style="color:#16a34a;">'+(counts.policy_and_program||0)+'</strong> ' + swT('sw.step4_name', 'Quy trình') + '</p>'+(counts.policy_and_program>0?'<div style="padding:20px;text-align:center;background:#ECFDF5;border-radius:12px;border:1px solid #A7F3D0;"><span class="material-symbols-rounded" style="font-size:40px;color:#059669;">task_alt</span><div style="margin-top:8px;font-size:13px;color:#111827;font-weight:600;">Đã có '+counts.policy_and_program+' quy trình</div></div>':'<div style="padding:30px;text-align:center;color:#9CA3AF;font-size:13px;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div>';
+    tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step4_header', 'Thiết lập quy trình') + ': <strong style="color:#16a34a;">'+(counts.policy_and_program||0)+'</strong> ' + swT('sw.step4_name', 'Quy trình') + '</p>'+(counts.policy_and_program>0?'<div style="padding:20px;text-align:center;background:#ECFDF5;border-radius:12px;border:1px solid #A7F3D0;"><span class="material-symbols-rounded" style="font-size:40px;color:#059669;">task_alt</span><div style="margin-top:8px;font-size:13px;color:#111827;font-weight:600;">' + swT('sw.step4_existing_count', 'Đã có {{count}} quy trình').replace('{{count}}', counts.policy_and_program) + '</div></div>':'<div style="padding:30px;text-align:center;color:#9CA3AF;font-size:13px;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div>';
   }
   return '<div class="sw-card">'+swStepHeader('policy', 4, swT('sw.step4_header', 'Thiết lập quy trình'), swT('sw.step4_desc', 'Chọn quy trình mẫu phù hợp hoặc tự tạo theo nhu cầu doanh nghiệp.'))+swTabBar([{key:'library',label:swT('sw.step4_tab_library', 'Chọn từ thư viện mẫu')},{key:'create',label:swT('sw.step4_tab_create', 'Tạo quy trình mới')},{key:'excel',label:swT('sw.step4_tab_excel', 'Nhập từ Excel')},{key:'manage',label:swT('sw.step4_tab_manage', 'Quản lý')}],tab,'window.switchStep4Tab')+tc+swBottomNav(3, 5, swT('sw.step4_save_btn', 'Tạo các quy trình đã chọn'),'saveStep4AndAdvance()')+'</div>';
 }
@@ -984,7 +1018,7 @@ window.saveStep4AndAdvance = async function(){
     const name = document.getElementById('new_policy_name')?.value?.trim();
     if(!name){showToast(swT('form.required_field', 'Vui lòng nhập tên quy trình'),'warning');return;}
     const lvl = window.setupStep4ApprovalLevel || 'Tier 1';
-    const tier1 = document.getElementById('new_policy_tier1')?.value?.trim() || 'Direct Manager';
+    const tier1 = (lvl==='Tier 0') ? 'Auto' : (document.getElementById('new_policy_tier1')?.value?.trim() || 'Direct Manager');
     const tier2 = (lvl==='Tier 2'||lvl==='Tier 3') ? (document.getElementById('new_policy_tier2')?.value?.trim() || null) : null;
     const tier3 = (lvl==='Tier 3') ? (document.getElementById('new_policy_tier3')?.value?.trim() || null) : null;
 
@@ -1002,7 +1036,7 @@ window.saveStep4AndAdvance = async function(){
     try {
       const res = await apiPost('/system-setup/presets/policies', { policies: p });
       if(res.success){
-        showToast('Đã tạo quy trình "' + name + '"!','success');
+        showToast(swT('sw.step4_created_success', 'Đã tạo quy trình "{{name}}"!').replace('{{name}}', name),'success');
         window.setupCurrentStep = 5;
         await renderSetupContent(true);
       } else showToast(res.error || 'Lỗi','error');
@@ -1024,7 +1058,7 @@ window.saveStep4AndAdvance = async function(){
     showToast(swT('sw.step4_creating', 'Đang khởi tạo quy trình...'),'info');
     const res = await apiPost('/system-setup/presets/policies', { policies: payload });
     if(res.success){
-      showToast('Đã tạo ' + res.count + ' quy trình!','success');
+      showToast(swT('sw.step4_created_count', 'Đã tạo {{count}} quy trình!').replace('{{count}}', res.count),'success');
       window.setupCurrentStep = 5;
       await renderSetupContent(true);
     } else showToast(res.error || 'Lỗi','error');
@@ -1039,14 +1073,14 @@ function renderStep5HTML(comp,counts){
   const banks=['Vietcombank','Vietinbank','BIDV','Techcombank','MB Bank','ACB','Agribank','TPBank','VPBank','OCB','SHB','HDBank','MSB','VIB','SeABank'];
   let bopts='<option value="">-- ' + swT('sw.step5_bank', 'Ngân hàng') + ' --</option>';
   for(const b of banks) bopts+='<option value="'+b+'">'+b+'</option>';
-  const acctInfo=counts.account>0?'<div style="padding:12px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:16px;font-size:12px;color:#374151;"><span class="material-symbols-rounded" style="font-size:14px;color:#059669;vertical-align:middle;">check_circle</span> Hiện có <strong style="color:#059669;">'+counts.account+'</strong> tài khoản đã thiết lập.</div>':'';
+  const acctInfo=counts.account>0?'<div style="padding:12px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:16px;font-size:12px;color:#374151;"><span class="material-symbols-rounded" style="font-size:14px;color:#059669;vertical-align:middle;">check_circle</span> ' + swT('sw.step5_existing_count', 'Hiện có {{count}} tài khoản đã thiết lập.').replace('{{count}}', counts.account) + '</div>':'';
   return '<div class="sw-card">'
     +swStepHeader('account_balance',5, swT('sw.step5_header', 'Tài khoản ngân hàng'), swT('sw.step5_desc', 'Thiết lập tài khoản thanh toán để quản lý dòng tiền thu chi.'))
     +'<form id="form-step5" onsubmit="event.preventDefault();saveStep5AndAdvance();">'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">'
-    +'<div style="grid-column:span 2;">'+swLabel(swT('sw.step5_acct_name', 'Tên tài khoản giao dịch'),false)+swInput('step5_account_name','VD: Tài khoản chính Vietcombank','')+'</div>'
+    +'<div style="grid-column:span 2;">'+swLabel(swT('sw.step5_acct_name', 'Tên tài khoản giao dịch'),false)+swInput('step5_account_name', swT('sw.step5_acct_name_ph', 'VD: Tài khoản chính Vietcombank'), '')+'</div>'
     +'<div>'+swLabel(swT('sw.step5_bank', 'Ngân hàng'),false)+'<select id="step5_bank_name" class="sw-select">'+bopts+'</select></div>'
-    +'<div>'+swLabel(swT('sw.step5_acct_num', 'Số tài khoản'),false)+swInput('step5_account_number','VD: 0011001234567','')+'</div>'
+    +'<div>'+swLabel(swT('sw.step5_acct_num', 'Số tài khoản'),false)+swInput('step5_account_number', swT('sw.step5_acct_num_ph', 'VD: 0011001234567'), '')+'</div>'
     +'<div>'+swLabel(swT('sw.step5_currency', 'Loại tiền tệ'),false)+'<input type="text" id="step5_currency" readonly class="sw-input" style="background:#F9FAFB;color:#9CA3AF;" value="'+cur+'"></div>'
     +'</div>'+acctInfo
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:16px;border-top:1px solid #F3F4F6;">'
@@ -1061,7 +1095,7 @@ window.saveStep5AndAdvance = async function(){
   const num = document.getElementById('step5_account_number')?.value?.trim();
   const cur = document.getElementById('step5_currency')?.value || 'VND';
   try {
-    showToast('Đang thiết lập tài khoản...','info');
+    showToast(swT('sw.step5_setting_up', 'Đang thiết lập tài khoản...'),'info');
     await apiPost('/system-setup/quick-account', {
       account_name: an,
       bank_name: bn,
@@ -1069,7 +1103,7 @@ window.saveStep5AndAdvance = async function(){
       currency: cur,
       create_cash: true
     });
-    showToast('Đã lưu tài khoản!','success');
+    showToast(swT('sw.step5_saved', 'Đã lưu tài khoản!'),'success');
     window.setupCurrentStep = 6;
     await renderSetupContent(true);
   } catch(err){showToast('Lỗi: '+err.message,'error');}
@@ -1092,10 +1126,10 @@ function renderStep6HTML(counts,comp){
     sumCards+='<div style="padding:14px 12px;border-radius:12px;background:'+(s.done?s.bg:'#F9FAFB')+';border:1px solid '+(s.done?'rgba(0,0,0,0.06)':'#E5E7EB')+';text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:8px;">'+(s.done?'<span class="material-symbols-rounded" style="font-size:14px;color:#059669;">check_circle</span><span style="font-size:11px;font-weight:600;color:#059669;">' + swT('sw.status_done', 'Hoàn thành') + '</span>':'<span class="material-symbols-rounded" style="font-size:14px;color:#D1D5DB;">radio_button_unchecked</span><span style="font-size:11px;font-weight:600;color:#9CA3AF;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</span>')+'</div><div style="font-size:22px;font-weight:800;color:'+(s.done?s.color:'#D1D5DB')+';">'+s.val+'</div><div style="font-size:11px;color:'+(s.done?'#374151':'#9CA3AF')+';">'+s.unit+'</div><div style="font-size:10px;color:#9CA3AF;margin-top:2px;">'+s.label+'</div></div>';
   }
   const qas=[
-    {icon:'post_add',color:'#EA580C',bg:'#FFF7ED',title:'Tạo yêu cầu đầu tiên',desc:'Trải nghiệm quy trình phê duyệt và xử lý.',action:'request',btn:'Tạo yêu cầu'},
-    {icon:'task_alt',color:'#2563EB',bg:'#EFF6FF',title:'Giao nhiệm vụ',desc:'Phân công công việc và theo dõi tiến độ.',action:'assigned_task',btn:'Tạo nhiệm vụ'},
-    {icon:'bar_chart',color:'#059669',bg:'#ECFDF5',title:'Xem báo cáo',desc:'Khám phá các báo cáo quản trị.',action:'home',btn:'Xem báo cáo'},
-    {icon:'badge',color:'#7C3AED',bg:'#F5F3FF',title:'Quản lý nhân sự',desc:'Cập nhật thông tin nhân viên, phòng ban.',action:'employee',btn:'Xem danh sách'}
+    {icon:'post_add',color:'#EA580C',bg:'#FFF7ED',title:swT('sw.step6_qa1_title', 'Tạo yêu cầu đầu tiên'),desc:swT('sw.step6_qa1_desc', 'Trải nghiệm quy trình phê duyệt và xử lý.'),action:'request',btn:swT('sw.step6_qa1_btn', 'Tạo yêu cầu')},
+    {icon:'task_alt',color:'#2563EB',bg:'#EFF6FF',title:swT('sw.step6_qa2_title', 'Giao nhiệm vụ'),desc:swT('sw.step6_qa2_desc', 'Phân công công việc và theo dõi tiến độ.'),action:'assigned_task',btn:swT('sw.step6_qa2_btn', 'Tạo nhiệm vụ')},
+    {icon:'bar_chart',color:'#059669',bg:'#ECFDF5',title:swT('sw.step6_qa3_title', 'Xem báo cáo'),desc:swT('sw.step6_qa3_desc', 'Khám phá các báo cáo quản trị.'),action:'home',btn:swT('sw.step6_qa3_btn', 'Xem báo cáo')},
+    {icon:'badge',color:'#7C3AED',bg:'#F5F3FF',title:swT('sw.step6_qa4_title', 'Quản lý nhân sự'),desc:swT('sw.step6_qa4_desc', 'Cập nhật thông tin nhân viên, phòng ban.'),action:'employee',btn:swT('sw.step6_qa4_btn', 'Xem danh sách')}
   ];
   let qaCards='';
   for(const q of qas) {
