@@ -1101,6 +1101,28 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
       if (sumSpan && htmlParts.length > 0) {
         sumSpan.innerHTML = `<div style="display:flex; gap:8px; font-size:11px; color:#64748B; align-items:center; flex-wrap:nowrap;">${htmlParts.join('<span style="border-left: 1px solid #CBD5E1; height:10px; flex-shrink:0;"></span>')}</div>`;
       }
+
+      // If this is a request/my_request parent with contracts → hide Add buttons for payment & invoice
+      // (User must add payment/invoice from the contract, not from the request directly)
+      const isRequestLikeParent = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentKey);
+      if (isRequestLikeParent && data.length > 0) {
+        const hintMsg = typeof t === 'function'
+          ? t('detail.add_via_contract', 'Add from Contract')
+          : 'Add from Contract';
+        for (const finKey of ['payment', 'invoice']) {
+          const addBtn = contentPane.querySelector(`#child-add-btn-${finKey}`);
+          if (addBtn) {
+            addBtn.style.display = 'none';
+          }
+          const hintSpan = contentPane.querySelector(`#child-add-via-contract-hint-${finKey}`);
+          if (hintSpan) {
+            hintSpan.style.display = 'inline-flex';
+            hintSpan.style.alignItems = 'center';
+            hintSpan.style.gap = '4px';
+            hintSpan.innerHTML = `<span class="material-symbols-rounded" style="font-size:13px; color:#94A3B8;">info</span><span style="color:#94A3B8; font-size:11px;">${hintMsg}</span>`;
+          }
+        }
+      }
     }
 
     // Calculate sum for financial tables (payment, invoice, and expense summaries omitted per requirement)
@@ -1109,6 +1131,28 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
       const total = data.reduce((acc, curr) => acc + (parseFloat(curr.amount_in_base_currency != null ? curr.amount_in_base_currency : curr.amount) || 0), 0);
       if (sumSpan) {
         sumSpan.innerHTML = `<span style="font-size:11px; color:#64748B; font-weight:400; white-space:nowrap; flex-shrink:0;">Total: <span style="color:#111827; font-weight:700;">${formatNumber(Math.round(total))} ${baseCurr}</span></span>`;
+      }
+    }
+
+    // When loading payment/invoice tab for a request-like parent,
+    // check if there is already contract data in cache → if yes, hide Add button
+    const isRequestLikeParentForFinance = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentKey);
+    if (isRequestLikeParentForFinance && ['payment', 'invoice'].includes(childKey)) {
+      const contractCacheKey = `${parentKey}_${parentPkVal}_contract`;
+      const cachedContracts = window.childTableRawData && window.childTableRawData[contractCacheKey];
+      if (cachedContracts && cachedContracts.length > 0) {
+        const hintMsg = typeof t === 'function'
+          ? t('detail.add_via_contract', 'Add from Contract')
+          : 'Add from Contract';
+        const addBtn = contentPane.querySelector(`#child-add-btn-${childKey}`);
+        if (addBtn) addBtn.style.display = 'none';
+        const hintSpan = contentPane.querySelector(`#child-add-via-contract-hint-${childKey}`);
+        if (hintSpan) {
+          hintSpan.style.display = 'inline-flex';
+          hintSpan.style.alignItems = 'center';
+          hintSpan.style.gap = '4px';
+          hintSpan.innerHTML = `<span class="material-symbols-rounded" style="font-size:13px; color:#94A3B8;">info</span><span style="color:#94A3B8; font-size:11px;">${hintMsg}</span>`;
+        }
       }
     }
 

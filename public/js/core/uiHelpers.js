@@ -399,107 +399,41 @@ let originalClientData = {};   // cache for full unfiltered client-side data (fo
 let moduleStates = {};
 let companyTypeCounts = {};
 
-// --- Active Base Currency Helper for Dynamic labels (with memoized caching) ---
-let lastCurrencyCache = { key: null, value: 'VND' };
+// --- Active Base Currency Helper for Unified System-wide Base Currency ---
 window.getActiveBaseCurrency = function () {
-  // Build a unique cache key based on the current state parameters
-  const modKey = typeof currentModule !== 'undefined' ? currentModule : '';
-  const viewKey = typeof currentView !== 'undefined' ? currentView : 'table';
-  const filterVal = (modKey && typeof activeDropdownFilters !== 'undefined' && activeDropdownFilters[modKey] && activeDropdownFilters[modKey]['my_company'])
-    ? Array.from(activeDropdownFilters[modKey]['my_company'])[0]
-    : '';
-  const recordId = (viewKey === 'detail' && typeof currentRecord !== 'undefined' && currentRecord)
-    ? (currentRecord.my_company_id || currentRecord.company_id || currentRecord.company_entity || currentRecord.id__my_company)
-    : '';
-  const firstRowId = (typeof currentData !== 'undefined' && Array.isArray(currentData) && currentData.length > 0)
-    ? (currentData[0].my_company_id || currentData[0].company_id || currentData[0].company_entity || currentData[0].id__my_company)
-    : '';
-  const tenantCurr = (window.cmsTenantInfo && window.cmsTenantInfo.base_currency) || '';
-
-  const stateKey = `${modKey}_${viewKey}_${recordId}_${filterVal}_${firstRowId}_${tenantCurr}`;
-  if (lastCurrencyCache.key === stateKey) {
-    return lastCurrencyCache.value;
-  }
-
-  let resolvedCurrency = null;
-
-  // 1. If currently viewing a detail record
-  if (viewKey === 'detail' && typeof currentRecord !== 'undefined' && currentRecord) {
-    const record = currentRecord;
-    if (modKey === 'my_company' && record.base_currency) {
-      resolvedCurrency = record.base_currency;
-    } else if (selectCache && selectCache['my_company']) {
-      let compId = record.my_company_id || record.company_id || record.company_entity || record.id__my_company;
-      if (!compId && record.requester && selectCache['employee']) {
-        const emp = selectCache['employee'].find(e => e.email === record.requester || e.employee_id === record.requester);
-        if (emp) compId = emp.company_id;
-      }
-      if (!compId && record.request_type && selectCache['policy']) {
-        const pol = selectCache['policy'].find(p => p.policy_name === record.request_type || p.policy_id === record.request_type);
-        if (pol) compId = pol.company_id;
-      }
-      if (compId) {
-        const comp = selectCache['my_company'].find(c =>
-          String(c.my_company_id) === String(compId) ||
-          c.company_shortname === compId
-        );
-        if (comp && comp.base_currency) resolvedCurrency = comp.base_currency;
-      }
+  // 1. Tenant / Setup Wizard primary base currency
+  if (typeof window !== 'undefined') {
+    if (window.setupWizardData && window.setupWizardData.company && window.setupWizardData.company.base_currency) {
+      const c = String(window.setupWizardData.company.base_currency).trim().toUpperCase();
+      if (c && c !== 'BASE CURRENCY') return c;
+    }
+    if (window.cmsTenantInfo && window.cmsTenantInfo.base_currency) {
+      const c = String(window.cmsTenantInfo.base_currency).trim().toUpperCase();
+      if (c && c !== 'BASE CURRENCY') return c;
     }
   }
 
-  // 2. Check active sidebar filters
-  if (!resolvedCurrency && modKey && typeof activeDropdownFilters !== 'undefined' && activeDropdownFilters[modKey] && selectCache && selectCache['my_company']) {
-    const companyFilter = activeDropdownFilters[modKey]['my_company'];
-    if (companyFilter && companyFilter.size > 0) {
-      const filterValStr = Array.from(companyFilter)[0];
-      const comp = selectCache['my_company'].find(c =>
-        String(c.my_company_id) === String(filterValStr) ||
-        c.company_shortname === filterValStr ||
-        c.company_fullname === filterValStr
-      );
-      if (comp && comp.base_currency) resolvedCurrency = comp.base_currency;
+  // 2. Persisted setting in localStorage
+  try {
+    const stored = localStorage.getItem('crc_base_currency');
+    if (stored && stored !== 'Base Currency') {
+      const c = String(stored).trim().toUpperCase();
+      if (c) return c;
+    }
+  } catch (e) { }
+
+  // 3. Primary company in selectCache
+  if (typeof selectCache !== 'undefined' && selectCache && selectCache['my_company'] && selectCache['my_company'].length > 0) {
+    const primaryComp = selectCache['my_company'].find(c => String(c.my_company_id) === '1' && c.base_currency)
+      || selectCache['my_company'].find(c => c.base_currency);
+    if (primaryComp && primaryComp.base_currency) {
+      const c = String(primaryComp.base_currency).trim().toUpperCase();
+      if (c && c !== 'BASE CURRENCY') return c;
     }
   }
 
-  // 3. Check current data rows
-  if (!resolvedCurrency && typeof currentData !== 'undefined' && Array.isArray(currentData) && currentData.length > 0 && selectCache && selectCache['my_company']) {
-    const firstRow = currentData[0];
-    const compId = firstRow.my_company_id || firstRow.company_id || firstRow.company_entity || firstRow.id__my_company;
-    if (compId) {
-      const comp = selectCache['my_company'].find(c =>
-        String(c.my_company_id) === String(compId) ||
-        c.company_shortname === compId
-      );
-      if (comp && comp.base_currency) resolvedCurrency = comp.base_currency;
-    }
-  }
-
-  // 4. Check authUser company
-  if (!resolvedCurrency && typeof authUser !== 'undefined' && authUser && authUser.company_id && selectCache && selectCache['my_company']) {
-    const comp = selectCache['my_company'].find(c => String(c.my_company_id) === String(authUser.company_id) || c.company_shortname === authUser.company_id);
-    if (comp && comp.base_currency) resolvedCurrency = comp.base_currency;
-  }
-
-  // 5. Check cmsTenantInfo (from CMS subscription view)
-  if (!resolvedCurrency && window.cmsTenantInfo && window.cmsTenantInfo.base_currency) {
-    resolvedCurrency = window.cmsTenantInfo.base_currency;
-  }
-
-  // 6. First company in selectCache
-  if (!resolvedCurrency && selectCache && selectCache['my_company'] && selectCache['my_company'].length > 0) {
-    const firstComp = selectCache['my_company'].find(c => c.base_currency);
-    if (firstComp && firstComp.base_currency) resolvedCurrency = firstComp.base_currency;
-  }
-
-  // 7. Ultimate fallback: 'VND'
-  if (!resolvedCurrency || resolvedCurrency === 'Base Currency') {
-    resolvedCurrency = 'VND';
-  }
-
-  lastCurrencyCache.key = stateKey;
-  lastCurrencyCache.value = resolvedCurrency;
-  return resolvedCurrency;
+  // 4. Default fallback: 'VND'
+  return 'VND';
 };
 
 // Helper to escape HTML to prevent XSS

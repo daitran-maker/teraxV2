@@ -129,7 +129,8 @@ window.isChildTableActionAllowed = function (childKey, actionId, parentKey = cur
       'my_request',
       'my_process_owner',
       'my_task',
-      'my_team'
+      'my_team',
+      'contract'
     ];
     const parentCandidates = [effectiveView, normalizedParentKey, hashModule, currentModule]
       .filter(Boolean)

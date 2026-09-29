@@ -33,7 +33,7 @@
       { key: 'attached_file', label: 'Attached File', hidden: true }
     ],
     fields: [
-      { key: 'request', label: 'Request ID', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', required: true },
+      { key: 'request', label: 'Request ID', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description' },
       { key: 'contract_id', label: 'CONTRACT ID', type: 'select', optionsFrom: 'contract', optionValue: 'contract_id', optionLabel: 'contract_name_or_description' },
       { key: 'source', label: 'SOURCE', type: 'select', options: ['Contract', 'Request'], defaultValue: 'Request', hidden: true },
       { key: 'invoice_no', label: 'Invoice No.', type: 'text' },

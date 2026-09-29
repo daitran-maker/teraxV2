@@ -311,9 +311,17 @@ window.filterSwSearchOptions = function(type, term) {
   const q = String(term || '').trim().toLowerCase();
   const currentVal = document.getElementById('step1_' + type)?.value || '';
 
-  const filtered = q
-    ? options.filter(o => o.searchLabel.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
-    : options;
+  let filtered = [];
+  if (q) {
+    filtered = options.filter(o => o.searchLabel.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+  } else {
+    // Top 5 popular values only by default
+    filtered = options.slice(0, 5);
+    if (currentVal && !filtered.some(o => String(o.value).toLowerCase() === String(currentVal).toLowerCase())) {
+      const selectedOpt = options.find(o => String(o.value).toLowerCase() === String(currentVal).toLowerCase());
+      if (selectedOpt) filtered.push(selectedOpt);
+    }
+  }
 
   if (filtered.length === 0) {
     listEl.innerHTML = '<div style="padding:12px;text-align:center;color:#9CA3AF;font-size:12px;">' + swT('form.no_results', 'Không tìm thấy kết quả') + '</div>';
@@ -466,7 +474,21 @@ window.saveStep1AndAdvance = async function(){
       website:document.getElementById('step1_website')?.value?.trim(),
       logo: window.step1LogoBase64 || null
     });
-    if(res.success){showToast(swT('sw.step1_saved', 'Đã lưu thông tin công ty!'),'success');window.setupCurrentStep=2;await renderSetupContent(true);}
+    if(res.success){
+      const curr = document.getElementById('step1_currency')?.value;
+      if (curr) {
+        localStorage.setItem('crc_base_currency', curr);
+        if (window.setupWizardData && window.setupWizardData.company) {
+          window.setupWizardData.company.base_currency = curr;
+        }
+        if (window.cmsTenantInfo) {
+          window.cmsTenantInfo.base_currency = curr;
+        }
+      }
+      showToast(swT('sw.step1_saved', 'Đã lưu thông tin công ty!'),'success');
+      window.setupCurrentStep=2;
+      await renderSetupContent(true);
+    }
     else showToast(res.error||'Lưu thất bại','error');
   }catch(err){showToast('Lỗi: '+err.message,'error');}
 };

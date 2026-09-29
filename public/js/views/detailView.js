@@ -3532,8 +3532,26 @@ function buildDetailViewHTML(moduleKey, record) {
         }
         if (moduleKey === 'contract') {
           initialObj.source = 'Contract';
-          if (record && record.request) {
-            initialObj.request = record.request;
+          initialObj.contract_id = pkVal;
+          if (record) {
+            if (record.request) initialObj.request = record.request;
+            if (record.my_company) initialObj.my_company = record.my_company;
+            if (record.currency) initialObj.currency = record.currency;
+            if (record.contractor) initialObj.counter_party = record.contractor;
+            const tStr = String(record.type || '').toLowerCase();
+            if (childKey === 'invoice') {
+              if (record.type === 69 || tStr === '69' || tStr === 'selling') {
+                initialObj.invoice_type = 'Selling';
+              } else if (record.type === 70 || tStr === '70' || tStr === 'buying') {
+                initialObj.invoice_type = 'Buying';
+              }
+            } else if (childKey === 'payment') {
+              if (record.type === 69 || tStr === '69' || tStr === 'selling') {
+                initialObj.payment_type = 60; // Incoming
+              } else if (record.type === 70 || tStr === '70' || tStr === 'buying') {
+                initialObj.payment_type = 61; // Outgoing
+              }
+            }
           }
         }
         const initialDataStr = encodeURI(JSON.stringify(initialObj));
@@ -3550,7 +3568,8 @@ function buildDetailViewHTML(moduleKey, record) {
           'my_request',
           'my_process_owner',
           'my_task',
-          'my_team'
+          'my_team',
+          'contract'
         ];
         const isParentAllowedToAddChild = allowedParentModulesForChildAdd.includes(effectiveParentView)
           || allowedParentModulesForChildAdd.includes(moduleKey);
@@ -3568,9 +3587,6 @@ function buildDetailViewHTML(moduleKey, record) {
         if (['logs', 'request_activity_log', 'history', 'request_rating', 'rating', 'feedback', 'comment', 'ticket_comment', 'finance'].includes(childKey)) {
           showChildAddButton = false;
         }
-        if (moduleKey === 'contract' && childKey === 'invoice' && record && String(record.type).toLowerCase() === 'selling') {
-          showChildAddButton = false;
-        }
 
         html += `
           <div class="tab-pane" id="tab-pane-${childKey}" style="display:${displayStyle}; flex-direction:column; height:100%; width:100%; min-height:0;">
@@ -3585,7 +3601,8 @@ function buildDetailViewHTML(moduleKey, record) {
                 <div style="display:flex; gap:12px; align-items:center; flex-wrap:nowrap; flex-shrink:0;">
                   <span id="child-sum-${childKey}" style="font-size:11px; color:#64748B; font-weight:400;"></span>
                   ${showChildAddButton ? `
-                    <button style="background:#F97316; border:none; color:#fff; font-weight:600; font-size:12px; padding:6px 14px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:background 0.2s;" onmouseover="this.style.background='#EA580C'" onmouseout="this.style.background='#F97316'" onclick="${childKey === 'assigned_task' ? `openAddAssignedTaskFromChild('${pkVal}', '${moduleKey}')` : `openAddModal('${childKey}', JSON.parse(decodeURI('${initialDataStr}')))`}"><span class="material-symbols-rounded" style="font-size:15px;">add</span> ${t('table.add', 'Add')}</button>
+                    <button id="child-add-btn-${childKey}" style="background:#F97316; border:none; color:#fff; font-weight:600; font-size:12px; padding:6px 14px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:background 0.2s;" onmouseover="this.style.background='#EA580C'" onmouseout="this.style.background='#F97316'" onclick="${childKey === 'assigned_task' ? `openAddAssignedTaskFromChild('${pkVal}', '${moduleKey}')` : `openAddModal('${childKey}', JSON.parse(decodeURI('${initialDataStr}')))`}"><span class="material-symbols-rounded" style="font-size:15px;">add</span> ${t('table.add', 'Add')}</button>
+                    <span id="child-add-via-contract-hint-${childKey}" style="display:none; font-size:11px; color:#64748B; font-style:italic;"></span>
                   ` : ''}
                 </div>
              </div>` : `<span id="child-sum-${childKey}" style="display:none;"></span>`}
