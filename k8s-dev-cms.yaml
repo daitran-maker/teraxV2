@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crc-dev-env
+  namespace: default
+stringData:
+  DATABASE_URL: "postgres://teraxadmin:TeraX123!%40%23@terax-postgres-service:5432/crcdevdb"
+  PORT: "5221"
+  JWT_SECRET: "f61b0048e7ecc1456badb69a872b51b6ad2f092041482dd5d19f3c3bafa8e25127aa6416bb88df3d0d44f157496184f195c31450"
+  CMS_HMAC_SECRET: "cms_hmac_secret_change_me_2026"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crc-dev-deployment
+  namespace: default
+  labels:
+    app: crc-dev-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crc-dev-app
+  template:
+    metadata:
+      labels:
+        app: crc-dev-app
+    spec:
+      containers:
+        - name: crc-dev-app
+          image: crc-dev-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5221
+          envFrom:
+            - secretRef:
+                name: crc-dev-env
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crc-dev-service
+  namespace: default
+  labels:
+    app: crc-dev-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: crc-dev-app
+  ports:
+    - name: http
+      port: 5222
+      targetPort: 5221
+      protocol: TCP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cms-env
+  namespace: default
+stringData:
+  DATABASE_URL: "postgres://teraxadmin:TeraX123!%40%23@terax-postgres-service:5432/cms_terax"
+  CRC_DATABASE_URL: "postgres://helpdesk_admin:Helpdesk123!%40%23@terax-postgres-service:5432/crc_helpdesk_db"
+  PORT: "5300"
+  VPS_HOST: "10.91.1.51"
+  VPS_PORT: "22"
+  VPS_USER: "terax"
+  VPS_SSH_KEY_PATH: "/root/.ssh/id_ed25519"
+  CRC_TENANT_SYNC_URL: "http://crc-dev-service:5222/api/cms/tenant-sync"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cms-deployment
+  namespace: default
+  labels:
+    app: cms-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cms-app
+  template:
+    metadata:
+      labels:
+        app: cms-app
+    spec:
+      containers:
+        - name: cms-app
+          image: cms-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5300
+          envFrom:
+            - secretRef:
+                name: cms-env
+          volumeMounts:
+            - name: ssh-key
+              mountPath: /root/.ssh
+              readOnly: true
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+      volumes:
+        - name: ssh-key
+          hostPath:
+            path: /home/terax/.ssh
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cms-service
+  namespace: default
+  labels:
+    app: cms-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: cms-app
+  ports:
+    - name: http
+      port: 5300
+      targetPort: 5300
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared-tunnel-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared-tunnel
+  template:
+    metadata:
+      labels:
+        app: cloudflared-tunnel
+    spec:
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:latest
+        args: ["tunnel", "run"]
+        env:
+        - name: TUNNEL_TOKEN
+          value: "eyJhIjoiN2NiYjQ2ZDllOTdkOGZlMmU2NTkwYWMwZTU1ODMzZTgiLCJ0IjoiNjZmMzE0MmEtZDk0YS00MzIyLWE3ZDQtMzFmMTdmOWU3N2EzIiwicyI6IllXTmxNRGMwWlRVdE9HWTVPQzAwTnpNMUxUaGlOamt0WVRrelpXVmtNVFExTVdReiJ9"
