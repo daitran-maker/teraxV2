@@ -1,0 +1,854 @@
+// Database Markup Language (DBML) generated for crcdevdb
+// Exported at: 2026-08-25T05:02:08.078Z
+
+Project crc_app {
+  database_type: 'PostgreSQL'
+  Note: 'Database schema for crc_app system'
+}
+
+Table "account" {
+  "account_id" varchar(50) [pk]
+  "account_name" text
+  "type" varchar(100)
+  "currency" text
+  "account_infor" text
+  "account_status" integer [default: 19]
+  "account_number" text
+  "bank_name" text
+  "exchange_rate" integer
+  "transaction_managed_by" text
+  "finance_control" text
+  "company_entity" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "id_request" varchar(50)
+  "id__request" varchar(50)
+}
+
+Table "action_rules" {
+  "id" integer [not null, default: `nextval('action_rules_id_seq')`]
+  "action_id" text
+  "view_name" text
+  "levels" text
+  "positions" text
+  "roles" text
+  "exceptions" text
+  "description" text
+  "display_name" text
+  "display" boolean [default: true]
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+
+  Indexes {
+    ("action_id") [name: "action_rules_action_id_key", unique]
+  }
+}
+
+Table "asset" {
+  "office_asset_id" varchar(50) [pk]
+  "asset_name" text
+  "request" text
+  "identity_number" text
+  "type" varchar(100)
+  "qty" integer
+  "status" integer [default: 21]
+  "purchase_date" date
+  "purchase_cost" text
+  "currency" text
+  "exchange_rate" text
+  "current_owner" text
+  "location" text
+  "log" jsonb [default: '[]']
+  "value_in_base_currency" numeric
+  "deleted_at" timestamp
+  "notification_logs" jsonb [default: '[]']
+  "updat" varchar(50)
+  "note" text
+  "id__my_company" varchar(50)
+
+  Indexes {
+    ("purchase_date") [name: "idx_asset_purchase_date"]
+  }
+}
+
+Table "assigned_task" {
+  "task_id" varchar(50) [pk]
+  "request_id" varchar(50)
+  "employee_id" varchar(50)
+  "deadline" date
+  "description" text
+  "task_info_link" text
+  "task_info_guide_file" text
+  "task_info_notes" text
+  "task_info_report" text
+  "status" integer [default: 62]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "task_info_comment" text
+}
+
+Table "audit_logs" {
+  "id" bigint [pk, default: `nextval('audit_logs_id_seq')`]
+  "table_name" varchar(100) [not null]
+  "record_id" varchar(100) [not null]
+  "action" varchar(50) [not null]
+  "changes" jsonb
+  "changed_by" varchar(100)
+  "tx_id" bigint [default: `txid_current()`]
+  "created_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+
+  Indexes {
+    ("created_at") [name: "idx_audit_logs_created_at"]
+    ("table_name", "record_id") [name: "idx_audit_logs_table_record"]
+  }
+}
+
+Table "automation_registry" {
+  "automation_id" text [pk]
+  "active" boolean [not null, default: true]
+  "updated_at" timestamp [not null, default: `now()`]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "automation_run_logs" {
+  "id" bigint [pk, default: `nextval('automation_run_logs_id_seq')`]
+  "automation_id" text [not null]
+  "source" text [not null]
+  "table_name" text
+  "record_id" text
+  "changed_columns" ARRAY
+  "condition_snapshot" jsonb
+  "output_snapshot" jsonb
+  "status" text [not null, default: 'success']
+  "message" text
+  "run_at" timestamp [not null, default: `now()`]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+
+  Indexes {
+    ("automation_id") [name: "idx_automation_run_logs_automation_id"]
+    ("run_at") [name: "idx_automation_run_logs_run_at"]
+  }
+}
+
+Table "cms_tenant_info" {
+  "id" integer [pk, default: `nextval('cms_tenant_info_id_seq')`]
+  "tenant_domain" text [not null]
+  "tenant_api_key" text [not null]
+  "customer_id" text
+  "plan_id" text
+  "plan_name" text
+  "billing_status" text
+  "next_payment_date" date
+  "super_admin_email" text
+  "subscription_start_date" date
+  "subscription_status" text
+  "last_billing_amount" numeric
+  "last_sync_signature" text
+  "last_sync_timestamp" bigint
+  "updated_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+  "user_limit" integer
+  "log" jsonb [default: '[]']
+  "features" jsonb [default: '{}']
+
+  Indexes {
+    ("tenant_domain") [name: "cms_tenant_info_tenant_domain_key", unique]
+  }
+}
+
+Table "column_permissions" {
+  "id" integer [pk, default: `nextval('column_permissions_id_seq')`]
+  "table_name" text [not null]
+  "column_name" text [not null]
+  "levels" text
+  "positions" text
+  "roles" text
+  "exceptions" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+
+  Indexes {
+    ("table_name", "column_name") [name: "column_permissions_table_column_key", unique]
+  }
+}
+
+Table "comment" {
+  "comment_id" varchar(255) [pk]
+  "request" varchar(255)
+  "comment" text
+  "file" text
+  "link" text
+  "comment_by" varchar(255)
+  "comment_date" timestamp [default: `CURRENT_TIMESTAMP`]
+  "reply_to" varchar(255)
+  "tag" text
+  "logs" jsonb
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+
+  Indexes {
+    ("request") [name: "idx_comment_request"]
+  }
+}
+
+Table "company" {
+  "company_id" varchar [pk]
+  "company_shortname" varchar
+  "company_fullname" varchar
+  "type" varchar
+  "logo" varchar
+  "website" varchar
+  "address" text
+  "country" varchar
+  "city" varchar
+  "log" jsonb [default: '[]']
+  "state" text
+  "province" text
+  "deleted_at" timestamp
+}
+
+Table "contact" {
+  "contact_id" varchar [pk]
+  "name" varchar
+  "title" varchar
+  "email" varchar
+  "mobile_no" varchar
+  "gen" varchar
+  "birthday" date
+  "company_id" varchar
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "contract" {
+  "contract_id" varchar(50) [pk]
+  "request" text
+  "my_company" integer
+  "contract_owner" text
+  "type" integer [default: 69]
+  "contractor" integer
+  "project" text
+  "contractspood_no" text
+  "contract_name_or_description" text
+  "contract_signed_date" date
+  "value_before_vat" numeric
+  "vat_value" numeric
+  "currency" text
+  "exchance_rate" numeric
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "department_id" varchar
+  "notification_logs" jsonb [default: '[]']
+  "operation_program_id" varchar(50)
+  "finance_splits" jsonb [default: '[]']
+  "note" text
+  "id__request" varchar(59)
+
+  Indexes {
+    ("contract_owner") [name: "idx_contract_owner"]
+    ("request") [name: "idx_contract_request"]
+  }
+}
+
+Table "customize" {
+  "id" integer [not null]
+  "setting_name" varchar(100) [not null]
+  "font_family" varchar(100)
+  "font_size" varchar(20)
+  "text_color" varchar(20)
+  "bg_color" varchar(20)
+  "menu_icons" jsonb
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "department" {
+  "department_id" varchar [pk]
+  "department_name" varchar
+  "manager_email" varchar
+  "company_id" varchar
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "department_code" varchar(20)
+  "type" text
+
+  Indexes {
+    ("company_id") [name: "idx_department_company"]
+  }
+}
+
+Table "employee" {
+  "full_name" varchar
+  "picture" bytea
+  "gen" varchar
+  "position" varchar
+  "employee_level" varchar
+  "company_id" varchar
+  "department_id" varchar
+  "status" integer [default: 17]
+  "direct_manager" varchar
+  "role" varchar
+  "location_base" varchar
+  "email" varchar
+  "phone" varchar
+  "address" text
+  "emergency_contact_name" varchar
+  "emergency_contact_phone" varchar
+  "social_insurance_code" varchar
+  "pit_code" varchar
+  "start_date" date
+  "end_date" date
+  "bank_account" varchar
+  "bank_name" varchar
+  "bank_city" varchar
+  "sow" text
+  "avatar" bytea
+  "password" varchar
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "employee_id" varchar(50) [pk]
+  "username" varchar(100)
+  "app_user_enabled" boolean [not null, default: true]
+  "nick_name" varchar(255)
+  "head_manager" varchar(50)
+  "employee_code" varchar(100)
+
+  Indexes {
+    ("email") [name: "employee_email_key", unique]
+    ("username") [name: "employee_username_unique_key", unique]
+    ("app_user_enabled") [name: "idx_employee_app_user_enabled"]
+    ("company_id") [name: "idx_employee_company"]
+    ("department_id") [name: "idx_employee_department"]
+    ("direct_manager") [name: "idx_employee_lower_direct_manager"]
+  }
+}
+
+Table "exception_rules" {
+  "id" integer [pk, default: `nextval('exception_rules_id_seq')`]
+  "name" text
+  "table_name" text
+  "levels" text
+  "positions" text
+  "roles" text
+  "exceptions" text
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+
+  Indexes {
+    ("name") [name: "exception_rules_name_key", unique]
+  }
+}
+
+Table "finance" {
+  "fcid" varchar(20) [pk, default: `nextval('finance_fcid_seq')`]
+  "finance_account_number" varchar(50) [not null]
+  "finance_account_name" varchar(255) [not null]
+  "finance_type" varchar(50)
+  "english_name" varchar(255)
+  "description" text
+  "example" text
+  "status" varchar(50)
+  "department" varchar(100)
+  "finance_account_standard" varchar(100)
+  "operation_type" varchar(100)
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "invoice" {
+  "invoice_id" varchar(50) [pk]
+  "request" text
+  "contract_id" varchar(50)
+  "my_company" text
+  "invoice_type" varchar(100)
+  "counter_party" text
+  "invoice_no" text
+  "description" text
+  "invoice_date" date
+  "invoice_status" integer [default: 34]
+  "payment_method" text
+  "value_before_vat" numeric
+  "vat_value" text
+  "currency" text
+  "exchange_rate" integer
+  "attached_file" text
+  "log" jsonb [default: '[]']
+  "invoice_request" text
+  "deleted_at" timestamp
+  "notification_logs" jsonb [default: '[]']
+  "operation_program_id" varchar(50)
+  "finance_splits" jsonb [default: '[]']
+  "payment_id" varchar(50)
+  "source" varchar(50) [default: 'Request']
+  "total_value" numeric
+  "total_value_in_vnd" numeric
+  "value_in_vnd" numeric
+  "vat_value_in_vnd" numeric
+  "value_before_vat_in_vnd" numeric
+  "request_date" date
+
+  Indexes {
+    ("request") [name: "idx_invoice_request"]
+  }
+}
+
+Table "mtr" {
+  "transaction_id" varchar(50) [pk]
+  "account" text
+  "transaction_date" date
+  "transaction_type" varchar(100)
+  "description" text
+  "amount" numeric
+  "exchange_rate" integer
+  "note" text
+  "status" integer [default: 55]
+  "request" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "notification_logs" jsonb [default: '[]']
+  "amount_in_vnd" numeric
+
+  Indexes {
+    ("account") [name: "idx_mtr_account"]
+    ("request") [name: "idx_mtr_request"]
+    ("transaction_date") [name: "idx_mtr_transaction_date"]
+  }
+}
+
+Table "my_company" {
+  "my_company_id" varchar [pk]
+  "company_shortname" varchar
+  "company_fullname" varchar
+  "logo" bytea
+  "tax_code" varchar
+  "website" varchar
+  "address" text
+  "country" varchar
+  "log" jsonb [default: '[]']
+  "city" text
+  "base_currency" text
+  "currency_list" text
+  "state" text
+  "province" text
+  "deleted_at" timestamp
+  "status" integer [default: 67]
+}
+
+Table "my_location" {
+  "my_location_id" text [pk]
+  "location_code" text
+  "type" text
+  "address" text
+  "my_company" text
+  "responsible_employee" text
+  "status" integer [default: 50]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "my_product_and_service" {
+  "id" integer [pk, default: `nextval('my_product_and_service_id_seq')`]
+  "psid" text
+  "ps_name" text
+  "type" varchar(100)
+  "vendor" text
+  "sale_credit" numeric
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "notification" {
+  "id" uuid [pk, default: `gen_random_uuid()`]
+  "title" varchar(255)
+  "body" text
+  "link" varchar(512)
+  "is_read" boolean [default: false]
+  "deleted_at" timestamp
+  "is_pinned" boolean [default: false]
+  "is_flagged" boolean [default: false]
+  "flagged_note" text
+  "user_employee_id" varchar(100)
+  "log" jsonb [default: '[]']
+  "created_date" timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table "operation_program" {
+  "oper_id" varchar(50) [pk]
+  "payment_code" text
+  "payment_name" text
+  "description" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "department_id" varchar(50)
+  "company_id" varchar(50)
+  "finance_mappings" jsonb [default: '[]']
+  "payment_type" varchar(255)
+}
+
+Table "oppotunity" {
+  "project_id" varchar(50) [pk]
+  "project_name" text
+  "enduser" integer
+  "estimated_revenue" numeric
+  "currency" text
+  "exchange_rate" integer
+  "status" integer [default: 52]
+  "stage" text
+  "sources" text
+  "close_date" date
+  "sale_lead" text
+  "create_date" date
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "payment" {
+  "payment_id" varchar(50) [pk]
+  "request" text
+  "contractspood" text
+  "my_company" text
+  "payment_type" integer [default: 61]
+  "counter_party" text
+  "company" text
+  "employee" text
+  "payment_description" text
+  "payment_period" integer
+  "due_date" date
+  "value" numeric
+  "currency" text
+  "exchange_rate" numeric
+  "payment_method" text
+  "bank_info" text
+  "payment_status" integer [default: 30]
+  "payment_date" date
+  "transaction_id" varchar(50)
+  "payment_request" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "notification_logs" jsonb [default: '[]']
+  "operation_program_id" varchar(50)
+  "contract_id" varchar(50)
+  "source" varchar(50) [default: 'Request']
+  "payment_term" varchar(500)
+  "vat" numeric [default: 0]
+  "total_value" numeric
+  "finance_splits" jsonb [default: '[]']
+
+  Indexes {
+    ("due_date") [name: "idx_payment_due_date"]
+    ("employee") [name: "idx_payment_employee"]
+    ("request") [name: "idx_payment_request"]
+  }
+}
+
+Table "permission_exceptions" {
+  "id" integer [pk, default: `nextval('permission_exceptions_id_seq')`]
+  "permission_id" integer
+  "email" text [not null]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "permission_levels" {
+  "id" integer [pk, default: `nextval('permission_levels_id_seq')`]
+  "permission_id" integer
+  "level" text [not null]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "permission_positions" {
+  "id" integer [pk, default: `nextval('permission_positions_id_seq')`]
+  "permission_id" integer
+  "position" text [not null]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "permission_roles" {
+  "id" integer [pk, default: `nextval('permission_roles_id_seq')`]
+  "permission_id" integer
+  "role" text [not null]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "policy_and_program" {
+  "policy_id" varchar [pk]
+  "policy_type" varchar
+  "policy_name" varchar
+  "description" text
+  "procedure_file" varchar
+  "procedure_link" varchar
+  "tier1_approval" varchar
+  "tier2_approval" varchar
+  "tier3_approval" varchar
+  "approval_level" varchar
+  "policy_lead" varchar
+  "sr_owner" varchar
+  "elements" text
+  "company_id" text [default: '1']
+  "department_id" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+  "coordinator" text
+  "priority" varchar(50)
+  "subscription" text
+  "server" text
+  "id__request" varchar(50)
+  "sla" numeric
+}
+
+Table "project" {
+  "project_id" varchar(50) [pk]
+  "fy_recognized" integer
+  "note" text
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "push_subscriptions" {
+  "id" integer [pk, default: `nextval('push_subscriptions_id_seq')`]
+  "endpoint" text [not null]
+  "p256dh" text [not null]
+  "auth" text [not null]
+  "created_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "user_employee_id" varchar(100)
+
+  Indexes {
+    ("endpoint") [name: "push_subscriptions_endpoint_key", unique]
+  }
+}
+
+Table "request" {
+  "request_id" varchar(50) [pk]
+  "request_type" varchar(100)
+  "sr_creater" text
+  "requester" text
+  "description" text
+  "sr_created_date" timestamp [default: `CURRENT_TIMESTAMP`]
+  "policy_lead" text
+  "sr_owner" ARRAY
+  "sr_status" integer [default: 1]
+  "sr_submitted_date" timestamp
+  "sr_close_date" timestamp
+  "process_status" integer [default: 7]
+  "process_start_date" timestamp
+  "process_end_date" timestamp
+  "approval_level" text
+  "approval_flow" jsonb
+  "rating" jsonb
+  "log" jsonb [default: '[]']
+  "company_id" varchar
+  "elements" ARRAY
+  "deleted_at" timestamp
+  "notification_logs" jsonb [default: '[]']
+  "parent__id_request" varchar(50)
+
+  Indexes {
+    ("policy_lead") [name: "idx_request_lower_policy_lead"]
+    ("requester") [name: "idx_request_lower_requester"]
+    ("sr_creater") [name: "idx_request_lower_sr_creater"]
+    ("sr_owner") [name: "idx_request_sr_owner"]
+    ("sr_submitted_date") [name: "idx_request_sr_submitted_date"]
+    ("request_type") [name: "idx_request_type"]
+  }
+}
+
+Table "request_rating" {
+  "id" uuid [pk, default: `gen_random_uuid()`]
+  "request_id" varchar(255) [not null]
+  "from_user" varchar(255) [not null]
+  "to_user" varchar(255) [not null]
+  "point" integer [not null]
+  "comment" text
+  "created_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "updated_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+}
+
+Table "request_watches" {
+  "id" uuid [pk, default: `gen_random_uuid()`]
+  "request_id" varchar(255) [not null]
+  "is_watching" boolean [default: true]
+  "created_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "updated_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+  "user_employee_id" varchar(100)
+  "log" jsonb [default: '[]']
+
+  Indexes {
+    ("request_id") [name: "idx_request_watches_request_id"]
+    ("user_employee_id", "request_id") [name: "request_watches_user_email_request_id_key", unique]
+  }
+}
+
+Table "service" {
+  "service_id" varchar(50) [pk]
+  "request" text
+  "service_type" varchar(100)
+  "service_name" text
+  "status" integer [default: 26]
+  "start_date" date
+  "end_date" date
+  "note" text
+  "fy" text
+  "log" jsonb [default: '[]']
+  "my_company" varchar(50)
+  "deleted_at" timestamp
+  "notification_logs" jsonb [default: '[]']
+
+  Indexes {
+    ("end_date") [name: "idx_service_end_date"]
+  }
+}
+
+Table "status_catalog" {
+  "id" integer [pk]
+  "table_name" varchar(100) [not null]
+  "column_name" varchar(100) [not null]
+  "status_key" varchar(100) [not null]
+  "color_code" varchar(50)
+  "created_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "system_setup" {
+  "key" text [pk]
+  "value" text
+  "updated_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+}
+
+Table "target_table" {
+  "target_table_id" varchar(50) [pk]
+  "request" varchar(50)
+  "type" varchar(50)
+  "table_name" varchar(50)
+  "record_ids" ARRAY
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "task_subtask" {
+  "subtask_id" varchar(50) [pk]
+  "task_id" varchar(50)
+  "description" text
+  "status" varchar(50) [default: 'Pending']
+  "log" jsonb [default: '[]']
+  "deleted_at" timestamp
+}
+
+Table "ticket" {
+  "ticket_id" varchar(50) [pk]
+  "ticket_type" varchar(100)
+  "sr_creater" text
+  "requester" text
+  "description" text
+  "sr_start_date" timestamp
+  "policy_lead" text
+  "sr_coordinator" ARRAY
+  "sr_status" integer [default: 10]
+  "sr_created_date" timestamp [default: `CURRENT_TIMESTAMP`]
+  "sr_close_date" timestamp
+  "process_status" integer [default: 14]
+  "process_start_date" timestamp
+  "process_end_date" timestamp
+  "approval_level" text
+  "log" jsonb [default: '[]']
+  "rating" jsonb
+  "processing_flow" jsonb
+  "deleted_at" timestamp
+}
+
+Table "ticket_comment" {
+  "comment_id" uuid [pk, default: `gen_random_uuid()`]
+  "ticket" text
+  "comment" text
+  "file" text
+  "link" text
+  "comment_by" text
+  "comment_date" timestamp [default: `CURRENT_TIMESTAMP`]
+  "reply_to" text
+  "tag" text
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+}
+
+Table "ticket_type" {
+  "ticket_type_id" varchar [pk]
+  "ticket_name" varchar [not null]
+  "ticket_type" varchar
+  "ticket_lead" varchar
+  "sr_owner" varchar
+  "coordinator" varchar
+  "tier_1_engineer" varchar
+  "tier_2_engineer" varchar
+  "tier_3_engineer" varchar
+  "processing_tier" varchar(50) [default: 'Tier 3']
+  "priority" varchar(50) [default: 'Medium']
+  "subscription" varchar
+  "server" varchar
+  "ticket_link" varchar
+  "ticket_file" varchar
+  "description" text
+  "created_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "updated_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+}
+
+Table "uploaded_files" {
+  "id" uuid [pk, default: `gen_random_uuid()`]
+  "table_name" varchar(100) [not null]
+  "record_id" varchar(100) [not null]
+  "column_name" varchar(100) [not null]
+  "file_name" varchar(255) [not null]
+  "mime_type" varchar(100) [not null]
+  "file_path" varchar(512) [not null]
+  "uploaded_by" varchar(100) [not null]
+  "uploaded_at" timestamp [default: `CURRENT_TIMESTAMP`]
+  "deleted_at" timestamp
+  "log" jsonb [default: '[]']
+
+  Indexes {
+    ("table_name", "record_id") [name: "idx_uploaded_files_record"]
+    ("uploaded_by", "uploaded_at") [name: "idx_uploaded_files_uploader"]
+  }
+}
+
+// Explicit Foreign Key Constraints
+Ref: "contact"."company_id" > "company"."company_id"
+Ref: "department"."company_id" > "my_company"."my_company_id"
+Ref: "employee"."company_id" > "my_company"."my_company_id"
+Ref: "employee"."department_id" > "department"."department_id"
+Ref: "employee"."direct_manager" > "employee"."employee_id"
+Ref: "employee"."head_manager" > "employee"."employee_id"
+Ref: "permission_exceptions"."permission_id" > "column_permissions"."id"
+Ref: "permission_levels"."permission_id" > "column_permissions"."id"
+Ref: "permission_positions"."permission_id" > "column_permissions"."id"
+Ref: "permission_roles"."permission_id" > "column_permissions"."id"
+
+// Additional Logical Relationships (inferred by column naming convention)
+Ref: "assigned_task"."request_id" > "request"."request_id"
+Ref: "assigned_task"."employee_id" > "employee"."employee_id"
+Ref: "automation_run_logs"."automation_id" > "automation_registry"."automation_id"
+Ref: "contract"."department_id" > "department"."department_id"
+Ref: "invoice"."contract_id" > "contract"."contract_id"
+Ref: "invoice"."payment_id" > "payment"."payment_id"
+Ref: "operation_program"."department_id" > "department"."department_id"
+Ref: "operation_program"."company_id" > "company"."company_id"
+Ref: "payment"."transaction_id" > "mtr"."transaction_id"
+Ref: "payment"."contract_id" > "contract"."contract_id"
+Ref: "policy_and_program"."company_id" > "company"."company_id"
+Ref: "policy_and_program"."department_id" > "department"."department_id"
+Ref: "request"."company_id" > "company"."company_id"
+Ref: "request_rating"."request_id" > "request"."request_id"
+Ref: "request_watches"."request_id" > "request"."request_id"
+Ref: "task_subtask"."task_id" > "assigned_task"."task_id"

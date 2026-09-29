@@ -1,0 +1,11 @@
+<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- TeraX 'X' Icon - Light Theme (Deep Navy & Vibrant Orange) -->
+  <!-- Top Left Navy Arm -->
+  <polygon points="0,0 29.3,0 37.9,47.4 33.2,47.4" fill="#02112C" />
+  <!-- Top Right Orange Arm -->
+  <polygon points="37.9,47.4 70.4,0 100,0 66.2,47.4" fill="#FE5C01" />
+  <!-- Bottom Left Navy Arm -->
+  <polygon points="33.5,52.6 61.8,52.6 28.3,100 0,100" fill="#02112C" />
+  <!-- Bottom Right Orange Arm -->
+  <polygon points="61.8,52.6 66.5,52.6 100,100 70.9,100" fill="#FE5C01" />
+</svg>
