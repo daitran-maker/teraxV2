@@ -195,6 +195,52 @@ router.get('/data', async (req, res) => {
   }
 });
 
+// GET /api/system-setup/tax-payer/:taxCode → Lookup via xinvoice GDT API
+router.get('/tax-payer/:taxCode', async (req, res) => {
+  const { taxCode } = req.params;
+  const cleanCode = String(taxCode || '').trim().replace(/[^a-zA-Z0-9-]/g, '');
+  if (!cleanCode) {
+    return res.status(400).json({ success: false, message: 'Mã số thuế không hợp lệ' });
+  }
+
+  try {
+    const url = `https://api.xinvoice.vn/gdt-api/tax-payer/${encodeURIComponent(cleanCode)}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.success === false) {
+      return res.status(404).json({ success: false, message: data.message || 'Mã số thuế không tìm thấy' });
+    }
+
+    // Extract brand/short name from full company name
+    let shortName = '';
+    if (data.name) {
+      shortName = data.name
+        .replace(/^(CÔNG TY CỔ PHẦN|CÔNG TY TNHH MTV|CÔNG TY TNHH|TẬP ĐOÀN|TỔNG CÔNG TY|DOANH NGHIỆP TƯ NHÂN|CHI NHÁNH|VĂN PHÒNG ĐẠI DIỆN)\s+/i, '')
+        .trim();
+    }
+
+    res.json({
+      success: true,
+      data: {
+        fullname: data.name || '',
+        shortname: shortName || data.name || '',
+        address: data.address || '',
+        taxCode: data.taxID || cleanCode,
+        status: data.status || '',
+        taxDepartment: data.taxDepartment || ''
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi kết nối tra cứu thuế: ' + err.message });
+  }
+});
+
 // POST /api/system-setup/company (Step 1 save)
 router.post('/company', async (req, res) => {
   const {
@@ -205,6 +251,7 @@ router.post('/company', async (req, res) => {
     address,
     website,
     base_currency,
+    timezone,
     logo
   } = req.body;
 
@@ -224,6 +271,8 @@ router.post('/company', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query("ALTER TABLE my_company ADD COLUMN IF NOT EXISTS timezone VARCHAR(100) DEFAULT 'Asia/Ho_Chi_Minh'");
+
     const existing = await client.query('SELECT my_company_id FROM my_company ORDER BY my_company_id ASC LIMIT 1');
     let compId = '1';
 
@@ -239,14 +288,15 @@ router.post('/company', async (req, res) => {
             website = COALESCE($6, website),
             base_currency = COALESCE($7, base_currency),
             logo = COALESCE($8, logo),
+            timezone = COALESCE($9, timezone),
             status = COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67)
-        WHERE my_company_id = $9
-      `, [company_fullname, company_shortname, tax_code, country, address, website, base_currency, logoParam, compId]);
+        WHERE my_company_id = $10
+      `, [company_fullname, company_shortname, tax_code, country, address, website, base_currency, logoParam, timezone || 'Asia/Ho_Chi_Minh', compId]);
     } else {
       await client.query(`
-        INSERT INTO my_company (my_company_id, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logo, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67))
-      `, [compId, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logoParam]);
+        INSERT INTO my_company (my_company_id, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logo, timezone, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67))
+      `, [compId, company_fullname, company_shortname, tax_code, country, address, website, base_currency, logoParam, timezone || 'Asia/Ho_Chi_Minh']);
     }
 
     const saved = await client.query('SELECT * FROM my_company WHERE my_company_id = $1', [compId]);

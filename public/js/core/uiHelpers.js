@@ -849,12 +849,12 @@ function formatDateTime(val, customTimeZone) {
     d = val;
   } else if (typeof val === 'string') {
     const trimmed = val.trim();
-    const legacyFormat = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/;
-    if (legacyFormat.test(trimmed)) {
-      d = new Date(trimmed + ' +07:00');
-    } else if (!trimmed.includes('Z') && !trimmed.includes('+') && !trimmed.includes('-') && trimmed.includes(':')) {
-      d = new Date(trimmed.replace(' ', 'T') + 'Z');
-    } else if (!trimmed.includes('Z') && !trimmed.includes('+') && trimmed.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/)) {
+    const legacyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2}:\d{2})$/);
+    if (legacyMatch) {
+      d = new Date(`${legacyMatch[3]}-${legacyMatch[2]}-${legacyMatch[1]}T${legacyMatch[4]}+07:00`);
+    } else if (trimmed.endsWith('Z') || /[+-]\d{2}(:\d{2})?$/.test(trimmed)) {
+      d = new Date(trimmed);
+    } else if (trimmed.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/)) {
       d = new Date(trimmed.replace(' ', 'T') + 'Z');
     } else {
       d = new Date(trimmed);
@@ -866,6 +866,10 @@ function formatDateTime(val, customTimeZone) {
   if (isNaN(d.getTime())) return '';
 
   const tz = customTimeZone || (typeof getUserTimeZone === 'function' ? getUserTimeZone() : (window.userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone));
+  const isVi = ((typeof currentLang !== 'undefined' ? currentLang : '') || localStorage.getItem('crc_lang') || 'vi') === 'vi';
+  const enMonths = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const viMonths = ['Th01', 'Th02', 'Th03', 'Th04', 'Th05', 'Th06', 'Th07', 'Th08', 'Th09', 'Th10', 'Th11', 'Th12'];
+
   try {
     const formatter = new Intl.DateTimeFormat('en-GB', {
       timeZone: tz,
@@ -884,21 +888,27 @@ function formatDateTime(val, customTimeZone) {
       p[parts[i].type] = parts[i].value;
     }
     const day = p.day || '';
-    const month = (p.month || '').slice(0, 3).toUpperCase();
+    const rawMonth = (p.month || '').slice(0, 3).toUpperCase();
     const year = p.year || '';
     const hour = p.hour || '00';
     const min = p.minute || '00';
     const sec = p.second || '00';
 
-    return `${day}-${month}-${year} ${hour}:${min}:${sec}`;
+    let monthStr = rawMonth;
+    if (isVi) {
+      const mIdx = enMonths.indexOf(rawMonth);
+      if (mIdx !== -1) monthStr = viMonths[mIdx];
+    }
+
+    return `${day}-${monthStr}-${year} ${hour}:${min}:${sec}`;
   } catch (err) {
     const pad = (n) => String(n).padStart(2, '0');
     const h = pad(d.getUTCHours());
     const m = pad(d.getUTCMinutes());
     const s = pad(d.getUTCSeconds());
     const D = pad(d.getUTCDate());
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    const monthStr = months[d.getUTCMonth()];
+    const mIdx = d.getUTCMonth();
+    const monthStr = isVi ? (viMonths[mIdx] || pad(mIdx + 1)) : (enMonths[mIdx] || pad(mIdx + 1));
     const Y = d.getUTCFullYear();
     return `${D}-${monthStr}-${Y} ${h}:${m}:${s}`;
   }
@@ -906,14 +916,17 @@ function formatDateTime(val, customTimeZone) {
 
 function formatDateMON(val) {
   if (!val || (typeof val === 'object' && !(val instanceof Date))) return '';
+  const isVi = ((typeof currentLang !== 'undefined' ? currentLang : '') || localStorage.getItem('crc_lang') || 'vi') === 'vi';
+  const enMonths = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const viMonths = ['Th01', 'Th02', 'Th03', 'Th04', 'Th05', 'Th06', 'Th07', 'Th08', 'Th09', 'Th10', 'Th11', 'Th12'];
+
   if (typeof val === 'string') {
     const ymdMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (ymdMatch) {
       const year = ymdMatch[1];
       const monthIdx = parseInt(ymdMatch[2], 10) - 1;
       const day = ymdMatch[3];
-      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-      const monthStr = months[monthIdx] || ymdMatch[2];
+      const monthStr = isVi ? (viMonths[monthIdx] || ymdMatch[2]) : (enMonths[monthIdx] || ymdMatch[2]);
       return `${day}-${monthStr}-${year}`;
     }
   }
@@ -921,8 +934,8 @@ function formatDateMON(val) {
   if (isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   const day = pad(d.getDate());
-  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  const monthStr = months[d.getMonth()];
+  const monthIdx = d.getMonth();
+  const monthStr = isVi ? (viMonths[monthIdx] || pad(monthIdx + 1)) : (enMonths[monthIdx] || pad(monthIdx + 1));
   const year = d.getFullYear();
   return `${day}-${monthStr}-${year}`;
 }

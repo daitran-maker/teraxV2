@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (Notification.permission === "default") {
                 Notification.requestPermission().then(permission => {
                     if (permission === 'granted') {
-                        subscribeUserToPush();
+                        subscribeUserToPush(false);
                         showToast(t('noti.permission_granted', 'Đã cấp quyền thông báo thành công!'), 'success');
                     } else {
                         showToast(t('noti.permission_denied', 'Bạn đã từ chối cấp quyền thông báo.'), 'error');
@@ -41,8 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Subscribe to Web Push if already granted
-    if ("Notification" in window && Notification.permission === "granted") {
-        subscribeUserToPush();
+    if ("Notification" in window && Notification.permission === "granted" && localStorage.getItem('crc_token')) {
+        subscribeUserToPush(true);
     }
 
     // Load initial notifications and badge count
@@ -383,13 +383,16 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
-async function subscribeUserToPush() {
+async function subscribeUserToPush(silent = false) {
+    if (!localStorage.getItem('crc_token')) {
+        return;
+    }
     if (!('serviceWorker' in navigator)) {
-        showToast(t('noti.sw_not_supported', 'Trình duyệt không hỗ trợ Service Worker.'), 'error');
+        if (!silent) showToast(t('noti.sw_not_supported', 'Trình duyệt không hỗ trợ Service Worker.'), 'error');
         return;
     }
     if (!('PushManager' in window)) {
-        showToast(t('noti.push_not_supported', 'Trình duyệt không hỗ trợ Web Push (Safari cần Add to Home Screen + HTTPS).'), 'error');
+        if (!silent) showToast(t('noti.push_not_supported', 'Trình duyệt không hỗ trợ Web Push (Safari cần Add to Home Screen + HTTPS).'), 'error');
         return;
     }
 
@@ -403,11 +406,16 @@ async function subscribeUserToPush() {
         });
 
         // Send to backend
-        await apiFetch('/notifications/subscribe', 'POST', { subscription });
+        const subJson = subscription.toJSON ? subscription.toJSON() : subscription;
+        await apiFetch('/notifications/subscribe', 'POST', { subscription: subJson });
         console.log('[Web Push] Subscribed successfully!');
-        showToast(t('noti.subscribe_success', 'Đăng ký nhận Thông báo ngầm thành công!'), 'success');
+        if (!silent) {
+            showToast(t('noti.subscribe_success', 'Đăng ký nhận Thông báo ngầm thành công!'), 'success');
+        }
     } catch (error) {
         console.error('[Web Push] Failed to subscribe:', error);
-        showToast(t('noti.subscribe_failed', 'Lỗi khi đăng ký thông báo: ') + error.message, 'error');
+        if (!silent) {
+            showToast(t('noti.subscribe_failed', 'Lỗi khi đăng ký thông báo: ') + error.message, 'error');
+        }
     }
 }

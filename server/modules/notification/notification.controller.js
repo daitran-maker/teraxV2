@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const repo = require('./notification.repository');
 const service = require('./notification.service');
@@ -99,11 +99,35 @@ router.delete('/:id', async (req, res) => {
 router.post('/subscribe', async (req, res) => {
   try {
     const userId = req.user?.employee_id || req.user?.email;
-    const subscription = req.body;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const subscription = req.body?.subscription || req.body;
     if (!subscription || !subscription.endpoint || !subscription.keys) {
       return res.status(400).json({ error: 'Invalid subscription object' });
     }
     await repo.savePushSubscription(userId, subscription);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/notifications/update-subscription
+router.post('/update-subscription', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    const { oldEndpoint, newSubscription } = req.body;
+    const subscription = newSubscription?.subscription || newSubscription;
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: 'Invalid subscription object' });
+    }
+    if (oldEndpoint) {
+      await repo.removePushSubscription(oldEndpoint);
+    }
+    if (userId) {
+      await repo.savePushSubscription(userId, subscription);
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
