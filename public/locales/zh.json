@@ -547,7 +547,7 @@
   "sw.step1_tax_code": "Tax Code",
   "sw.step1_tax_code_ph": "e.g. 0101234567",
   "sw.step1_country": "Country",
-  "sw.step1_currency": "Base Currency",
+  "sw.step1_currency": "Currency",
   "sw.step1_address": "Headquarters Address",
   "sw.step1_address_ph": "e.g. 5th Floor, Landmark Tower, Hanoi",
   "sw.step1_website": "Website",

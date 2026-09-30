@@ -601,7 +601,7 @@ function renderStep1HTML(comp) {
     + '</div></div></div>'
 
     // Currency Searchable Select (top 5 popular first, flat list, searchable)
-    + '<div class="form-group">'+swLabel(swT('sw.step1_currency', 'Đơn vị tiền tệ chính'), true)
+    + '<div class="form-group">'+swLabel(swT('sw.step1_currency', 'Currency'), true)
     + '<div class="sw-search-dropdown">'
     + '<input type="hidden" id="step1_currency" value="'+escapeHTML(defaultCurrency)+'">'
     + '<div class="sw-search-display" id="sw_search_display_currency" onclick="window.toggleSwSearchDropdown(\'currency\')">'
