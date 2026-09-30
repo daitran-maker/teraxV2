@@ -2301,7 +2301,6 @@ router.post('/execute', async (req, res) => {
       const finalRes = await getPoolForTable(table_name).query(queryStr, [rawRecordId, decodedRecordId]);
       if (finalRes.rows.length > 0) {
         broadcastSSE('db_change', { action: 'update', table: table_name, record: finalRes.rows[0] });
-        await triggerNotifications(table_name, record, finalRes.rows[0], 'update');
         eventBus.safeEmit(EVENTS.ACTION_EXECUTED, {
           actionId: action_id,
           tableName: table_name,

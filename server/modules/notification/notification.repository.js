@@ -1,4 +1,4 @@
-﻿const pool = require('../../db');
+const pool = require('../../../server/db');
 
 class NotificationRepository {
   async ensureSchema() {
@@ -33,6 +33,15 @@ class NotificationRepository {
         auth TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS request_watches (
+        id SERIAL PRIMARY KEY,
+        user_employee_id VARCHAR(255) NOT NULL,
+        request_id VARCHAR(255) NOT NULL,
+        is_watching BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_employee_id, request_id)
+      );
     `);
   }
 
@@ -56,6 +65,25 @@ class NotificationRepository {
 
     const res = await pool.query(sql, params);
     return res.rows;
+  }
+
+  async getTotalCount(userId, filter = null) {
+    let sql = `
+      SELECT COUNT(*) as total FROM "notification"
+      WHERE user_employee_id = $1 AND deleted_at IS NULL
+    `;
+    const params = [userId];
+
+    if (filter === 'unread') {
+      sql += ' AND is_read = false';
+    } else if (filter === 'pinned') {
+      sql += ' AND is_pinned = true';
+    } else if (filter === 'flagged') {
+      sql += ' AND is_flagged = true';
+    }
+
+    const res = await pool.query(sql, params);
+    return parseInt(res.rows[0]?.total || '0', 10);
   }
 
   async getUnreadCount(userId) {
@@ -94,6 +122,59 @@ class NotificationRepository {
     const res = await pool.query(
       `UPDATE "notification" SET is_flagged = NOT COALESCE(is_flagged, false), flagged_note = $3 WHERE id = $1 AND user_employee_id = $2 RETURNING *`,
       [id, userId, note]
+    );
+    return res.rows[0];
+  }
+
+  async getTasks(userId) {
+    const res = await pool.query(
+      `SELECT * FROM "notification"
+       WHERE user_employee_id = $1 AND is_flagged = true AND deleted_at IS NULL
+       ORDER BY created_date DESC`,
+      [userId]
+    );
+    return res.rows;
+  }
+
+  async completeTask(id, userId) {
+    const res = await pool.query(
+      `UPDATE "notification"
+       SET is_flagged = false, is_pinned = false, flagged_note = NULL
+       WHERE id = $1 AND user_employee_id = $2
+       RETURNING *`,
+      [id, userId]
+    );
+    return res.rows[0];
+  }
+
+  async getWatches(userId) {
+    const res = await pool.query(
+      `SELECT * FROM request_watches WHERE user_employee_id = $1 ORDER BY updated_at DESC`,
+      [userId]
+    );
+    return res.rows;
+  }
+
+  async watchRequest(userId, requestId) {
+    const res = await pool.query(
+      `INSERT INTO request_watches (user_employee_id, request_id, is_watching)
+       VALUES ($1, $2, true)
+       ON CONFLICT (user_employee_id, request_id)
+       DO UPDATE SET is_watching = true, updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [userId, requestId]
+    );
+    return res.rows[0];
+  }
+
+  async unwatchRequest(userId, requestId) {
+    const res = await pool.query(
+      `INSERT INTO request_watches (user_employee_id, request_id, is_watching)
+       VALUES ($1, $2, false)
+       ON CONFLICT (user_employee_id, request_id)
+       DO UPDATE SET is_watching = false, updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [userId, requestId]
     );
     return res.rows[0];
   }

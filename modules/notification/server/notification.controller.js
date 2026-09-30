@@ -9,27 +9,67 @@ repo.ensureSchema().catch(err => {
 });
 
 // GET /api/notifications
+// Fetch paginated notifications for current user
 router.get('/', async (req, res) => {
   try {
     const userId = req.user?.employee_id || req.user?.email;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const limit = parseInt(req.query.limit || '50', 10);
-    const offset = parseInt(req.query.offset || '0', 10);
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const offset = req.query.offset !== undefined ? parseInt(req.query.offset, 10) : (page - 1) * limit;
     const filter = req.query.filter || null;
 
-    const [items, unreadCount] = await Promise.all([
+    const [items, unreadCount, totalCount] = await Promise.all([
       repo.getByUser(userId, limit, offset, filter),
-      repo.getUnreadCount(userId)
+      repo.getUnreadCount(userId),
+      repo.getTotalCount(userId, filter)
     ]);
 
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+
     res.json({
+      data: items,
       notifications: items,
+      total: totalCount,
+      page,
+      limit,
+      totalPages,
       unread_count: unreadCount,
-      total: items.length
+      unreadCount
     });
   } catch (err) {
     console.error('[NotificationController] GET / error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/notifications/unread-count
+// Returns count of unread notifications for badge
+router.get('/unread-count', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const unreadCount = await repo.getUnreadCount(userId);
+    res.json({ count: unreadCount, unread_count: unreadCount });
+  } catch (err) {
+    console.error('[NotificationController] GET /unread-count error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/notifications/tasks
+// Fetch flagged notifications for Dashboard Task Pending
+router.get('/tasks', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tasks = await repo.getTasks(userId);
+    res.json(tasks);
+  } catch (err) {
+    console.error('[NotificationController] GET /tasks error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -44,29 +84,33 @@ router.put('/:id/read', async (req, res) => {
   try {
     const userId = req.user?.employee_id || req.user?.email;
     const updated = await repo.markAsRead(req.params.id, userId);
-    res.json({ success: true, notification: updated });
+    if (!updated) return res.status(404).json({ error: 'Notification not found' });
+    res.json({ success: true, notification: updated, ...updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/notifications/mark-all-read
-router.put('/mark-all-read', async (req, res) => {
+// PUT /api/notifications/read-all & PUT /api/notifications/mark-all-read
+const handleMarkAllRead = async (req, res) => {
   try {
     const userId = req.user?.employee_id || req.user?.email;
     const updatedCount = await repo.markAllAsRead(userId);
-    res.json({ success: true, count: updatedCount });
+    res.json({ success: true, count: updatedCount, message: 'All notifications marked as read' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+};
+router.put('/read-all', handleMarkAllRead);
+router.put('/mark-all-read', handleMarkAllRead);
 
 // PUT /api/notifications/:id/pin
 router.put('/:id/pin', async (req, res) => {
   try {
     const userId = req.user?.employee_id || req.user?.email;
     const updated = await repo.togglePin(req.params.id, userId);
-    res.json({ success: true, notification: updated });
+    if (!updated) return res.status(404).json({ error: 'Notification not found' });
+    res.json({ success: true, notification: updated, ...updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -78,7 +122,57 @@ router.put('/:id/flag', async (req, res) => {
     const userId = req.user?.employee_id || req.user?.email;
     const note = req.body?.note || '';
     const updated = await repo.toggleFlag(req.params.id, userId, note);
-    res.json({ success: true, notification: updated });
+    if (!updated) return res.status(404).json({ error: 'Notification not found' });
+    res.json({ success: true, notification: updated, ...updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/notifications/:id/complete-task
+router.put('/:id/complete-task', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    const updated = await repo.completeTask(req.params.id, userId);
+    if (!updated) return res.status(404).json({ error: 'Notification not found' });
+    res.json({ success: true, notification: updated, ...updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/notifications/watches
+router.get('/watches', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    const watches = await repo.getWatches(userId);
+    res.json(watches);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/notifications/watch
+router.post('/watch', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    const { requestId } = req.body;
+    if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+    await repo.watchRequest(userId, requestId);
+    res.json({ message: 'Now watching request', requestId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/notifications/unwatch
+router.put('/unwatch', async (req, res) => {
+  try {
+    const userId = req.user?.employee_id || req.user?.email;
+    const { requestId } = req.body;
+    if (!requestId) return res.status(400).json({ error: 'Missing requestId' });
+    await repo.unwatchRequest(userId, requestId);
+    res.json({ message: 'Unfollowed request', requestId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -107,7 +201,7 @@ router.post('/subscribe', async (req, res) => {
       return res.status(400).json({ error: 'Invalid subscription object' });
     }
     await repo.savePushSubscription(userId, subscription);
-    res.json({ success: true });
+    res.json({ success: true, message: 'Subscribed to push notifications' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -119,16 +213,13 @@ router.post('/update-subscription', async (req, res) => {
     const userId = req.user?.employee_id || req.user?.email;
     const { oldEndpoint, newSubscription } = req.body;
     const subscription = newSubscription?.subscription || newSubscription;
-    if (!subscription || !subscription.endpoint || !subscription.keys) {
-      return res.status(400).json({ error: 'Invalid subscription object' });
-    }
     if (oldEndpoint) {
       await repo.removePushSubscription(oldEndpoint);
     }
-    if (userId) {
+    if (userId && subscription && subscription.endpoint && subscription.keys) {
       await repo.savePushSubscription(userId, subscription);
     }
-    res.json({ success: true });
+    res.json({ success: true, message: 'Subscription updated' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -141,7 +232,7 @@ router.post('/unsubscribe', async (req, res) => {
     if (endpoint) {
       await repo.removePushSubscription(endpoint);
     }
-    res.json({ success: true });
+    res.json({ success: true, message: 'Unsubscribed' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -104,42 +104,22 @@ async function createNotification(users, title, body, link, context = null) {
     const uniqueUsers = [...new Set(resolvedUsers)];
     if (uniqueUsers.length === 0) return;
 
+    const insertedRows = [];
     try {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
             for (const user_employee_id of uniqueUsers) {
                 const res = await client.query(
-                    `INSERT INTO "notification" (user_employee_id, title, body, link) VALUES ($1, $2, $3, $4) RETURNING *`,
+                    `INSERT INTO "notification" (user_employee_id, title, body, link, is_read, created_date) 
+                     VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP) 
+                     RETURNING *`,
                     [user_employee_id, title, body, link]
                 );
-                broadcastSSE('new_notification', res.rows[0]);
-                
-                // Web Push Notification
-                const plainBody = (body || '').replace(/<[^>]*>?/gm, '');
-                sendPushNotification(user_employee_id, title, plainBody, link).catch(err => console.error(err));
-            }
-            
-            // Append log to parent record if context is provided
-            if (context && context.tableName && context.id && context.pk) {
-                try {
-                    const logEntry = JSON.stringify([{
-                        sent_at: new Date().toISOString(),
-                        recipients: uniqueUsers,
-                        title,
-                        body
-                    }]);
-                    await client.query(
-                        `UPDATE "${context.tableName}" 
-                         SET notification_logs = COALESCE(notification_logs, '[]'::jsonb) || $1::jsonb
-                         WHERE "${context.pk}" = $2`,
-                        [logEntry, context.id]
-                    );
-                } catch(e) {
-                    console.error('[Notification] Failed to update notification_logs in parent record:', e.message);
+                if (res.rows.length > 0) {
+                    insertedRows.push(res.rows[0]);
                 }
             }
-
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');
@@ -148,7 +128,46 @@ async function createNotification(users, title, body, link, context = null) {
             client.release();
         }
     } catch (e) {
-        console.error('[Notification] Error creating notification', e);
+        console.error('[Notification] Error creating notification records:', e);
+        return;
+    }
+
+    // Broadcast SSE & Web Push after successful DB commit
+    const plainBody = (body || '').replace(/<[^>]*>?/gm, '');
+    for (const notif of insertedRows) {
+        try {
+            broadcastSSE('new_notification', notif);
+            broadcastSSE('notification', {
+                type: 'new_notification',
+                userId: notif.user_employee_id,
+                notification: notif
+            });
+            sendPushNotification(notif.user_employee_id, title, plainBody, link).catch(err => {
+                console.error('[Notification] WebPush send error:', err.message);
+            });
+        } catch (dispatchErr) {
+            console.error('[Notification] Error broadcasting notification:', dispatchErr.message);
+        }
+    }
+
+    // Append log to parent record if context is provided (safely isolated from notification commit)
+    if (context && context.tableName && context.id && context.pk && context.tableName !== 'comment') {
+        try {
+            const logEntry = JSON.stringify([{
+                sent_at: new Date().toISOString(),
+                recipients: uniqueUsers,
+                title,
+                body
+            }]);
+            await pool.query(
+                `UPDATE "${context.tableName}" 
+                 SET notification_logs = COALESCE(notification_logs, '[]'::jsonb) || $1::jsonb
+                 WHERE "${context.pk}" = $2`,
+                [logEntry, context.id]
+            );
+        } catch (e) {
+            console.warn('[Notification] Notice: Failed to update notification_logs in parent record (non-critical):', e.message);
+        }
     }
 }
 

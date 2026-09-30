@@ -121,7 +121,11 @@ END \$\$;
 
 # 4. Mã hóa Password và Khởi tạo Super Admin dựa trên thông tin CMS Sign Up
 echo "==> 3. Initializing Super Admin Account (EMP-001)..."
-HASHED_PASSWORD=$(node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('${ADMIN_PASSWORD}', 10));" 2>/dev/null || node -e "console.log('${ADMIN_PASSWORD}')")
+if [[ "${ADMIN_PASSWORD}" =~ ^\$2[aby]\$ ]]; then
+  HASHED_PASSWORD="${ADMIN_PASSWORD}"
+else
+  HASHED_PASSWORD=$(node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('${ADMIN_PASSWORD}', 10));" 2>/dev/null || node -e "console.log('${ADMIN_PASSWORD}')")
+fi
 
 kubectl exec -i "${PG_DEPLOY}" -- psql -U "${DB_ADMIN_USER}" -d "${DB_NAME}" -c "
 ALTER TABLE public.employee ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50);
@@ -153,9 +157,20 @@ docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
 # Đảm bảo /opt/app/terax_ver2 luôn sẵn sàng làm template
 if [ ! -d "${TEMPLATE_DIR}" ] || [ ! -f "${TEMPLATE_DIR}/server/index.js" ]; then
-  echo "==> ${TEMPLATE_DIR} chưa tồn tại, đang clone teraxdev mới nhất từ GitHub..."
+  echo "==> ${TEMPLATE_DIR} chưa tồn tại, đang clone teraxV2 mới nhất từ GitHub (branch: lee.anh)..."
   rm -rf "${TEMPLATE_DIR}"
-  git clone -b lee.anh git@github.com:daitran-maker/teraxdev.git "${TEMPLATE_DIR}" || git clone git@github.com:daitran-maker/teraxdev.git "${TEMPLATE_DIR}"
+  git clone -b lee.anh git@github.com:daitran-maker/teraxV2.git "${TEMPLATE_DIR}"
+else
+  # Nếu thư mục git sạch (không có uncommitted edits) thì pull code mới nhất từ branch lee.anh
+  if [ -d "${TEMPLATE_DIR}/.git" ]; then
+    GIT_DIRTY=$(cd "${TEMPLATE_DIR}" && git status --porcelain 2>/dev/null || true)
+    if [ -z "${GIT_DIRTY}" ]; then
+      echo "==> Thư mục template sạch sẽ, đang cập nhật code mới nhất từ branch lee.anh..."
+      cd "${TEMPLATE_DIR}" && git fetch origin lee.anh && git reset --hard origin/lee.anh || true
+    else
+      echo "==> Thư mục template ${TEMPLATE_DIR} đang có file đang chỉnh sửa (uncommitted), giữ nguyên code hiện tại."
+    fi
+  fi
 fi
 
 # Tạo thư mục và copy code sạch từ template /opt/app/terax_ver2

@@ -1,4 +1,4 @@
-﻿const webpush = require('web-push');
+const webpush = require('web-push');
 const repo = require('./notification.repository');
 const { broadcastSSE } = require('../../../server/helpers/sseHelper');
 
@@ -46,7 +46,8 @@ class NotificationService {
     try {
       const created = await repo.create(userId, title, body, link);
       
-      // SSE broadcast for live badge
+      // SSE broadcast for live badge & notifications bell dropdown
+      broadcastSSE('new_notification', created);
       broadcastSSE('notification', {
         type: 'new_notification',
         userId,

@@ -1,6 +1,6 @@
-﻿const webpush = require('web-push');
+const webpush = require('web-push');
 const repo = require('./notification.repository');
-const { broadcastSSE } = require('../../helpers/sseHelper');
+const { broadcastSSE } = require('../../../server/helpers/sseHelper');
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || 'BB9c2sN9HL17iyM6UtISHRN-NEDR9v490BoaOkzWdOq8GOs08c-hDgMQvc0xORsps2mS9GoHIbyqzgdh7898_PI';
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || 'K6kBBA6lRLAF0OD2ItuQtKwh-UIM_U3RPrzThM4fgfU';
@@ -46,7 +46,8 @@ class NotificationService {
     try {
       const created = await repo.create(userId, title, body, link);
       
-      // SSE broadcast for live badge
+      // SSE broadcast for live badge & notifications bell dropdown
+      broadcastSSE('new_notification', created);
       broadcastSSE('notification', {
         type: 'new_notification',
         userId,
@@ -78,7 +79,7 @@ class NotificationService {
   async handleActionExecuted(payload) {
     const { actionId, tableName, recordId, user, record, nextRecord } = payload;
     try {
-      const { triggerNotifications } = require('../../helpers/notificationHelper');
+      const { triggerNotifications } = require('../../../server/helpers/notificationHelper');
       if (typeof triggerNotifications === 'function') {
         await triggerNotifications(tableName, record, nextRecord, 'update');
       }
