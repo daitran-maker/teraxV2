@@ -414,37 +414,49 @@ function buildTimezoneOptions(selectedTz) {
   }));
 }
 
-window.lookupTaxCode = async function(isBlur) {
-  const taxInput = document.getElementById('step1_tax_code');
-  const rawCode = taxInput ? taxInput.value.trim() : '';
-  const cleanCode = rawCode.replace(/[^0-9A-Za-z-]/g, '');
+let _taxDebounceTimer = null;
+window.handleTaxCodeInput = function(rawVal, immediate) {
+  if (_taxDebounceTimer) clearTimeout(_taxDebounceTimer);
+  const clean = String(rawVal || '').trim().replace(/[^0-9A-Za-z-]/g, '');
 
-  if (!cleanCode) {
-    if (!isBlur) {
-      showToast(swT('sw.tax_code_empty', 'Vui lòng nhập mã số thuế để tra cứu!'), 'warning');
-    }
-    return;
-  }
-
-  if (isBlur && window.lookupTaxCode._lastFetchedCode === cleanCode) {
-    return;
-  }
-
-  const btn = document.getElementById('btn_lookup_tax');
-  const icon = document.getElementById('icon_lookup_tax');
   const hintEl = document.getElementById('step1_tax_hint');
+  const iconEl = document.getElementById('step1_tax_status_icon');
+
+  if (clean.length < 10) {
+    if (hintEl) hintEl.style.display = 'none';
+    if (iconEl) iconEl.style.display = 'none';
+    return;
+  }
+
+  if (immediate) {
+    window.autoFetchTaxCode(clean);
+  } else {
+    _taxDebounceTimer = setTimeout(() => {
+      window.autoFetchTaxCode(clean);
+    }, 600);
+  }
+};
+
+window.autoFetchTaxCode = async function(cleanCode) {
+  if (!cleanCode || cleanCode.length < 10) return;
+  if (window.autoFetchTaxCode._lastFetchedCode === cleanCode) return;
+  if (window.autoFetchTaxCode._running) return;
+
+  const hintEl = document.getElementById('step1_tax_hint');
+  const iconEl = document.getElementById('step1_tax_status_icon');
 
   try {
-    window.lookupTaxCode._running = true;
-    if (btn) btn.disabled = true;
-    if (icon) {
-      icon.textContent = 'progress_activity';
-      icon.style.animation = 'spin 1s linear infinite';
+    window.autoFetchTaxCode._running = true;
+    if (iconEl) {
+      iconEl.textContent = 'progress_activity';
+      iconEl.style.color = '#F97316';
+      iconEl.style.display = 'inline-block';
+      iconEl.style.animation = 'spin 1s linear infinite';
     }
     if (hintEl) {
       hintEl.style.display = 'block';
       hintEl.style.color = '#6B7280';
-      hintEl.textContent = swT('common.loading', 'Đang tra cứu dữ liệu Tổng cục Thuế...');
+      hintEl.textContent = swT('common.loading', 'Đang tự động nhận diện thông tin doanh nghiệp...');
     }
 
     const res = await apiGet('/system-setup/tax-payer/' + encodeURIComponent(cleanCode));
@@ -454,7 +466,7 @@ window.lookupTaxCode = async function(isBlur) {
       const snInput = document.getElementById('step1_shortname');
       const addrInput = document.getElementById('step1_address');
 
-      const nameVal = data.fullname || data.name || '';
+      const nameVal = data.fullname || '';
       if (fnInput && nameVal) {
         fnInput.value = nameVal;
         fnInput.style.transition = 'background-color 0.5s';
@@ -474,39 +486,38 @@ window.lookupTaxCode = async function(isBlur) {
         setTimeout(() => { addrInput.style.backgroundColor = ''; }, 1500);
       }
 
-      window.lookupTaxCode._lastFetchedCode = cleanCode;
+      window.autoFetchTaxCode._lastFetchedCode = cleanCode;
 
+      if (iconEl) {
+        iconEl.textContent = 'check_circle';
+        iconEl.style.color = '#16A34A';
+        iconEl.style.animation = 'none';
+        iconEl.style.display = 'inline-block';
+      }
       if (hintEl) {
         hintEl.style.display = 'block';
-        hintEl.style.color = '#059669';
+        hintEl.style.color = '#15803D';
         hintEl.textContent = '✓ ' + (nameVal || '') + (data.status ? ` (${data.status})` : '');
       }
 
-      showToast(swT('sw.tax_lookup_success', 'Đã tự động điền thông tin công ty từ Tổng cục Thuế!'), 'success');
+      showToast(swT('sw.tax_lookup_success', 'Đã tự động lấy thông tin từ mã số thuế!'), 'success');
     } else {
-      const errMsg = (res && res.error) || swT('sw.tax_lookup_not_found', 'Không tìm thấy thông tin cho MST này');
+      if (iconEl) iconEl.style.display = 'none';
       if (hintEl) {
         hintEl.style.display = 'block';
         hintEl.style.color = '#DC2626';
-        hintEl.textContent = errMsg;
+        hintEl.textContent = (res && (res.message || res.error)) || swT('sw.tax_lookup_not_found', 'Không tìm thấy thông tin cho mã số thuế này');
       }
-      if (!isBlur) showToast(errMsg, 'warning');
     }
   } catch (err) {
-    const errMsg = err.message || swT('sw.tax_lookup_error', 'Lỗi tra cứu thông tin doanh nghiệp');
+    if (iconEl) iconEl.style.display = 'none';
     if (hintEl) {
       hintEl.style.display = 'block';
       hintEl.style.color = '#DC2626';
-      hintEl.textContent = errMsg;
+      hintEl.textContent = swT('sw.tax_lookup_error', 'Lỗi tra cứu mã số thuế: ') + err.message;
     }
-    if (!isBlur) showToast(errMsg, 'error');
   } finally {
-    window.lookupTaxCode._running = false;
-    if (btn) btn.disabled = false;
-    if (icon) {
-      icon.textContent = 'travel_explore';
-      icon.style.animation = '';
-    }
+    window.autoFetchTaxCode._running = false;
   }
 };
 
@@ -567,14 +578,11 @@ function renderStep1HTML(comp) {
     + '<div class="form-group">'+swLabel(swT('sw.step1_shortname', 'Tên viết tắt / Brand Name'), true)+swInput('step1_shortname', swT('sw.step1_shortname_ph', 'VD: TERAX'), escapeHTML(comp.company_shortname||''))+'</div>'
     + '<div class="form-group">'
     + swLabel(swT('sw.step1_tax_code', 'Mã số thuế'), false)
-    + '<div style="display:flex;gap:8px;position:relative;">'
-    + '<input type="text" id="step1_tax_code" class="sw-input" style="flex:1;" placeholder="' + swT('sw.step1_tax_code_ph', 'VD: 0101234567') + '" value="' + escapeHTML(comp.tax_code||'') + '" onkeydown="if(event.key===\'Enter\'){event.preventDefault();window.lookupTaxCode(false);}" onblur="if(this.value.trim().length >= 10 && !window.lookupTaxCode._running){window.lookupTaxCode(true);}">'
-    + '<button type="button" id="btn_lookup_tax" class="sw-btn-secondary" onclick="window.lookupTaxCode(false)" title="' + swT('sw.lookup_tax_tooltip', 'Tự động lấy Tên công ty, Tên viết tắt và Địa chỉ từ Tổng cục Thuế') + '" style="padding:0 12px;white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;border:1px solid #D1D5DB;border-radius:8px;background:#F9FAFB;color:#374151;cursor:pointer;">'
-    + '<span class="material-symbols-rounded" id="icon_lookup_tax" style="font-size:17px;color:#F97316;">travel_explore</span>'
-    + '<span>' + swT('sw.lookup_tax', 'Tra cứu') + '</span>'
-    + '</button>'
+    + '<div style="position:relative;">'
+    + '<input type="text" id="step1_tax_code" class="sw-input" style="padding-right:36px;" placeholder="' + swT('sw.step1_tax_code_ph', 'VD: 0101234567') + '" value="' + escapeHTML(comp.tax_code||'') + '" oninput="window.handleTaxCodeInput(this.value)" onblur="window.handleTaxCodeInput(this.value, true)">'
+    + '<span id="step1_tax_status_icon" class="material-symbols-rounded" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:18px;color:#9CA3AF;pointer-events:none;display:none;"></span>'
     + '</div>'
-    + '<div id="step1_tax_hint" style="font-size:11px;color:#6B7280;margin-top:4px;display:none;"></div>'
+    + '<div id="step1_tax_hint" style="font-size:11.5px;color:#6B7280;margin-top:4px;display:none;"></div>'
     + '</div>'
 
     // Country Searchable Select (top 5 popular first, flat list, searchable)

@@ -195,7 +195,7 @@ router.get('/data', async (req, res) => {
   }
 });
 
-// GET /api/system-setup/tax-payer/:taxCode → Lookup via xinvoice GDT API
+// GET /api/system-setup/tax-payer/:taxCode → Lookup via VietQR Business API
 router.get('/tax-payer/:taxCode', async (req, res) => {
   const { taxCode } = req.params;
   const cleanCode = String(taxCode || '').trim().replace(/[^a-zA-Z0-9-]/g, '');
@@ -204,23 +204,28 @@ router.get('/tax-payer/:taxCode', async (req, res) => {
   }
 
   try {
-    const url = `https://api.xinvoice.vn/gdt-api/tax-payer/${encodeURIComponent(cleanCode)}`;
-    const response = await fetch(url, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const response = await fetch(`https://api.vietqr.io/v2/business/${encodeURIComponent(cleanCode)}`, {
+      signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       }
     });
+    clearTimeout(timeoutId);
 
-    const data = await response.json();
-    if (!response.ok || data.success === false) {
-      return res.status(404).json({ success: false, message: data.message || 'Mã số thuế không tìm thấy' });
+    const json = await response.json();
+    if (!response.ok || json.code !== '00' || !json.data) {
+      return res.status(404).json({ success: false, message: json.desc || 'Không tìm thấy thông tin cho mã số thuế này' });
     }
 
-    // Extract brand/short name from full company name
-    let shortName = '';
-    if (data.name) {
-      shortName = data.name
+    const d = json.data;
+    const fullName = d.name || '';
+    let shortName = d.shortName || '';
+    if (!shortName && fullName) {
+      shortName = fullName
         .replace(/^(CÔNG TY CỔ PHẦN|CÔNG TY TNHH MTV|CÔNG TY TNHH|TẬP ĐOÀN|TỔNG CÔNG TY|DOANH NGHIỆP TƯ NHÂN|CHI NHÁNH|VĂN PHÒNG ĐẠI DIỆN)\s+/i, '')
         .trim();
     }
@@ -228,12 +233,11 @@ router.get('/tax-payer/:taxCode', async (req, res) => {
     res.json({
       success: true,
       data: {
-        fullname: data.name || '',
-        shortname: shortName || data.name || '',
-        address: data.address || '',
-        taxCode: data.taxID || cleanCode,
-        status: data.status || '',
-        taxDepartment: data.taxDepartment || ''
+        fullname: fullName,
+        shortname: shortName || fullName,
+        address: d.address || '',
+        taxCode: d.id || cleanCode,
+        status: d.status || ''
       }
     });
   } catch (err) {
