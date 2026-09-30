@@ -418,10 +418,15 @@ function buildStatusCards(viewKey, data) {
 
   if (cardConfigs.length === 0) return '';
 
+  let activeCardFilterKey = 'sr_status';
+  if (viewKey === 'my_approval') activeCardFilterKey = 'approval_status';
+  else if (['my_process_owner', 'my_task', 'my_team'].includes(viewKey)) activeCardFilterKey = 'process_status';
+
   let html = '<div class="dv-kpi-cards-row" style="display:flex; gap:12px; width: 100%; overflow-x: auto; padding-bottom: 2px;">';
   for (const card of cardConfigs) {
+    const isCardActive = dashboardFilters[activeCardFilterKey] && dashboardFilters[activeCardFilterKey].has(card.key);
     html += `
-      <div class="dv-kpi-card" style="flex:1; min-width:120px; height:64px; background:#ffffff; border:1px solid #E5E7EB; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:12px; box-shadow: 0 1px 2px rgba(16,24,40,0.04); border-bottom: 3px solid ${card.color}; transition: all 0.2s ease;">
+      <div class="dv-kpi-card ${isCardActive ? 'is-active' : ''}" onclick="handleKpiCardFilterClick('${viewKey}', '${card.key}')" style="flex:1; min-width:120px; height:64px; background:${isCardActive ? card.bgLight : '#ffffff'}; border:${isCardActive ? `2px solid ${card.color}` : '1px solid #E5E7EB'}; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:12px; box-shadow: ${isCardActive ? '0 4px 6px -1px rgba(0,0,0,0.1)' : '0 1px 2px rgba(16,24,40,0.04)'}; border-bottom: 3px solid ${card.color}; transition: all 0.2s ease; cursor:pointer;" title="Click để lọc theo ${card.label}">
         <div class="dv-card-icon" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:${card.bgLight}; color:${card.color}; flex-shrink:0;">
           <span class="material-symbols-rounded" style="font-size:14px;">${card.icon}</span>
         </div>
@@ -467,6 +472,14 @@ function buildFilterSidebar(viewKey, data) {
     });
     filterGroups.push({ key: 'rating_status', label: 'Rating', values: ratingCounts });
   } else if (viewKey === 'my_approval') {
+    // Approval Status filter (synchronized with the top KPI cards)
+    const appCounts = {};
+    data.forEach(r => {
+      const s = r._cache?.approvalStatus || getApprovalStatusForUser(r);
+      appCounts[s] = (appCounts[s] || 0) + 1;
+    });
+    filterGroups.push({ key: 'approval_status', label: 'Approval Status', values: appCounts });
+
     // SR Status filter
     const srCounts = {};
     data.forEach(r => { const s = r.sr_status_key || r.sr_status || 'Unknown'; srCounts[s] = (srCounts[s] || 0) + 1; });
@@ -760,6 +773,24 @@ window.toggleDashboardFilter = function (viewKey, filterKey, filterValue, checke
   } else {
     dashboardFilters[filterKey].delete(filterValue);
     if (dashboardFilters[filterKey].size === 0) delete dashboardFilters[filterKey];
+  }
+  savePersistedFilters(viewKey);
+  currentDashboardPage = 1;
+  applyDashboardFilters(viewKey);
+};
+
+window.handleKpiCardFilterClick = function (viewKey, cardKey) {
+  let filterKey = 'sr_status';
+  if (viewKey === 'my_approval') filterKey = 'approval_status';
+  else if (['my_process_owner', 'my_task', 'my_team'].includes(viewKey)) filterKey = 'process_status';
+
+  if (!dashboardFilters[filterKey]) dashboardFilters[filterKey] = new Set();
+  if (dashboardFilters[filterKey].has(cardKey)) {
+    dashboardFilters[filterKey].delete(cardKey);
+    if (dashboardFilters[filterKey].size === 0) delete dashboardFilters[filterKey];
+  } else {
+    dashboardFilters[filterKey].clear();
+    dashboardFilters[filterKey].add(cardKey);
   }
   savePersistedFilters(viewKey);
   currentDashboardPage = 1;

@@ -96,9 +96,28 @@ window.isActionAllowedWithContext = function (childKey, actionId, parentKey) {
 window.isChildTableActionAllowed = function (childKey, actionId, parentKey = currentModule) {
   let normalizedParentKey = parentKey;
   const hashModule = window.location.hash.replace('#', '').split('/')[0];
-  const activeRecord = (currentView === 'detail' && window.currentDetailRecord)
+  const hashParts = window.location.hash.replace('#', '').split('/');
+  const hashPk = hashParts[1] ? hashParts[1].split('&')[0] : null;
+
+  let activeRecord = (currentView === 'detail' && window.currentDetailRecord)
     ? window.currentDetailRecord
     : (typeof currentRecord !== 'undefined' ? currentRecord : null);
+
+  // Self-healing: if activeRecord is missing or doesn't match the current detail record in URL
+  if (currentView === 'detail' && hashPk) {
+    const isMismatch = !activeRecord || String(activeRecord.request_id || activeRecord.id || (typeof MODULES !== 'undefined' && MODULES[hashModule] ? activeRecord[MODULES[hashModule].pk] : '')) !== String(hashPk);
+    if (isMismatch) {
+      const pane = document.getElementById('content') || document.querySelector('.main > [id^="pane-"]');
+      const recovered = (pane && pane._detailRecord)
+        || (window.__paneDetailRecords && (window.__paneDetailRecords[`${hashModule}/${hashPk}`] || window.__paneDetailRecords[`request/${hashPk}`]))
+        || (selectCache['request'] && selectCache['request'].find(r => String(r.request_id || r.id) === String(hashPk)));
+      if (recovered) {
+        activeRecord = recovered;
+        window.currentDetailRecord = recovered;
+        currentRecord = recovered;
+      }
+    }
+  }
 
   // Feedback (request_rating), Comments, History & Logs, and Finance never allow manual Add or Duplicate action
   const nonAddableDuplicateChildTables = ['logs', 'request_activity_log', 'history', 'request_rating', 'rating', 'feedback', 'comment', 'ticket_comment', 'finance'];

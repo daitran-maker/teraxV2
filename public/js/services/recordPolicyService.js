@@ -335,9 +335,10 @@ function canUserEditRecord(moduleKey, record) {
 
     if (authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN') return true;
 
-    // 2. Parent request context checks
+    // 2. Parent request context checks (applies when viewing as a child under a request)
+    const isUnderRequestView = currentView === 'detail' && ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule);
     const parentId = record.request || record.request_id || record.id__request;
-    if (parentId) {
+    if (isUnderRequestView && parentId) {
       const parentRequest = selectCache['request']?.find(r => String(r.request_id) === String(parentId));
       if (parentRequest) {
         const processStatus = Number(parentRequest.process_status);
@@ -479,9 +480,10 @@ function canUserDeleteRecord(moduleKey, record) {
       }
     }
 
-    // 2. Parent request context checks
+    // 2. Parent request context checks (applies when viewing as a child under a request)
+    const isUnderRequestView = currentView === 'detail' && ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule);
     const parentId = record.request || record.request_id || record.id__request;
-    if (parentId) {
+    if (isUnderRequestView && parentId) {
       const parentRequest = selectCache['request']?.find(r => String(r.request_id) === String(parentId));
       if (parentRequest) {
         const processStatus = Number(parentRequest.process_status);

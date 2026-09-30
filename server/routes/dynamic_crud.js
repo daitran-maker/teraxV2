@@ -3528,7 +3528,7 @@ router.post('/:tableName', async (req, res) => {
               newTotal = Math.round((valBefore + valVat) * rate);
             }
             
-            const existingRes = await client.query('SELECT SUM(COALESCE(total_value_in_base_currency, (COALESCE(value_before_vat, 0) + COALESCE(vat_value, 0)) * COALESCE(exchange_rate, 1))) as existing_total FROM invoice WHERE contract_id = $1 AND deleted_at IS NULL', [data.contract_id]);
+            const existingRes = await client.query('SELECT SUM(COALESCE(NULLIF(regexp_replace(COALESCE(total_value_in_base_currency::text, \'\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, (COALESCE(NULLIF(regexp_replace(COALESCE(value_before_vat::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0) + COALESCE(NULLIF(regexp_replace(COALESCE(vat_value::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0)) * COALESCE(NULLIF(regexp_replace(COALESCE(exchange_rate::text, \'1\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 1))) as existing_total FROM invoice WHERE contract_id = $1 AND deleted_at IS NULL', [data.contract_id]);
             const existingTotal = parseFloat(existingRes.rows[0].existing_total) || 0;
             if (existingTotal + newTotal > contractTotal) {
               throw new Error(`Tổng giá trị các hóa đơn (${(existingTotal + newTotal).toLocaleString()}) vượt quá tổng giá trị hợp đồng (${contractTotal.toLocaleString()})`);
@@ -4204,7 +4204,7 @@ router.put('/:tableName/:id', async (req, res) => {
             newTotal = oldRecord ? (parseFloat(oldRecord.total_value_in_base_currency) || ((parseFloat(oldRecord.value_before_vat || 0) + parseFloat(oldRecord.vat_value || 0)) * parseFloat(oldRecord.exchange_rate || 1))) : 0;
           }
 
-          const existingRes = await getPoolForTable(tableName).query('SELECT SUM(COALESCE(total_value_in_base_currency, (COALESCE(value_before_vat, 0) + COALESCE(vat_value, 0)) * COALESCE(exchange_rate, 1))) as existing_total FROM invoice WHERE contract_id = $1 AND deleted_at IS NULL AND invoice_id <> $2', [contractId, id]);
+          const existingRes = await getPoolForTable(tableName).query('SELECT SUM(COALESCE(NULLIF(regexp_replace(COALESCE(total_value_in_base_currency::text, \'\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, (COALESCE(NULLIF(regexp_replace(COALESCE(value_before_vat::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0) + COALESCE(NULLIF(regexp_replace(COALESCE(vat_value::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0)) * COALESCE(NULLIF(regexp_replace(COALESCE(exchange_rate::text, \'1\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 1))) as existing_total FROM invoice WHERE contract_id = $1 AND deleted_at IS NULL AND invoice_id <> $2', [contractId, id]);
           const existingTotal = parseFloat(existingRes.rows[0].existing_total) || 0;
           if (existingTotal + newTotal > contractTotal) {
             throw new Error(`Tổng giá trị các hóa đơn (${(existingTotal + newTotal).toLocaleString()}) vượt quá tổng giá trị hợp đồng (${contractTotal.toLocaleString()})`);
@@ -4771,6 +4771,7 @@ router.delete('/:tableName/:id', async (req, res) => {
     }
     let query;
     if (dbCols.includes('deleted_at')) {
+      const colTypes = await getTableColumnTypes(tableName);
       let statusColToUpdate = null;
       let statusValToUpdate = null;
       if (dbCols.includes('sr_status')) {
@@ -4791,8 +4792,11 @@ router.delete('/:tableName/:id', async (req, res) => {
         statusColToUpdate = 'billing_status';
         statusValToUpdate = 43; // canceled
       } else if (dbCols.includes('status')) {
-        statusColToUpdate = 'status';
-        statusValToUpdate = 'Deleted';
+        const sType = String(colTypes['status'] || '').toLowerCase();
+        if (sType.includes('char') || sType.includes('text')) {
+          statusColToUpdate = 'status';
+          statusValToUpdate = 'Deleted';
+        }
       }
 
       if (statusColToUpdate && statusValToUpdate !== null) {
@@ -4962,6 +4966,7 @@ router.post('/:tableName/bulk-delete', async (req, res) => {
     }
     let query;
     if (dbCols.includes('deleted_at')) {
+      const colTypes = await getTableColumnTypes(tableName);
       let statusColToUpdate = null;
       let statusValToUpdate = null;
       if (dbCols.includes('sr_status')) {
@@ -4982,8 +4987,11 @@ router.post('/:tableName/bulk-delete', async (req, res) => {
         statusColToUpdate = 'billing_status';
         statusValToUpdate = 43; // canceled
       } else if (dbCols.includes('status')) {
-        statusColToUpdate = 'status';
-        statusValToUpdate = 'Deleted';
+        const sType = String(colTypes['status'] || '').toLowerCase();
+        if (sType.includes('char') || sType.includes('text')) {
+          statusColToUpdate = 'status';
+          statusValToUpdate = 'Deleted';
+        }
       }
 
       if (statusColToUpdate && statusValToUpdate !== null) {

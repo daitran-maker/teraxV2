@@ -22,10 +22,13 @@ class PaymentService {
     }
 
     // 3. payment_type validation (Outgoing / Incoming)
-    if (data.payment_type !== undefined && data.payment_type !== null) {
+    if (data.payment_type !== undefined && data.payment_type !== null && String(data.payment_type).trim() !== '') {
       const typeStr = String(data.payment_type).trim();
-      const validTypes = ['Outgoing', 'Incoming', '24', '25']; // Support both string and status ID
-      if (!validTypes.includes(typeStr) && !validTypes.map(t => t.toLowerCase()).includes(typeStr.toLowerCase())) {
+      if (typeStr === '61' || typeStr.toLowerCase() === 'outgoing' || typeStr === '25') {
+        data.payment_type = 61;
+      } else if (typeStr === '60' || typeStr.toLowerCase() === 'incoming' || typeStr === '24') {
+        data.payment_type = 60;
+      } else {
         throw new Error("Payment Type must be either 'Outgoing' or 'Incoming'.");
       }
     }

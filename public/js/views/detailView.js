@@ -75,6 +75,14 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
     try {
       currentRecord = rec;
       window.currentDetailRecord = rec;
+      if (content) {
+        content._detailRecord = rec;
+      }
+      window.__paneDetailRecords = window.__paneDetailRecords || {};
+      window.__paneDetailRecords[`${moduleKey}/${pkVal}`] = rec;
+      if (content && content.id) {
+        window.__paneDetailRecords[content.id] = rec;
+      }
 
       const scrollEl = document.querySelector('.detail-scroll');
       const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
@@ -276,6 +284,14 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
 
       currentRecord = freshRecord;
       window.currentDetailRecord = freshRecord;
+      if (content) {
+        content._detailRecord = freshRecord;
+      }
+      window.__paneDetailRecords = window.__paneDetailRecords || {};
+      window.__paneDetailRecords[`${moduleKey}/${pkVal}`] = freshRecord;
+      if (content && content.id) {
+        window.__paneDetailRecords[content.id] = freshRecord;
+      }
 
       if (!selectCache[moduleKey]) selectCache[moduleKey] = [];
       const cachedRecordIndex = selectCache[moduleKey].findIndex(r => String(r[mod.pk]) === String(pkVal));

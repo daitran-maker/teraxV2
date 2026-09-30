@@ -1798,6 +1798,29 @@ function validateFormAndNotify(moduleKey, showNotification = false) {
     }
   }
 
+  // Service date validation: End Date must be greater than Start Date
+  if (moduleKey === 'service') {
+    const sDate = document.getElementById('f-start_date');
+    const eDate = document.getElementById('f-end_date');
+    if (sDate && eDate && sDate.value && eDate.value) {
+      const dStart = new Date(sDate.value);
+      const dEnd = new Date(eDate.value);
+      if (dEnd <= dStart) {
+        eDate.style.borderColor = '#EF4444';
+        const pane = eDate.closest('.form-tab-pane') || eDate.closest('.wizard-content');
+        const tabId = pane ? pane.id : null;
+        missingFields.push({
+          key: 'end_date',
+          label: 'End Date phải sau Start Date',
+          targetEl: eDate,
+          tabId,
+          pane
+        });
+        if (tabId) tabErrorsCount[tabId] = (tabErrorsCount[tabId] || 0) + 1;
+      }
+    }
+  }
+
   // Update tab headers with error indicator dot
   const tabBtns = formModalBody.querySelectorAll('.form-tab-btn');
   tabBtns.forEach(btn => {
@@ -2816,6 +2839,14 @@ async function submitAdd(moduleKey, extraData = {}) {
     ? activeHashModule
     : parentModuleKeyForAdd;
 
+  if (moduleKey === 'service' && data.start_date && data.end_date) {
+    if (new Date(data.end_date) <= new Date(data.start_date)) {
+      showToast(typeof t === 'function' ? t('msg.service_date_invalid', 'End Date phải sau Start Date (End Date must be greater than Start Date)') : 'End Date phải sau Start Date (End Date must be greater than Start Date)', 'error');
+      resetSaveButton(saveBtn);
+      return;
+    }
+  }
+
   if (moduleKey === 'payment') {
     if (!data.payment_status) {
       data.payment_status = 'Draft';
@@ -2854,7 +2885,7 @@ async function submitAdd(moduleKey, extraData = {}) {
     const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
     const yy = String(vnDate.getFullYear()).slice(-2);
     const dateStr = `${dd}${mm}${yy}`;
-    const rand = Math.floor(1000 + Math.random() * 9000);
+    const rand = Math.floor(100000 + Math.random() * 900000);
     data.office_asset_id = `${companyPrefix}-${typePrefix}-${dateStr}-${rand}`;
   }
 
@@ -3037,6 +3068,14 @@ async function submitEdit(moduleKey, pkVal, extraData = {}) {
 
   const mod = MODULES[moduleKey];
   const data = { ...collectFormData(moduleKey), ...extraData };
+
+  if (moduleKey === 'service' && data.start_date && data.end_date) {
+    if (new Date(data.end_date) <= new Date(data.start_date)) {
+      showToast(typeof t === 'function' ? t('msg.service_date_invalid', 'End Date phải sau Start Date (End Date must be greater than Start Date)') : 'End Date phải sau Start Date (End Date must be greater than Start Date)', 'error');
+      resetSaveButton(saveBtn);
+      return;
+    }
+  }
 
   if (moduleKey === 'invoice') {
     if (!data.description || !data.description.trim()) {

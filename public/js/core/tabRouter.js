@@ -51,6 +51,12 @@ window.closeTabPane = function (paneId, event) {
   const pane = document.getElementById(paneId);
   if (!pane) return;
   const isClosingActive = pane.id === 'content';
+  if (window.__paneDetailRecords) {
+    delete window.__paneDetailRecords[paneId];
+    if (pane.dataset && pane.dataset.hash) {
+      delete window.__paneDetailRecords[pane.dataset.hash.split('&')[0]];
+    }
+  }
   pane.remove();
 
   if (isClosingActive) {
@@ -597,6 +603,32 @@ async function handleHashChange() {
     const parts = path.split('/');
     currentModule = parts[0];
     currentView = parts[1] ? 'detail' : (['my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(currentModule) ? 'dashboard' : 'table');
+
+    // Restore or reset active record based on view type
+    if (currentView === 'detail' && parts[1]) {
+      const pkVal = parts[1];
+      const lookupKey = `${currentModule}/${pkVal}`;
+      const savedRec = newPane._detailRecord
+        || (window.__paneDetailRecords && (window.__paneDetailRecords[lookupKey] || window.__paneDetailRecords[newPane.id] || window.__paneDetailRecords[newPaneId]));
+      if (savedRec) {
+        currentRecord = savedRec;
+        window.currentDetailRecord = savedRec;
+        newPane._detailRecord = savedRec;
+      } else {
+        const mod = MODULES[currentModule];
+        const pkKey = mod ? mod.pk : 'request_id';
+        const inCache = (selectCache[currentModule] || []).find(r => String(r[pkKey] || r.id) === String(pkVal))
+          || (selectCache['request'] || []).find(r => String(r[pkKey] || r.request_id || r.id) === String(pkVal));
+        if (inCache) {
+          currentRecord = inCache;
+          window.currentDetailRecord = inCache;
+          newPane._detailRecord = inCache;
+        }
+      }
+    } else {
+      currentRecord = null;
+      window.currentDetailRecord = null;
+    }
 
     document.querySelectorAll('.nav-item').forEach(el => {
       el.classList.toggle('active', el.id === `nav-${currentModule}`);

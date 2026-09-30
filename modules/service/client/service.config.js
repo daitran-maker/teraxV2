@@ -34,8 +34,8 @@
       { key: 'note', label: 'NOTE', type: 'textarea', full: true },
       { key: 'service_id', label: 'SERVICE CODE', type: 'text', hint: 'Auto-generated code, feel free to edit if needed', hidden: true },
       { section: 'service period' },
-      { key: 'start_date', label: 'START DATE', type: 'date', required: true },
-      { key: 'end_date', label: 'END DATE', type: 'date', required: true },
+      { key: 'start_date', label: 'START DATE', type: 'date', required: true, onchange: 'handleServiceDateChange()' },
+      { key: 'end_date', label: 'END DATE', type: 'date', required: true, onchange: 'handleServiceDateChange()' },
       { key: 'fy', label: 'FISCAL YEAR', labelKey: 'col.fy', type: 'select', options: FISCAL_YEAR_OPTIONS },
       { key: 'request', label: 'REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', hidden: true }
     ],

@@ -1443,7 +1443,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
         if (box) box.selectedInlineTags = [];
         setTimeout(() => {
           const stream = activeContainerComment.querySelector('.comments-stream');
-          if (stream) stream.scrollTop = stream.scrollHeight;
+          if (stream) stream.scrollTop = 0;
         }, 50);
       }
 
