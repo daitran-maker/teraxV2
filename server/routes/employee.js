@@ -114,26 +114,65 @@ router.get('/', async (req, res) => {
     }
   }
 
-  if (status) { whereClauses.push(`e.status = $${paramIndex++}`); values.push(status); }
-  if (company_id) { whereClauses.push(`e.company_id = $${paramIndex++}`); values.push(company_id); }
-  if (department_id) { whereClauses.push(`e.department_id = $${paramIndex++}`); values.push(department_id); }
-  if (search) { whereClauses.push(`(e.full_name ILIKE $${paramIndex} OR e.email ILIKE $${paramIndex} OR e.username ILIKE $${paramIndex} OR e.employee_id ILIKE $${paramIndex})`); values.push(`%${search}%`); paramIndex++; }
+  const baseClauses = [];
+  const facetClauses = [];
 
+  if (search) {
+    baseClauses.push({
+      build: (idx) => ({
+        clause: `(e.full_name ILIKE $${idx} OR e.email ILIKE $${idx} OR e.username ILIKE $${idx} OR e.employee_id ILIKE $${idx})`,
+        values: [`%${search}%`],
+        nextIdx: idx + 1
+      })
+    });
+  }
+
+  if (status) {
+    facetClauses.push({
+      keys: ['status'],
+      build: (idx) => ({ clause: `e.status = $${idx}`, values: [status], nextIdx: idx + 1 })
+    });
+  }
+  if (company_id) {
+    facetClauses.push({
+      keys: ['company_id', 'my_company'],
+      build: (idx) => ({ clause: `e.company_id = $${idx}`, values: [company_id], nextIdx: idx + 1 })
+    });
+  }
+  if (department_id) {
+    facetClauses.push({
+      keys: ['department_id', 'department_name'],
+      build: (idx) => ({ clause: `e.department_id = $${idx}`, values: [department_id], nextIdx: idx + 1 })
+    });
+  }
   if (my_company) {
     const companyNames = my_company.split(',');
-    const inPlaceholders = companyNames.map((_, i) => `$${paramIndex + i}`).join(', ');
-    whereClauses.push(`e.company_id IN (SELECT my_company_id FROM my_company WHERE company_shortname IN (${inPlaceholders}) OR company_fullname IN (${inPlaceholders}))`);
-    values.push(...companyNames);
-    paramIndex += companyNames.length;
+    facetClauses.push({
+      keys: ['my_company', 'company_id'],
+      build: (idx) => {
+        const inPlaceholders = companyNames.map((_, i) => `$${idx + i}`).join(', ');
+        return {
+          clause: `e.company_id IN (SELECT my_company_id FROM my_company WHERE company_shortname IN (${inPlaceholders}) OR company_fullname IN (${inPlaceholders}))`,
+          values: companyNames,
+          nextIdx: idx + companyNames.length
+        };
+      }
+    });
   }
   if (department_name) {
     const deptNames = department_name.split(',');
-    const inPlaceholders = deptNames.map((_, i) => `$${paramIndex + i}`).join(', ');
-    whereClauses.push(`e.department_id IN (SELECT department_id FROM department WHERE department_name IN (${inPlaceholders}))`);
-    values.push(...deptNames);
-    paramIndex += deptNames.length;
+    facetClauses.push({
+      keys: ['department_name', 'department_id'],
+      build: (idx) => {
+        const inPlaceholders = deptNames.map((_, i) => `$${idx + i}`).join(', ');
+        return {
+          clause: `e.department_id IN (SELECT department_id FROM department WHERE department_name IN (${inPlaceholders}))`,
+          values: deptNames,
+          nextIdx: idx + deptNames.length
+        };
+      }
+    });
   }
-
   if (app_user_enabled) {
     const valArr = app_user_enabled.split(',').map(v => v.trim().toLowerCase());
     let boolVals = [];
@@ -141,14 +180,51 @@ router.get('/', async (req, res) => {
     if (valArr.includes('disabled') || valArr.includes('false')) boolVals.push(false);
     
     if (boolVals.length > 0) {
-      const placeholders = boolVals.map((_, i) => `$${paramIndex + i}`).join(', ');
-      whereClauses.push(`e.app_user_enabled IN (${placeholders})`);
-      values.push(...boolVals);
-      paramIndex += boolVals.length;
+      facetClauses.push({
+        keys: ['app_user_enabled'],
+        build: (idx) => {
+          const placeholders = boolVals.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            clause: `e.app_user_enabled IN (${placeholders})`,
+            values: boolVals,
+            nextIdx: idx + boolVals.length
+          };
+        }
+      });
     }
   }
 
-  const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const buildWhere = (excludeKey = null) => {
+    let clauses = [];
+    let vals = [];
+    let idx = 1;
+
+    for (const b of baseClauses) {
+      const res = b.build(idx);
+      clauses.push(res.clause);
+      vals.push(...res.values);
+      idx = res.nextIdx;
+    }
+
+    for (const f of facetClauses) {
+      if (excludeKey && f.keys.includes(excludeKey)) continue;
+      const res = f.build(idx);
+      clauses.push(res.clause);
+      vals.push(...res.values);
+      idx = res.nextIdx;
+    }
+
+    return {
+      whereString: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
+      values: vals,
+      nextIdx: idx
+    };
+  };
+
+  const mainWhere = buildWhere(null);
+  const whereString = mainWhere.whereString;
+  values = mainWhere.values;
+  paramIndex = mainWhere.nextIdx;
 
   try {
     if (page || limit) {
@@ -172,41 +248,45 @@ router.get('/', async (req, res) => {
       `;
       const result = await pool.query(queryStr, [...values, limit, offset]);
 
+      const statusWhere = buildWhere('status');
       const statusRes = await pool.query(`
         SELECT COALESCE(status::text, 'Unknown') as name, COUNT(*)::int as count 
         FROM EMPLOYEE e 
-        ${whereString} 
+        ${statusWhere.whereString} 
         GROUP BY status
-      `, values);
+      `, statusWhere.values);
       let statusSummary = {};
       statusRes.rows.forEach(r => { statusSummary[r.name] = r.count; });
 
+      const companyWhere = buildWhere('my_company');
       const companyRes = await pool.query(`
         SELECT COALESCE(mc.company_shortname, 'Unknown') as name, COUNT(e.*)::int as count
         FROM EMPLOYEE e
         LEFT JOIN MY_COMPANY mc ON e.company_id = mc.my_company_id
-        ${whereString}
+        ${companyWhere.whereString}
         GROUP BY mc.company_shortname
-      `, values);
+      `, companyWhere.values);
       let companySummary = {};
       companyRes.rows.forEach(r => { companySummary[r.name] = r.count; });
 
+      const deptWhere = buildWhere('department_name');
       const deptRes = await pool.query(`
         SELECT COALESCE(d.department_name, 'Unknown') as name, COUNT(e.*)::int as count
         FROM EMPLOYEE e
         LEFT JOIN DEPARTMENT d ON e.department_id = d.department_id
-        ${whereString}
+        ${deptWhere.whereString}
         GROUP BY d.department_name
-      `, values);
+      `, deptWhere.values);
       let deptSummary = {};
       deptRes.rows.forEach(r => { deptSummary[r.name] = r.count; });
 
+      const seatWhere = buildWhere('app_user_enabled');
       const seatRes = await pool.query(`
         SELECT COALESCE(app_user_enabled::text, 'false') as name, COUNT(*)::int as count
         FROM EMPLOYEE e
-        ${whereString}
+        ${seatWhere.whereString}
         GROUP BY app_user_enabled
-      `, values);
+      `, seatWhere.values);
       let seatSummary = {};
       seatRes.rows.forEach(r => { seatSummary[r.name] = r.count; });
 

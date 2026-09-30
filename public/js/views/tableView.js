@@ -1342,45 +1342,50 @@ function resolveFilterDisplayVal(groupKey, val) {
   return displayVal;
 }
 
-function buildDropdownFiltersHTML(moduleKey) {
+function rowMatchesClientFilters(moduleKey, row, excludeKey = null) {
+  const dropdownFilters = activeDropdownFilters[moduleKey] || {};
+  const search = (moduleStates[moduleKey]?.search || '').toLowerCase();
+  if (search) {
+    if (!row._searchText) {
+      let rowText = '';
+      for (const k in row) {
+        rowText += ' ' + String(row[k] || '');
+        const resolved = resolveLookupValue(moduleKey, k, row[k]);
+        if (resolved && resolved !== row[k]) rowText += ' ' + String(resolved);
+      }
+      row._searchText = rowText.toLowerCase();
+    }
+    if (!row._searchText.includes(search)) return false;
+  }
+  for (const [key, filterVal] of Object.entries(dropdownFilters)) {
+    if (key === excludeKey || !filterVal) continue;
+    if (filterVal instanceof Set && filterVal.size === 0) continue;
+    let rowVal = row[key];
+    if (typeof resolveVirtualColumn === 'function') {
+      const v = resolveVirtualColumn(moduleKey, key, row);
+      if (v !== undefined) rowVal = v;
+    }
+    rowVal = resolveLookupValue(moduleKey, key, rowVal);
+    if (filterVal instanceof Set) {
+      if (!filterVal.has(String(rowVal))) return false;
+    } else if (String(rowVal) !== String(filterVal)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getDropdownFilterGroups(moduleKey) {
   const mod = MODULES[moduleKey];
   const allowedModules = ['employee', 'employee_active', 'payment', 'invoice', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'request', 'service', 'asset', 'mtr', 'account', 'my_company', 'request_activity_log', 'finance', 'contract', 'expense'];
   if (!allowedModules.includes(moduleKey) && !(mod && mod.groupBy)) {
-    return '';
-  }
-
-  let prefixHtml = '';
-  // Finance module uses date-range filter, in addition to checkbox dropdowns
-  if (moduleKey === 'finance') {
-    const state = moduleStates[moduleKey] || {};
-    const fromVal = state.from_date || '';
-    const toVal = state.to_date || '';
-    const labelFrom = typeof t === 'function' ? t('filter.from_date', 'From Date') : 'From Date';
-    const labelTo = typeof t === 'function' ? t('filter.to_date', 'To Date') : 'To Date';
-    prefixHtml = `
-      <div class="dv-filter-group" style="padding:8px 0;">
-        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">${labelFrom}</div>
-        <input type="date" value="${fromVal}" style="width:100%; padding:6px 8px; border:1px solid var(--border-light); border-radius:6px; font-size:12px; color:var(--text-primary); background:var(--bg-card); cursor:pointer;"
-          onchange="window.setFinanceDateFilter('${moduleKey}', 'from_date', this.value)" />
-      </div>
-      <div class="dv-filter-group" style="padding:8px 0; border-top:1px solid var(--border-light); margin-bottom:12px;">
-        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">${labelTo}</div>
-        <input type="date" value="${toVal}" style="width:100%; padding:6px 8px; border:1px solid var(--border-light); border-radius:6px; font-size:12px; color:var(--text-primary); background:var(--bg-card); cursor:pointer;"
-          onchange="window.setFinanceDateFilter('${moduleKey}', 'to_date', this.value)" />
-      </div>
-    `;
+    return [];
   }
 
   // For client-side filtered modules, use original unfiltered data so sidebar counts don't disappear when a filter is active
   const serverFilteredModulesForBuild = ['employee', 'employee_active', 'payment', 'invoice', 'request', 'service', 'asset', 'mtr', 'account', 'request_activity_log', 'finance', 'contract', 'expense', 'action_rules'];
   const isClientSideModule = !serverFilteredModulesForBuild.includes(moduleKey);
   const data = (isClientSideModule && originalClientData[moduleKey]) ? originalClientData[moduleKey] : (currentData || []);
-
-  console.log('buildDropdownFiltersHTML:', moduleKey, {
-    currentFacetedSummary,
-    originalFacetedSummary: originalFacetedSummary[moduleKey],
-    dataLength: data.length
-  });
 
   const filters = activeDropdownFilters[moduleKey] || {};
   let filterGroups = [];
@@ -2279,6 +2284,7 @@ function buildDropdownFiltersHTML(moduleKey) {
         } else {
           // Client-side fallback
           data.forEach(r => {
+            if (isClientSideModule && !rowMatchesClientFilters(moduleKey, r, gKey)) return;
             let val = r[gKey];
             if (typeof resolveVirtualColumn === 'function') {
               const virtualVal = resolveVirtualColumn(moduleKey, gKey, r);
@@ -2296,6 +2302,41 @@ function buildDropdownFiltersHTML(moduleKey) {
       }
     }
   }
+
+  return filterGroups;
+}
+
+function buildDropdownFiltersHTML(moduleKey) {
+  const mod = MODULES[moduleKey];
+  const allowedModules = ['employee', 'employee_active', 'payment', 'invoice', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'request', 'service', 'asset', 'mtr', 'account', 'my_company', 'request_activity_log', 'finance', 'contract', 'expense'];
+  if (!allowedModules.includes(moduleKey) && !(mod && mod.groupBy)) {
+    return '';
+  }
+
+  let prefixHtml = '';
+  // Finance module uses date-range filter, in addition to checkbox dropdowns
+  if (moduleKey === 'finance') {
+    const state = moduleStates[moduleKey] || {};
+    const fromVal = state.from_date || '';
+    const toVal = state.to_date || '';
+    const labelFrom = typeof t === 'function' ? t('filter.from_date', 'From Date') : 'From Date';
+    const labelTo = typeof t === 'function' ? t('filter.to_date', 'To Date') : 'To Date';
+    prefixHtml = `
+      <div class="dv-filter-group" style="padding:8px 0;">
+        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">${labelFrom}</div>
+        <input type="date" value="${fromVal}" style="width:100%; padding:6px 8px; border:1px solid var(--border-light); border-radius:6px; font-size:12px; color:var(--text-primary); background:var(--bg-card); cursor:pointer;"
+          onchange="window.setFinanceDateFilter('${moduleKey}', 'from_date', this.value)" />
+      </div>
+      <div class="dv-filter-group" style="padding:8px 0; border-top:1px solid var(--border-light); margin-bottom:12px;">
+        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">${labelTo}</div>
+        <input type="date" value="${toVal}" style="width:100%; padding:6px 8px; border:1px solid var(--border-light); border-radius:6px; font-size:12px; color:var(--text-primary); background:var(--bg-card); cursor:pointer;"
+          onchange="window.setFinanceDateFilter('${moduleKey}', 'to_date', this.value)" />
+      </div>
+    `;
+  }
+
+  const filterGroups = getDropdownFilterGroups(moduleKey);
+  const filters = activeDropdownFilters[moduleKey] || {};
 
   let html = '';
   for (const group of filterGroups) {
@@ -2322,7 +2363,7 @@ function buildDropdownFiltersHTML(moduleKey) {
     const remaining = showMore ? sortedEntries.slice(5) : [];
 
     html += `
-      <div class="dv-filter-group">
+      <div class="dv-filter-group" data-filter-group="${group.key}">
         <div class="dv-filter-group-title">${typeof t === 'function' ? (t('filter.' + group.key) !== ('filter.' + group.key) ? t('filter.' + group.key) : group.label) : group.label}</div>
         ${first5.map(([val, count]) => {
       const isChecked = isFilterValueChecked(filters[group.key], val) ? 'checked' : '';
@@ -2363,9 +2404,40 @@ function buildDropdownFiltersHTML(moduleKey) {
       prefixHtml = '';
     }
   }
-  console.log('buildDropdownFiltersHTML generated HTML:', html);
   return prefixHtml + html;
 }
+
+window.updateFilterSidebarCountsInPlace = function (moduleKey) {
+  const sidebar = document.querySelector(`#view-${moduleKey} .dv-filter-sidebar`);
+  if (!sidebar) return false;
+  const filterInputs = sidebar.querySelectorAll('.dv-filter-option input');
+  if (filterInputs.length === 0) return false;
+
+  const filterGroups = getDropdownFilterGroups(moduleKey);
+  if (!filterGroups || filterGroups.length === 0) return false;
+
+  const countsByGroup = {};
+  for (const g of filterGroups) {
+    countsByGroup[g.key] = g.values || {};
+  }
+
+  const currentFilters = activeDropdownFilters[moduleKey] || {};
+
+  filterInputs.forEach(input => {
+    const key = input.dataset.filterKey;
+    const val = input.dataset.filterValue;
+    const count = countsByGroup[key]?.[val] ?? 0;
+    const countEl = input.parentElement?.querySelector('.dv-filter-count');
+    if (countEl) countEl.textContent = formatNumber(count);
+
+    const isChecked = isFilterValueChecked(currentFilters[key], val);
+    if (input.checked !== isChecked) {
+      input.checked = isChecked;
+    }
+  });
+
+  return true;
+};
 
 window.toggleTableFilter = function (moduleKey, filterKey, filterValue, checked) {
   if (!activeDropdownFilters[moduleKey]) activeDropdownFilters[moduleKey] = {};
@@ -2409,7 +2481,7 @@ window.clearTableFilters = function (moduleKey) {
   if (moduleKey === 'finance') {
     delete moduleStates[moduleKey].from_date;
     delete moduleStates[moduleKey].to_date;
-    drawFilterSidebar(moduleKey); // redraw sidebar to clear date inputs visually
+    drawFilterSidebar(moduleKey, true); // redraw sidebar to clear date inputs visually
   }
 
   // Manually uncheck to avoid full DOM redraw which resets faceted counts
@@ -2420,6 +2492,7 @@ window.clearTableFilters = function (moduleKey) {
     renderTableView(moduleKey, 1, false);
   } else {
     applyAllFilters(moduleKey);
+    window.updateFilterSidebarCountsInPlace(moduleKey);
   }
 };
 
@@ -2526,9 +2599,14 @@ window.initSidebarResizer = function (moduleOrViewKey, isDashboard = false) {
   resizer._listenerAttached = onMouseDown;
 };
 
-window.drawFilterSidebar = function (moduleKey) {
+window.drawFilterSidebar = function (moduleKey, forceRedraw = false) {
   const sidebar = document.querySelector(`#view-${moduleKey} .dv-filter-sidebar`);
   if (!sidebar) return;
+
+  if (!forceRedraw && sidebar.querySelector('.dv-filter-groups-container .dv-filter-group')) {
+    const updated = window.updateFilterSidebarCountsInPlace(moduleKey);
+    if (updated) return;
+  }
 
   const scrollPos = sidebar.scrollTop;
   const isCollapsed = sidebar.classList.contains('collapsed');

@@ -380,16 +380,59 @@ router.post('/presets/policies', async (req, res) => {
     `);
     const defaultLead = adminRes.rows[0] ? adminRes.rows[0].employee_id : 'EMP-001';
 
+    // Fetch all employees to lookup email/username -> employee_id for approval tiers
+    const empRes = await client.query('SELECT employee_id, email, username FROM employee');
+    const emailToEmpId = new Map();
+    empRes.rows.forEach(e => {
+      if (e.employee_id) {
+        const empId = e.employee_id.trim();
+        emailToEmpId.set(empId.toLowerCase(), empId);
+        if (e.email) {
+          const cleanEmail = e.email.trim().toLowerCase();
+          emailToEmpId.set(cleanEmail, empId);
+          const prefix = cleanEmail.split('@')[0];
+          if (prefix && !emailToEmpId.has(prefix)) {
+            emailToEmpId.set(prefix, empId);
+          }
+        }
+        if (e.username) {
+          const cleanUser = e.username.trim().toLowerCase();
+          if (!emailToEmpId.has(cleanUser)) {
+            emailToEmpId.set(cleanUser, empId);
+          }
+        }
+      }
+    });
+
+    const resolveEmployeeVal = (val, isTier1 = false) => {
+      if (!val || typeof val !== 'string') return isTier1 ? 'Direct Manager' : null;
+      const trimmed = val.trim();
+      if (!trimmed) return isTier1 ? 'Direct Manager' : null;
+      if (trimmed.toLowerCase() === 'direct manager' || trimmed.toLowerCase() === 'quản lý trực tiếp') {
+        return 'Direct Manager';
+      }
+      if (trimmed.includes(',')) {
+        return trimmed.split(',').map(item => resolveEmployeeVal(item, false)).filter(Boolean).join(',');
+      }
+      const lower = trimmed.toLowerCase();
+      if (emailToEmpId.has(lower)) {
+        return emailToEmpId.get(lower);
+      }
+      return trimmed;
+    };
+
     const created = [];
     for (const p of policies) {
       const name = (p.policy_name || '').trim();
       const pType = (p.policy_type || 'Operation').trim();
       const desc = (p.description || name).trim();
       const elements = p.elements || 'ASSIGN_TASK';
-      const tier1 = (p.tier1_approval || 'Direct Manager').trim();
-      const tier2 = (p.tier2_approval || '').trim() || null;
-      const tier3 = (p.tier3_approval || '').trim() || null;
+      const tier1 = resolveEmployeeVal(p.tier1_approval, true);
+      const tier2 = resolveEmployeeVal(p.tier2_approval, false);
+      const tier3 = resolveEmployeeVal(p.tier3_approval, false);
       const approvalLevel = (p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
+      const lead = resolveEmployeeVal(p.policy_lead, false) || defaultLead;
+      const owner = resolveEmployeeVal(p.sr_owner, false) || defaultLead;
 
       const check = await client.query(
         'SELECT policy_id FROM POLICY_AND_PROGRAM WHERE LOWER(policy_name) = LOWER($1)',
@@ -413,8 +456,8 @@ router.post('/presets/policies', async (req, res) => {
           tier2,
           tier3,
           approvalLevel,
-          defaultLead,
-          defaultLead,
+          lead,
+          owner,
           elements,
           companyId,
           p.sla || 3

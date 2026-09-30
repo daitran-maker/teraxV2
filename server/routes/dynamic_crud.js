@@ -1337,6 +1337,46 @@ router.post('/:tableName/bulk', async (req, res) => {
       bulkIdCounter = maxSeq;
     }
 
+    let emailToEmpId = null;
+    if (tableName === 'policy_and_program') {
+      const empRes = await client.query('SELECT employee_id, email, username FROM employee');
+      emailToEmpId = new Map();
+      empRes.rows.forEach(e => {
+        if (e.employee_id) {
+          const empId = e.employee_id.trim();
+          emailToEmpId.set(empId.toLowerCase(), empId);
+          if (e.email) {
+            const cleanEmail = e.email.trim().toLowerCase();
+            emailToEmpId.set(cleanEmail, empId);
+            const prefix = cleanEmail.split('@')[0];
+            if (prefix && !emailToEmpId.has(prefix)) {
+              emailToEmpId.set(prefix, empId);
+            }
+          }
+          if (e.username) {
+            const cleanUser = e.username.trim().toLowerCase();
+            if (!emailToEmpId.has(cleanUser)) {
+              emailToEmpId.set(cleanUser, empId);
+            }
+          }
+        }
+      });
+    }
+
+    const resolvePolicyEmpVal = (val, isTier1 = false) => {
+      if (!val || typeof val !== 'string') return isTier1 ? 'Direct Manager' : null;
+      const trimmed = val.trim();
+      if (!trimmed) return isTier1 ? 'Direct Manager' : null;
+      if (trimmed.toLowerCase() === 'direct manager' || trimmed.toLowerCase() === 'quản lý trực tiếp') return 'Direct Manager';
+      if (!emailToEmpId) return trimmed;
+      if (trimmed.includes(',')) {
+        return trimmed.split(',').map(item => resolvePolicyEmpVal(item, false)).filter(Boolean).join(',');
+      }
+      const lower = trimmed.toLowerCase();
+      if (emailToEmpId.has(lower)) return emailToEmpId.get(lower);
+      return trimmed;
+    };
+
     for (const record of records) {
       let data = { ...record };
       let finalData = {};
@@ -1351,7 +1391,11 @@ router.post('/:tableName/bulk', async (req, res) => {
 
         const dbKey = findCol(cleanKey);
         if (dbKey) {
-          finalData[dbKey] = (val === '' ? null : val);
+          let resolvedVal = (val === '' ? null : val);
+          if (tableName === 'policy_and_program' && ['tier1_approval', 'tier2_approval', 'tier3_approval', 'policy_lead', 'sr_owner'].includes(dbKey)) {
+            resolvedVal = resolvePolicyEmpVal(resolvedVal, dbKey === 'tier1_approval');
+          }
+          finalData[dbKey] = resolvedVal;
         }
       }
 
@@ -1449,128 +1493,163 @@ router.get('/:tableName', async (req, res) => {
     const isSuperAdmin = user && user.role && user.role.toUpperCase() === 'SUPER ADMIN';
     const dbCols = await getTableColumns(tableName);
     const colTypes = await getTableColumnTypes(tableName);
-    let whereClauses = [];
-    let values = [];
-    let valIdx = 1;
+
+    const conditionRegistry = [];
+    const addBaseClause = (buildFn) => {
+      conditionRegistry.push({ facetKeys: null, build: buildFn });
+    };
+    const addFacetClause = (facetKeys, buildFn) => {
+      const keys = Array.isArray(facetKeys) ? facetKeys : [facetKeys];
+      conditionRegistry.push({ facetKeys: keys, build: buildFn });
+    };
+
+    function buildWhere(excludeFacetKey = null, prefixValues = []) {
+      const clauses = [];
+      const vals = [...prefixValues];
+      let curIdx = vals.length + 1;
+
+      for (const cond of conditionRegistry) {
+        if (excludeFacetKey && cond.facetKeys && cond.facetKeys.includes(excludeFacetKey)) {
+          continue;
+        }
+        const res = cond.build(curIdx);
+        if (res && res.sql) {
+          clauses.push(res.sql);
+          if (res.values && res.values.length > 0) {
+            vals.push(...res.values);
+            curIdx += res.values.length;
+          }
+        }
+      }
+
+      const whereStr = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+      return { whereStr, values: vals };
+    }
 
     if (dbCols.includes('deleted_at') && !isSuperAdmin) {
-      whereClauses.push(`"${tableName}"."deleted_at" IS NULL`);
+      addBaseClause(() => ({ sql: `"${tableName}"."deleted_at" IS NULL`, values: [] }));
     }
 
     if (search) {
-      whereClauses.push(`("${tableName}".*)::text ILIKE $${valIdx}`);
-      values.push(`%${search}%`);
-      valIdx++;
+      addBaseClause((idx) => ({ sql: `("${tableName}".*)::text ILIKE $${idx}`, values: [`%${search}%`] }));
     }
 
     // Special interceptor for employee_related on request
     if (tableName === 'request' && filters.employee_related) {
-      whereClauses.push(`(
-        "request"."requester" = $${valIdx} OR
-        "request"."sr_creater" = $${valIdx} OR
-        "request"."policy_lead" = $${valIdx} OR
-        $${valIdx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
-        EXISTS (
-          SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
-          WHERE LOWER(step->>'approver') = LOWER($${valIdx})
-        )
-      )`);
-      values.push(filters.employee_related);
-      valIdx++;
+      const empRel = filters.employee_related;
       delete filters.employee_related;
+      addBaseClause((idx) => ({
+        sql: `(
+          "request"."requester" = $${idx} OR
+          "request"."sr_creater" = $${idx} OR
+          "request"."policy_lead" = $${idx} OR
+          $${idx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
+          EXISTS (
+            SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
+            WHERE LOWER(step->>'approver') = LOWER($${idx})
+          )
+        )`,
+        values: [empRel]
+      }));
     }
 
     // Special interceptor for employee_related on asset
     if (tableName === 'asset' && filters.employee_related) {
-      whereClauses.push(`(
-        "asset"."current_owner" = $${valIdx} OR
-        "asset"."request" IN (
-          SELECT "request"."request_id"
-          FROM "request"
-          WHERE
-            "request"."requester" = $${valIdx} OR
-            "request"."sr_creater" = $${valIdx} OR
-            "request"."policy_lead" = $${valIdx} OR
-            $${valIdx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
-            EXISTS (
-              SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
-              WHERE LOWER(step->>'approver') = LOWER($${valIdx})
-            )
-        )
-      )`);
-      values.push(filters.employee_related);
-      valIdx++;
+      const empRel = filters.employee_related;
       delete filters.employee_related;
+      addBaseClause((idx) => ({
+        sql: `(
+          "asset"."current_owner" = $${idx} OR
+          "asset"."request" IN (
+            SELECT "request"."request_id"
+            FROM "request"
+            WHERE
+              "request"."requester" = $${idx} OR
+              "request"."sr_creater" = $${idx} OR
+              "request"."policy_lead" = $${idx} OR
+              $${idx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
+              EXISTS (
+                SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
+                WHERE LOWER(step->>'approver') = LOWER($${idx})
+              )
+          )
+        )`,
+        values: [empRel]
+      }));
     }
 
     // Special interceptor for employee_related on service
     if (tableName === 'service' && filters.employee_related) {
-      whereClauses.push(`(
-        "service"."request" IN (
-          SELECT "request"."request_id"
-          FROM "request"
-          WHERE
-            "request"."requester" = $${valIdx} OR
-            "request"."sr_creater" = $${valIdx} OR
-            "request"."policy_lead" = $${valIdx} OR
-            $${valIdx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
-            EXISTS (
-              SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
-              WHERE LOWER(step->>'approver') = LOWER($${valIdx})
-            )
-        )
-      )`);
-      values.push(filters.employee_related);
-      valIdx++;
+      const empRel = filters.employee_related;
       delete filters.employee_related;
+      addBaseClause((idx) => ({
+        sql: `(
+          "service"."request" IN (
+            SELECT "request"."request_id"
+            FROM "request"
+            WHERE
+              "request"."requester" = $${idx} OR
+              "request"."sr_creater" = $${idx} OR
+              "request"."policy_lead" = $${idx} OR
+              $${idx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
+              EXISTS (
+                SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
+                WHERE LOWER(step->>'approver') = LOWER($${idx})
+              )
+          )
+        )`,
+        values: [empRel]
+      }));
     }
-
-
 
     // Special interceptor for employee_related on payment
     if (tableName === 'payment' && filters.employee_related) {
-      whereClauses.push(`(
-        "payment"."employee" = $${valIdx} OR
-        "payment"."request" IN (
-          SELECT "request"."request_id"
-          FROM "request"
-          WHERE
-            "request"."requester" = $${valIdx} OR
-            "request"."sr_creater" = $${valIdx} OR
-            "request"."policy_lead" = $${valIdx} OR
-            $${valIdx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
-            EXISTS (
-              SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
-              WHERE LOWER(step->>'approver') = LOWER($${valIdx})
-            )
-        )
-      )`);
-      values.push(filters.employee_related);
-      valIdx++;
+      const empRel = filters.employee_related;
       delete filters.employee_related;
+      addBaseClause((idx) => ({
+        sql: `(
+          "payment"."employee" = $${idx} OR
+          "payment"."request" IN (
+            SELECT "request"."request_id"
+            FROM "request"
+            WHERE
+              "request"."requester" = $${idx} OR
+              "request"."sr_creater" = $${idx} OR
+              "request"."policy_lead" = $${idx} OR
+              $${idx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
+              EXISTS (
+                SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
+                WHERE LOWER(step->>'approver') = LOWER($${idx})
+              )
+          )
+        )`,
+        values: [empRel]
+      }));
     }
 
     // Special interceptor for employee_related on expense
     if (tableName === 'expense' && filters.employee_related) {
-      whereClauses.push(`(
-        "expense"."id__employee" = $${valIdx} OR
-        "expense"."id__request" IN (
-          SELECT "request"."request_id"
-          FROM "request"
-          WHERE
-            "request"."requester" = $${valIdx} OR
-            "request"."sr_creater" = $${valIdx} OR
-            "request"."policy_lead" = $${valIdx} OR
-            $${valIdx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
-            EXISTS (
-              SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
-              WHERE LOWER(step->>'approver') = LOWER($${valIdx})
-            )
-        )
-      )`);
-      values.push(filters.employee_related);
-      valIdx++;
+      const empRel = filters.employee_related;
       delete filters.employee_related;
+      addBaseClause((idx) => ({
+        sql: `(
+          "expense"."id__employee" = $${idx} OR
+          "expense"."id__request" IN (
+            SELECT "request"."request_id"
+            FROM "request"
+            WHERE
+              "request"."requester" = $${idx} OR
+              "request"."sr_creater" = $${idx} OR
+              "request"."policy_lead" = $${idx} OR
+              $${idx} = ANY(COALESCE("request"."sr_owner", ARRAY[]::text[])) OR
+              EXISTS (
+                SELECT 1 FROM jsonb_array_elements(COALESCE("request"."approval_flow"->'steps', '[]'::jsonb)) AS step 
+                WHERE LOWER(step->>'approver') = LOWER($${idx})
+              )
+          )
+        )`,
+        values: [empRel]
+      }));
     }
 
     // Dynamic WHERE based on query params (for Slices & Master-Detail)
@@ -1605,30 +1684,39 @@ router.get('/:tableName', async (req, res) => {
       // Handle country filter for finance
       if (key === 'country' && (tableName === 'finance' || tableName === 'v_finance')) {
         const countries = typeof value === 'string' ? value.split(',') : [value];
-        const inPlaceholders = countries.map((_, i) => `$${valIdx + i}`).join(', ');
-        whereClauses.push(`("${tableName}"."country" IN (${inPlaceholders}) OR "${tableName}"."company_id" IN (SELECT "my_company_id" FROM "my_company" WHERE "country" IN (${inPlaceholders})))`);
-        values.push(...countries);
-        valIdx += countries.length;
+        addFacetClause('country', (idx) => {
+          const inPlaceholders = countries.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            sql: `("${tableName}"."country" IN (${inPlaceholders}) OR "${tableName}"."company_id" IN (SELECT "my_company_id" FROM "my_company" WHERE "country" IN (${inPlaceholders})))`,
+            values: countries
+          };
+        });
         continue;
       }
 
       // Handle policy_type filter for finance
       if (key === 'policy_type' && (tableName === 'finance' || tableName === 'v_finance')) {
         const types = typeof value === 'string' ? value.split(',') : [value];
-        const inPlaceholders = types.map((_, i) => `$${valIdx + i}`).join(', ');
-        whereClauses.push(`"${tableName}"."policy_type" IN (${inPlaceholders})`);
-        values.push(...types);
-        valIdx += types.length;
+        addFacetClause('policy_type', (idx) => {
+          const inPlaceholders = types.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            sql: `"${tableName}"."policy_type" IN (${inPlaceholders})`,
+            values: types
+          };
+        });
         continue;
       }
 
       // Handle fy filter for finance
       if (key === 'fy' && (tableName === 'finance' || tableName === 'v_finance')) {
         const fys = typeof value === 'string' ? value.split(',') : [value];
-        const inPlaceholders = fys.map((_, i) => `$${valIdx + i}`).join(', ');
-        whereClauses.push(`("${tableName}"."fy" IN (${inPlaceholders}) OR REPLACE("${tableName}"."fy", 'FY', '') IN (${inPlaceholders}) OR ('FY' || "${tableName}"."fy") IN (${inPlaceholders}))`);
-        values.push(...fys);
-        valIdx += fys.length;
+        addFacetClause('fy', (idx) => {
+          const inPlaceholders = fys.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            sql: `("${tableName}"."fy" IN (${inPlaceholders}) OR REPLACE("${tableName}"."fy", 'FY', '') IN (${inPlaceholders}) OR ('FY' || "${tableName}"."fy") IN (${inPlaceholders}))`,
+            values: fys
+          };
+        });
         continue;
       }
 
@@ -1636,22 +1724,28 @@ router.get('/:tableName', async (req, res) => {
       if (key === 'policy_name' && ['request', 'my_request', 'my_approval', 'my_task', 'my_process_owner'].includes(tableName)) {
         key = 'request_type';
         const policyNames = typeof value === 'string' ? value.split(',') : [value];
-        if (policyNames.includes('Opportunity')) {
-          const otherPolicies = policyNames.filter(p => p !== 'Opportunity');
-          let conditions = [`"policy_name" ILIKE 'OPPORTUNITY%'`];
-          if (otherPolicies.length > 0) {
-            const inPlaceholders = otherPolicies.map((_, i) => `$${valIdx + i}`).join(', ');
-            conditions.push(`"policy_name" IN (${inPlaceholders})`);
-            values.push(...otherPolicies);
-            valIdx += otherPolicies.length;
+        addFacetClause(['policy_name', 'request_type'], (idx) => {
+          if (policyNames.includes('Opportunity')) {
+            const otherPolicies = policyNames.filter(p => p !== 'Opportunity');
+            let conditions = [`"policy_name" ILIKE 'OPPORTUNITY%'`];
+            const vals = [];
+            if (otherPolicies.length > 0) {
+              const inPlaceholders = otherPolicies.map((_, i) => `$${idx + i}`).join(', ');
+              conditions.push(`"policy_name" IN (${inPlaceholders})`);
+              vals.push(...otherPolicies);
+            }
+            return {
+              sql: `"${tableName}"."${key}" IN (SELECT "policy_id" FROM "policy_and_program" WHERE ${conditions.join(' OR ')})`,
+              values: vals
+            };
+          } else {
+            const inPlaceholders = policyNames.map((_, i) => `$${idx + i}`).join(', ');
+            return {
+              sql: `"${tableName}"."${key}" IN (SELECT "policy_id" FROM "policy_and_program" WHERE "policy_name" IN (${inPlaceholders}))`,
+              values: policyNames
+            };
           }
-          whereClauses.push(`"${tableName}"."${key}" IN (SELECT "policy_id" FROM "policy_and_program" WHERE ${conditions.join(' OR ')})`);
-        } else {
-          const inPlaceholders = policyNames.map((_, i) => `$${valIdx + i}`).join(', ');
-          whereClauses.push(`"${tableName}"."${key}" IN (SELECT "policy_id" FROM "policy_and_program" WHERE "policy_name" IN (${inPlaceholders}))`);
-          values.push(...policyNames);
-          valIdx += policyNames.length;
-        }
+        });
         continue;
       }
 
@@ -1664,67 +1758,67 @@ router.get('/:tableName', async (req, res) => {
       if (key === 'my_company' && ['payment', 'employee', 'service', 'asset', 'mtr', 'account', 'contract'].includes(tableName)) {
         const companyNames = typeof value === 'string' ? value.split(',') : [value];
         const isNumeric = companyNames.every(val => !isNaN(parseInt(val, 10)) && String(parseInt(val, 10)) === String(val).trim());
-
-        if (isNumeric) {
-          const inPlaceholders = companyNames.map((_, i) => `$${valIdx + i}`).join(', ');
-          
-          if (tableName === 'employee') {
-            whereClauses.push(`"${tableName}"."company_id" IN (${inPlaceholders})`);
-          } else if (tableName === 'account') {
-            whereClauses.push(`"${tableName}"."company_entity" IN (${inPlaceholders})`);
-          } else if (tableName === 'contract' || tableName === 'payment' || tableName === 'service') {
-            whereClauses.push(`"${tableName}"."my_company"::text IN (${inPlaceholders})`);
-          } else {
-            whereClauses.push(`"${tableName}"."company_id" IN (${inPlaceholders})`);
-          }
-          values.push(...companyNames);
-          valIdx += companyNames.length;
-        } else {
-          const hasNA = companyNames.some(v => v === 'N/A' || v === 'NA' || v === 'Unknown');
-          const nonNACompanies = companyNames.filter(v => v !== 'N/A' && v !== 'NA' && v !== 'Unknown');
-
-          let companyConditions = [];
-          if (hasNA) {
-            if (tableName === 'payment' || tableName === 'contract' || tableName === 'service') {
-              companyConditions.push(`("${tableName}"."my_company" IS NULL OR "${tableName}"."my_company"::text = '' OR "${tableName}"."my_company"::text = 'N/A')`);
-            } else if (tableName === 'account') {
-              companyConditions.push(`("${tableName}"."company_entity" IS NULL OR "${tableName}"."company_entity"::text = '')`);
-            } else {
-              companyConditions.push(`("${tableName}"."company_id" IS NULL OR "${tableName}"."company_id"::text = '')`);
-            }
-          }
-
-          if (nonNACompanies.length > 0) {
-            const inPlaceholders = nonNACompanies.map((_, i) => `$${valIdx + i}`).join(', ');
-            if (tableName === 'employee') {
-              companyConditions.push(`"${tableName}"."company_id" IN (SELECT "my_company_id" FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders}))`);
-            } else if (tableName === 'account') {
-              companyConditions.push(`"${tableName}"."company_entity" IN (SELECT "my_company_id" FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders}))`);
+        addFacetClause(['my_company', 'company_id', 'company_entity', 'company_shortname', 'id__my_company'], (idx) => {
+          if (isNumeric) {
+            const inPlaceholders = companyNames.map((_, i) => `$${idx + i}`).join(', ');
+            let targetCol = `"${tableName}"."company_id"`;
+            if (tableName === 'account') {
+              targetCol = `"${tableName}"."company_entity"`;
             } else if (tableName === 'contract' || tableName === 'payment' || tableName === 'service') {
-              companyConditions.push(`("${tableName}"."my_company"::text IN (SELECT "my_company_id"::text FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders})) OR "${tableName}"."my_company"::text IN (${inPlaceholders}))`);
-            } else if (tableName === 'expense') {
-              companyConditions.push(`("${tableName}"."id__my_company"::text IN (${inPlaceholders}) OR "${tableName}"."id__my_company"::text IN (SELECT "my_company_id"::text FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders})))`);
-            } else {
-              companyConditions.push(`"${tableName}"."company_id" IN (${inPlaceholders})`);
+              targetCol = `"${tableName}"."my_company"::text`;
             }
-            values.push(...nonNACompanies);
-            valIdx += nonNACompanies.length;
+            return {
+              sql: `${targetCol} IN (${inPlaceholders})`,
+              values: companyNames
+            };
+          } else {
+            const hasNA = companyNames.some(v => v === 'N/A' || v === 'NA' || v === 'Unknown');
+            const nonNACompanies = companyNames.filter(v => v !== 'N/A' && v !== 'NA' && v !== 'Unknown');
+            let companyConditions = [];
+            if (hasNA) {
+              if (tableName === 'payment' || tableName === 'contract' || tableName === 'service') {
+                companyConditions.push(`("${tableName}"."my_company" IS NULL OR "${tableName}"."my_company"::text = '' OR "${tableName}"."my_company"::text = 'N/A')`);
+              } else if (tableName === 'account') {
+                companyConditions.push(`("${tableName}"."company_entity" IS NULL OR "${tableName}"."company_entity"::text = '')`);
+              } else {
+                companyConditions.push(`("${tableName}"."company_id" IS NULL OR "${tableName}"."company_id"::text = '')`);
+              }
+            }
+            const vals = [];
+            if (nonNACompanies.length > 0) {
+              const inPlaceholders = nonNACompanies.map((_, i) => `$${idx + i}`).join(', ');
+              if (tableName === 'employee') {
+                companyConditions.push(`"${tableName}"."company_id" IN (SELECT "my_company_id" FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders}))`);
+              } else if (tableName === 'account') {
+                companyConditions.push(`"${tableName}"."company_entity" IN (SELECT "my_company_id" FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders}))`);
+              } else if (tableName === 'contract' || tableName === 'payment' || tableName === 'service') {
+                companyConditions.push(`("${tableName}"."my_company"::text IN (SELECT "my_company_id"::text FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders})) OR "${tableName}"."my_company"::text IN (${inPlaceholders}))`);
+              } else if (tableName === 'expense') {
+                companyConditions.push(`("${tableName}"."id__my_company"::text IN (${inPlaceholders}) OR "${tableName}"."id__my_company"::text IN (SELECT "my_company_id"::text FROM "my_company" WHERE "company_shortname" IN (${inPlaceholders}) OR "company_fullname" IN (${inPlaceholders})))`);
+              } else {
+                companyConditions.push(`"${tableName}"."company_id" IN (${inPlaceholders})`);
+              }
+              vals.push(...nonNACompanies);
+            }
+            return {
+              sql: companyConditions.length > 0 ? `(${companyConditions.join(' OR ')})` : '1=1',
+              values: vals
+            };
           }
-
-          if (companyConditions.length > 0) {
-            whereClauses.push(`(${companyConditions.join(' OR ')})`);
-          }
-        }
+        });
         continue;
       }
 
       // Handle contract_owner filter for contract module
       if (key === 'contract_owner' && tableName === 'contract') {
         const ownerNames = typeof value === 'string' ? value.split(',') : [value];
-        const inPlaceholders = ownerNames.map((_, i) => `$${valIdx + i}`).join(', ');
-        whereClauses.push(`"${tableName}"."contract_owner" IN (SELECT "employee_id" FROM "employee" WHERE "full_name" IN (${inPlaceholders}) OR "email" IN (${inPlaceholders}))`);
-        values.push(...ownerNames);
-        valIdx += ownerNames.length;
+        addFacetClause('contract_owner', (idx) => {
+          const inPlaceholders = ownerNames.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            sql: `"${tableName}"."contract_owner" IN (SELECT "employee_id" FROM "employee" WHERE "full_name" IN (${inPlaceholders}) OR "email" IN (${inPlaceholders}))`,
+            values: ownerNames
+          };
+        });
         continue;
       }
 
@@ -1739,7 +1833,10 @@ router.get('/:tableName', async (req, res) => {
           return false;
         }).filter(Boolean);
         if (fyConditions.length > 0) {
-          whereClauses.push(`(${fyConditions.join(' OR ')})`);
+          addFacetClause('fy', () => ({
+            sql: `(${fyConditions.join(' OR ')})`,
+            values: []
+          }));
         }
         continue;
       }
@@ -1755,7 +1852,10 @@ router.get('/:tableName', async (req, res) => {
           return false;
         }).filter(Boolean);
         if (fyConditions.length > 0) {
-          whereClauses.push(`(${fyConditions.join(' OR ')})`);
+          addFacetClause('fy', () => ({
+            sql: `(${fyConditions.join(' OR ')})`,
+            values: []
+          }));
         }
         continue;
       }
@@ -1763,10 +1863,13 @@ router.get('/:tableName', async (req, res) => {
       // Handle fy (Fiscal Year) filter for expense
       if (key === 'fy' && tableName === 'expense') {
         const fys = typeof value === 'string' ? value.split(',') : [value];
-        const inPlaceholders = fys.map((_, i) => `$${valIdx + i}`).join(', ');
-        whereClauses.push(`("${tableName}"."fy" IN (${inPlaceholders}) OR EXTRACT(YEAR FROM "${tableName}"."created_at")::text IN (${inPlaceholders}))`);
-        values.push(...fys);
-        valIdx += fys.length;
+        addFacetClause('fy', (idx) => {
+          const inPlaceholders = fys.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            sql: `("${tableName}"."fy" IN (${inPlaceholders}) OR EXTRACT(YEAR FROM "${tableName}"."created_at")::text IN (${inPlaceholders}))`,
+            values: fys
+          };
+        });
         continue;
       }
 
@@ -1788,7 +1891,10 @@ router.get('/:tableName', async (req, res) => {
           return 'FALSE';
         }).filter(Boolean);
         if (overdueConditions.length > 0) {
-          whereClauses.push(`(${overdueConditions.join(' OR ')})`);
+          addFacetClause('overdue', () => ({
+            sql: `(${overdueConditions.join(' OR ')})`,
+            values: []
+          }));
         }
         continue;
       }
@@ -1797,20 +1903,29 @@ router.get('/:tableName', async (req, res) => {
         const arrValues = typeof value === 'string' ? value.split(',') : [value];
         if (arrValues.includes('VIRTUAL_OPPORTUNITY')) {
           const otherValues = arrValues.filter(p => p !== 'VIRTUAL_OPPORTUNITY');
-          let conditions = [`"${tableName}"."request_type" IN (SELECT "policy_id" FROM "policy_and_program" WHERE "policy_name" ILIKE 'OPPORTUNITY%')`];
-          if (otherValues.length > 0) {
-            const inPlaceholders = otherValues.map((_, i) => `$${valIdx + i}`).join(', ');
-            conditions.push(`"${tableName}"."request_type" IN (${inPlaceholders})`);
-            values.push(...otherValues);
-            valIdx += otherValues.length;
-          }
-          whereClauses.push(`(${conditions.join(' OR ')})`);
+          addFacetClause(['request_type', 'policy_name'], (idx) => {
+            let conditions = [`"${tableName}"."request_type" IN (SELECT "policy_id" FROM "policy_and_program" WHERE "policy_name" ILIKE 'OPPORTUNITY%')`];
+            const vals = [];
+            if (otherValues.length > 0) {
+              const inPlaceholders = otherValues.map((_, i) => `$${idx + i}`).join(', ');
+              conditions.push(`"${tableName}"."request_type" IN (${inPlaceholders})`);
+              vals.push(...otherValues);
+            }
+            return {
+              sql: `(${conditions.join(' OR ')})`,
+              values: vals
+            };
+          });
           continue;
         }
       }
 
       const colType = (colTypes && colTypes[key] ? colTypes[key] : '').toLowerCase();
       const isIntCol = ['integer', 'smallint', 'bigint'].includes(colType);
+      const facetKeysForCol = [key];
+      if (key === 'payment_status' || key === 'invoice_status' || key === 'sr_status' || key === 'status') {
+        facetKeysForCol.push('status', 'payment_status', 'invoice_status', 'sr_status');
+      }
 
       if (typeof value === 'string' && value.includes(',')) {
         // Support bulk lookup via IN operator
@@ -1822,34 +1937,42 @@ router.get('/:tableName', async (req, res) => {
         if (isIntCol) {
           const validInts = inValues.filter(v => !isNaN(Number(v)) && String(v).trim() !== '');
           if (validInts.length === 0) {
-            whereClauses.push('1 = 0');
+            addFacetClause(facetKeysForCol, () => ({ sql: '1 = 0', values: [] }));
           } else {
-            const inPlaceholders = validInts.map((_, i) => `$${valIdx + i}`).join(', ');
-            whereClauses.push(`"${tableName}"."${key}" IN (${inPlaceholders})`);
-            values.push(...validInts.map(v => parseInt(v, 10)));
-            valIdx += validInts.length;
+            addFacetClause(facetKeysForCol, (idx) => {
+              const inPlaceholders = validInts.map((_, i) => `$${idx + i}`).join(', ');
+              return {
+                sql: `"${tableName}"."${key}" IN (${inPlaceholders})`,
+                values: validInts.map(v => parseInt(v, 10))
+              };
+            });
           }
         } else {
-          const inPlaceholders = inValues.map((_, i) => `$${valIdx + i}`).join(', ');
-          whereClauses.push(`"${tableName}"."${key}" IN (${inPlaceholders})`);
-          values.push(...inValues);
-          valIdx += inValues.length;
+          addFacetClause(facetKeysForCol, (idx) => {
+            const inPlaceholders = inValues.map((_, i) => `$${idx + i}`).join(', ');
+            return {
+              sql: `"${tableName}"."${key}" IN (${inPlaceholders})`,
+              values: inValues
+            };
+          });
         }
       } else {
         const resolved = resolveStatusId(tableName, key, value);
         const finalVal = (resolved !== null && resolved !== undefined) ? resolved : value;
         if (isIntCol) {
           if (isNaN(Number(finalVal)) || String(finalVal).trim() === '') {
-            whereClauses.push('1 = 0');
+            addFacetClause(facetKeysForCol, () => ({ sql: '1 = 0', values: [] }));
           } else {
-            whereClauses.push(`"${tableName}"."${key}" = $${valIdx}`);
-            values.push(parseInt(finalVal, 10));
-            valIdx++;
+            addFacetClause(facetKeysForCol, (idx) => ({
+              sql: `"${tableName}"."${key}" = $${idx}`,
+              values: [parseInt(finalVal, 10)]
+            }));
           }
         } else {
-          whereClauses.push(`"${tableName}"."${key}" = $${valIdx}`);
-          values.push(finalVal);
-          valIdx++;
+          addFacetClause(facetKeysForCol, (idx) => ({
+            sql: `"${tableName}"."${key}" = $${idx}`,
+            values: [finalVal]
+          }));
         }
       }
     }
@@ -1860,20 +1983,13 @@ router.get('/:tableName', async (req, res) => {
     const isMainHost = requestHost === 'terax.ai' || requestHost === 'localhost' || requestHost === '127.0.0.1' || !requestHost;
     if (!isHelpdeskHost && !isMainHost) {
       if (tableName === 'cms_tenant_info') {
-        whereClauses.push(`("${tableName}"."tenant_domain" = $${valIdx})`);
-        values.push(requestHost);
-        valIdx++;
+        addBaseClause((idx) => ({ sql: `("${tableName}"."tenant_domain" = $${idx})`, values: [requestHost] }));
       } else if (tableName === 'ticket') {
-        whereClauses.push(`("${tableName}"."subdomain" = $${valIdx} OR "${tableName}"."subdomain" IS NULL OR "${tableName}"."subdomain" = '')`);
-        values.push(requestHost);
-        valIdx++;
+        addBaseClause((idx) => ({ sql: `("${tableName}"."subdomain" = $${idx} OR "${tableName}"."subdomain" IS NULL OR "${tableName}"."subdomain" = '')`, values: [requestHost] }));
       } else {
         const hasTicketCol = dbCols.includes('ticket');
-        const hasRequestCol = dbCols.includes('request');
         if (hasTicketCol) {
-          whereClauses.push(`("${tableName}"."ticket" IN (SELECT "ticket_id" FROM "ticket" WHERE "subdomain" = $${valIdx} OR "subdomain" IS NULL OR "subdomain" = ''))`);
-          values.push(requestHost);
-          valIdx++;
+          addBaseClause((idx) => ({ sql: `("${tableName}"."ticket" IN (SELECT "ticket_id" FROM "ticket" WHERE "subdomain" = $${idx} OR "subdomain" IS NULL OR "subdomain" = ''))`, values: [requestHost] }));
         }
       }
     }
@@ -1884,14 +2000,15 @@ router.get('/:tableName', async (req, res) => {
       const userForFilter = getUserFromReq(req);
       if (userForFilter.employee_id) {
         const userEmpId = (userForFilter.employee_id || '').toLowerCase();
-        whereClauses.push(`(
-          string_to_array(REPLACE(LOWER(COALESCE("account"."finance_control", '')), ' ', ''), ',') @> ARRAY[$${valIdx}] OR
-          string_to_array(REPLACE(LOWER(COALESCE("account"."transaction_managed_by", '')), ' ', ''), ',') @> ARRAY[$${valIdx}]
-        )`);
-        values.push(userEmpId);
-        valIdx++;
+        addBaseClause((idx) => ({
+          sql: `(
+            string_to_array(REPLACE(LOWER(COALESCE("account"."finance_control", '')), ' ', ''), ',') @> ARRAY[$${idx}] OR
+            string_to_array(REPLACE(LOWER(COALESCE("account"."transaction_managed_by", '')), ' ', ''), ',') @> ARRAY[$${idx}]
+          )`,
+          values: [userEmpId]
+        }));
       } else {
-        whereClauses.push('1 = 0');
+        addBaseClause(() => ({ sql: '1 = 0', values: [] }));
       }
     } else if (tableName === 'request' || tablesWithRequestCol.includes(tableName)) {
       const userForFilter = getUserFromReq(req);
@@ -1904,60 +2021,60 @@ router.get('/:tableName', async (req, res) => {
       if (!isGlobalAdmin && userForFilter.employee_id) {
         const userEmpId = (userForFilter.employee_id || '').toLowerCase();
         if (tableName === 'request') {
-          whereClauses.push(`(
-            LOWER("request"."requester") = $${valIdx} OR
-            LOWER("request"."sr_creater") = $${valIdx} OR
-            $${valIdx} = ANY(SELECT LOWER(x) FROM UNNEST("request"."sr_owner") x) OR
-            LOWER("request"."policy_lead") = $${valIdx} OR
-            EXISTS (SELECT 1 FROM jsonb_array_elements("request".approval_flow->'steps') AS step WHERE LOWER(step->>'approver') = $${valIdx}) OR
-            EXISTS (SELECT 1 FROM "employee" mgr WHERE LOWER(mgr.employee_id) = $${valIdx} AND LOWER(mgr.employee_id) = (SELECT LOWER(emp.direct_manager) FROM "employee" emp WHERE LOWER(emp.employee_id) = ANY(SELECT LOWER(x) FROM UNNEST("request"."sr_owner") x) LIMIT 1)) OR
-            EXISTS (SELECT 1 FROM "comment" c WHERE LOWER(c.request) = LOWER("request".request_id) AND LOWER(c.tag) LIKE LOWER('%' || $${valIdx} || '%'))
-          )`);
-          values.push(userEmpId);
-          valIdx++;
+          addBaseClause((idx) => ({
+            sql: `(
+              LOWER("request"."requester") = $${idx} OR
+              LOWER("request"."sr_creater") = $${idx} OR
+              $${idx} = ANY(SELECT LOWER(x) FROM UNNEST("request"."sr_owner") x) OR
+              LOWER("request"."policy_lead") = $${idx} OR
+              EXISTS (SELECT 1 FROM jsonb_array_elements("request".approval_flow->'steps') AS step WHERE LOWER(step->>'approver') = $${idx}) OR
+              EXISTS (SELECT 1 FROM "employee" mgr WHERE LOWER(mgr.employee_id) = $${idx} AND LOWER(mgr.employee_id) = (SELECT LOWER(emp.direct_manager) FROM "employee" emp WHERE LOWER(emp.employee_id) = ANY(SELECT LOWER(x) FROM UNNEST("request"."sr_owner") x) LIMIT 1)) OR
+              EXISTS (SELECT 1 FROM "comment" c WHERE LOWER(c.request) = LOWER("request".request_id) AND LOWER(c.tag) LIKE LOWER('%' || $${idx} || '%'))
+            )`,
+            values: [userEmpId]
+          }));
         } else if (tableName === 'mtr') {
           const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId);
           let extraOwnerConds = [];
-          if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $${valIdx + 1}`);
-          if (dbCols.includes('created_by')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."created_by", '')) = $${valIdx + 1}`);
+          if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $2`);
+          if (dbCols.includes('created_by')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."created_by", '')) = $2`);
           const extraStr = extraOwnerConds.length > 0 ? ' OR ' + extraOwnerConds.join(' OR ') : '';
 
-          whereClauses.push(`(
-            "${tableName}"."request" IS NULL OR
-            NOT EXISTS (SELECT 1 FROM "request" r WHERE LOWER(r.request_id) = LOWER("${tableName}"."request")) OR
-            LOWER("${tableName}"."request") = ANY($${valIdx}::text[]) OR
-            EXISTS (
-              SELECT 1 FROM "account" acc
-              WHERE acc.account_id = "${tableName}"."account" AND (
-                string_to_array(REPLACE(REPLACE(LOWER(COALESCE(acc.finance_control, '')), ' ', ''), '@mps-aisa.com', '@mps-asia.com'), ',') @> ARRAY[$${valIdx + 1}] OR
-                string_to_array(REPLACE(REPLACE(LOWER(COALESCE(acc.transaction_managed_by, '')), ' ', ''), '@mps-aisa.com', '@mps-asia.com'), ',') @> ARRAY[$${valIdx + 1}]
-              )
-            )${extraStr}
-          )`);
-          values.push(accessibleReqIds, userEmpId);
-          valIdx += 2;
+          addBaseClause((idx) => ({
+            sql: `(
+              "${tableName}"."request" IS NULL OR
+              NOT EXISTS (SELECT 1 FROM "request" r WHERE LOWER(r.request_id) = LOWER("${tableName}"."request")) OR
+              LOWER("${tableName}"."request") = ANY($${idx}::text[]) OR
+              EXISTS (
+                SELECT 1 FROM "account" acc
+                WHERE acc.account_id = "${tableName}"."account" AND (
+                  string_to_array(REPLACE(REPLACE(LOWER(COALESCE(acc.finance_control, '')), ' ', ''), '@mps-aisa.com', '@mps-asia.com'), ',') @> ARRAY[$${idx + 1}] OR
+                  string_to_array(REPLACE(REPLACE(LOWER(COALESCE(acc.transaction_managed_by, '')), ' ', ''), '@mps-aisa.com', '@mps-asia.com'), ',') @> ARRAY[$${idx + 1}]
+                )
+              )${extraStr.replace(/\$2/g, `$${idx + 1}`)}
+            )`,
+            values: [accessibleReqIds, userEmpId]
+          }));
         } else {
           const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId);
           let reqCol = dbCols.includes('id__request') ? 'id__request' : (dbCols.includes('id_request') ? 'id_request' : 'request');
           let extraOwnerConds = [];
-          if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $${valIdx + 1}`);
-          if (dbCols.includes('id__employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."id__employee", '')) = $${valIdx + 1}`);
-          if (dbCols.includes('created_by')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."created_by", '')) = $${valIdx + 1}`);
-          if (dbCols.includes('contract_owner')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."contract_owner", '')) = $${valIdx + 1}`);
-          const extraStr = extraOwnerConds.length > 0 ? ' OR ' + extraOwnerConds.join(' OR ') : '';
+          if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $2`);
+          if (dbCols.includes('id__employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."id__employee", '')) = $2`);
+          if (dbCols.includes('created_by')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."created_by", '')) = $2`);
+          if (dbCols.includes('contract_owner')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."contract_owner", '')) = $2`);
+          const hasExtra = extraOwnerConds.length > 0;
+          const extraStr = hasExtra ? ' OR ' + extraOwnerConds.join(' OR ') : '';
 
-          whereClauses.push(`(
-            "${tableName}"."${reqCol}" IS NULL OR
-            NOT EXISTS (SELECT 1 FROM "request" r WHERE LOWER(r.request_id) = LOWER("${tableName}"."${reqCol}")) OR
-            LOWER("${tableName}"."${reqCol}") = ANY($${valIdx}::text[])
-            ${extraStr}
-          )`);
-          values.push(accessibleReqIds);
-          valIdx++;
-          if (extraOwnerConds.length > 0) {
-            values.push(userEmpId);
-            valIdx++;
-          }
+          addBaseClause((idx) => ({
+            sql: `(
+              "${tableName}"."${reqCol}" IS NULL OR
+              NOT EXISTS (SELECT 1 FROM "request" r WHERE LOWER(r.request_id) = LOWER("${tableName}"."${reqCol}")) OR
+              LOWER("${tableName}"."${reqCol}") = ANY($${idx}::text[])
+              ${hasExtra ? extraStr.replace(/\$2/g, `$${idx + 1}`) : ''}
+            )`,
+            values: hasExtra ? [accessibleReqIds, userEmpId] : [accessibleReqIds]
+          }));
         }
       }
     }
@@ -1978,56 +2095,63 @@ router.get('/:tableName', async (req, res) => {
           if (hasRequestFilter) {
             if (!isGlobalAdmin) {
               const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId);
-              whereClauses.push(`(
-                LOWER("assigned_task"."employee_id") = $${valIdx} OR
-                LOWER("assigned_task"."request_id") = ANY($${valIdx + 1}::text[])
-              )`);
-              values.push(userEmpId, accessibleReqIds);
-              valIdx += 2;
+              addBaseClause((idx) => ({
+                sql: `(
+                  LOWER("assigned_task"."employee_id") = $${idx} OR
+                  LOWER("assigned_task"."request_id") = ANY($${idx + 1}::text[])
+                )`,
+                values: [userEmpId, accessibleReqIds]
+              }));
             }
           } else {
             // General view (My Tasks list): EVERYONE (including Super Admin) only sees their own tasks
-            whereClauses.push(`LOWER("assigned_task"."employee_id") = $${valIdx}`);
-            values.push(userEmpId);
-            valIdx++;
-            whereClauses.push(`"assigned_task"."request_status" IN (8, 9)`);
+            addBaseClause((idx) => ({
+              sql: `LOWER("assigned_task"."employee_id") = $${idx}`,
+              values: [userEmpId]
+            }));
+            addBaseClause(() => ({
+              sql: `"assigned_task"."request_status" IN (8, 9)`,
+              values: []
+            }));
           }
         } else if (tableName === 'task_subtask') {
           const hasTaskFilter = req.query.task_id || req.query.task;
           if (hasTaskFilter) {
             if (!isGlobalAdmin) {
-              whereClauses.push(`(
-                LOWER("task_subtask"."task_id") IN (
-                  SELECT LOWER(task_id)
-                  FROM "assigned_task"
-                  WHERE
-                    LOWER(employee_id) = $${valIdx} OR
-                    LOWER(request_id) IN (
-                      SELECT LOWER(request_id)
-                      FROM "request"
-                      WHERE
-                        LOWER(requester) = $${valIdx} OR
-                        LOWER(sr_creater) = $${valIdx} OR
-                        $${valIdx} = ANY(SELECT LOWER(x) FROM UNNEST(sr_owner) x) OR
-                        LOWER(policy_lead) = $${valIdx} OR
-                        EXISTS (SELECT 1 FROM jsonb_array_elements(approval_flow->'steps') AS step WHERE LOWER(step->>'approver') = $${valIdx})
-                    )
-                )
-              )`);
-              values.push(userEmpId);
-              valIdx++;
+              addBaseClause((idx) => ({
+                sql: `(
+                  LOWER("task_subtask"."task_id") IN (
+                    SELECT LOWER(task_id)
+                    FROM "assigned_task"
+                    WHERE
+                      LOWER(employee_id) = $${idx} OR
+                      LOWER(request_id) IN (
+                        SELECT LOWER(request_id)
+                        FROM "request"
+                        WHERE
+                          LOWER(requester) = $${idx} OR
+                          LOWER(sr_creater) = $${idx} OR
+                          $${idx} = ANY(SELECT LOWER(x) FROM UNNEST(sr_owner) x) OR
+                          LOWER(policy_lead) = $${idx} OR
+                          EXISTS (SELECT 1 FROM jsonb_array_elements(approval_flow->'steps') AS step WHERE LOWER(step->>'approver') = $${idx})
+                      )
+                  )
+                )`,
+                values: [userEmpId]
+              }));
             }
           } else {
             // General view: only show subtasks of tasks assigned to the user
-            whereClauses.push(`(
-              LOWER("task_subtask"."task_id") IN (
-                SELECT LOWER(task_id)
-                FROM "assigned_task"
-                WHERE LOWER(employee_id) = $${valIdx}
-              )
-            )`);
-            values.push(userEmpId);
-            valIdx++;
+            addBaseClause((idx) => ({
+              sql: `(
+                LOWER("task_subtask"."task_id") IN (
+                  SELECT LOWER(task_id)
+                  FROM "assigned_task"
+                  WHERE LOWER(employee_id) = $${idx}
+                )
+              )`,
+              values: [userEmpId]
+            }));
           }
         }
       }
@@ -2041,7 +2165,9 @@ router.get('/:tableName', async (req, res) => {
       return res.status(403).json({ error: 'Access denied: You do not have permission to view this slice.' });
     }
 
-    const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const financePrefix = (tableName === 'finance' || tableName === 'v_finance') ? [fromDateVal, toDateVal] : [];
+    const { whereStr, values } = buildWhere(null, financePrefix);
+    const valIdx = values.length + 1;
 
     let baseTableOrCTE = `"${tableName}"`;
     if (tableName === 'contract') {
@@ -2213,11 +2339,6 @@ router.get('/:tableName', async (req, res) => {
         LEFT JOIN "my_company" mc ON d.company_id = mc.my_company_id
       ) as "${tableName}"`;
     } else if (tableName === 'finance' || tableName === 'v_finance') {
-      const fdIdx = valIdx;
-      const tdIdx = valIdx + 1;
-      valIdx += 2;
-      values.push(fromDateVal, toDateVal);
-
       baseTableOrCTE = `(
         WITH contract_agg AS (
           SELECT 
@@ -2352,8 +2473,8 @@ router.get('/:tableName', async (req, res) => {
           LEFT JOIN expense_agg ea ON r.request_id = ea.request_id
           LEFT JOIN asset_agg aa ON r.request_id = aa.request_id
           WHERE r.deleted_at IS NULL
-            AND ($${fdIdx}::date IS NULL OR COALESCE(r.sr_submitted_date, r.sr_created_date)::date >= $${fdIdx}::date)
-            AND ($${tdIdx}::date IS NULL OR COALESCE(r.sr_submitted_date, r.sr_created_date)::date <= $${tdIdx}::date)
+            AND ($1::date IS NULL OR COALESCE(r.sr_submitted_date, r.sr_created_date)::date >= $1::date)
+            AND ($2::date IS NULL OR COALESCE(r.sr_submitted_date, r.sr_created_date)::date <= $2::date)
         ),
         process_summary AS (
           SELECT
@@ -2589,24 +2710,26 @@ router.get('/:tableName', async (req, res) => {
 
       if (statusCol) {
         const targetFrom = dbCols.includes(statusCol) ? `"${tableName}"` : baseTableOrCTE;
+        const { whereStr: sWhere, values: sVals } = buildWhere(statusCol, financePrefix);
         const summaryQuery = `
           SELECT COALESCE("${statusCol}"::text, 'Unknown') as name, COUNT(*)::int as count 
           FROM ${targetFrom} 
-          ${whereStr} 
+          ${sWhere} 
           GROUP BY "${statusCol}"
         `;
-        const resultSummary = await pool.query(summaryQuery, values);
+        const resultSummary = await pool.query(summaryQuery, sVals);
         resultSummary.rows.forEach(r => {
           const key = getStatusKey(tableName, statusCol, r.name) || r.name;
           summary[key] = r.count;
         });
       }
 
-      const getFacetedCounts = async (col) => {
+      const getFacetedCounts = async (col, facetKey = col) => {
         try {
           const targetFrom = (tableName === 'finance' || tableName === 'v_finance') ? baseTableOrCTE : (dbCols.includes(col) ? `"${tableName}"` : baseTableOrCTE);
-          const q = `SELECT COALESCE("${col}"::text, 'Unknown') as name, COUNT(*)::int as count FROM ${targetFrom} ${whereStr} GROUP BY "${col}"`;
-          const res = await pool.query(q, values);
+          const { whereStr: fWhere, values: fVals } = buildWhere(facetKey, financePrefix);
+          const q = `SELECT COALESCE("${col}"::text, 'Unknown') as name, COUNT(*)::int as count FROM ${targetFrom} ${fWhere} GROUP BY "${col}"`;
+          const res = await pool.query(q, fVals);
           return res.rows.reduce((acc, r) => {
             const key = getStatusKey(tableName, col, r.name) || r.name;
             acc[key] = r.count;
@@ -2617,35 +2740,37 @@ router.get('/:tableName', async (req, res) => {
 
       if (tableName === 'employee' || tableName === 'employee_active') {
         const [company_shortname, department_name, status] = await Promise.all([
-          getFacetedCounts('company_shortname'),
-          getFacetedCounts('department_name'),
-          getFacetedCounts('status')
+          getFacetedCounts('company_shortname', 'my_company'),
+          getFacetedCounts('department_name', 'department_name'),
+          getFacetedCounts('status', 'status')
         ]);
         faceted_summary.company_shortname = company_shortname;
         faceted_summary.department_name = department_name;
         faceted_summary.status = status;
       } else if (tableName === 'company') {
         const [type, country] = await Promise.all([
-          getFacetedCounts('type'),
-          getFacetedCounts('country')
+          getFacetedCounts('type', 'type'),
+          getFacetedCounts('country', 'country')
         ]);
         faceted_summary.type = type;
         faceted_summary.country = country;
       } else if (tableName === 'payment') {
         const getPaymentFyCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('fy', financePrefix);
             const qFy = `
                 SELECT EXTRACT(YEAR FROM "due_date")::text as name, COUNT(*)::int as count 
                 FROM "payment" 
-                ${whereStr} 
+                ${fWhere} 
                 GROUP BY name
               `;
-            const res = await pool.query(qFy, values);
+            const res = await pool.query(qFy, fVals);
             return res.rows.reduce((acc, row) => { if (row.name) acc[row.name] = row.count; return acc; }, {});
           } catch (e) { console.log('Payment FY Facet Error:', e.message); return {}; }
         };
         const getOverdueCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('overdue', financePrefix);
             const q = `
                 SELECT 
                   COALESCE(SUM(CASE WHEN "payment_status" <> 32 AND "due_date" < CURRENT_DATE AND CURRENT_DATE - "due_date" <= 30 THEN 1 ELSE 0 END), 0)::int as "0 - 30 days",
@@ -2653,18 +2778,18 @@ router.get('/:tableName', async (req, res) => {
                   COALESCE(SUM(CASE WHEN "payment_status" <> 32 AND "due_date" < CURRENT_DATE AND CURRENT_DATE - "due_date" > 60 AND CURRENT_DATE - "due_date" <= 90 THEN 1 ELSE 0 END), 0)::int as "60 - 90 days",
                   COALESCE(SUM(CASE WHEN "payment_status" <> 32 AND "due_date" < CURRENT_DATE AND CURRENT_DATE - "due_date" > 90 THEN 1 ELSE 0 END), 0)::int as "Over 90 days"
                 FROM "payment"
-                ${whereStr}
+                ${fWhere}
               `;
-            const res = await pool.query(q, values);
+            const res = await pool.query(q, fVals);
             return res.rows[0] || {};
           } catch (e) { console.log('Payment Overdue Facet Error:', e.message); return {}; }
         };
 
         const [company_id, payment_type, payment_status, payment_method, fy, overdue] = await Promise.all([
-          getFacetedCounts('company_id'),
-          getFacetedCounts('payment_type'),
-          getFacetedCounts('payment_status'),
-          getFacetedCounts('payment_method'),
+          getFacetedCounts('company_id', 'my_company'),
+          getFacetedCounts('payment_type', 'payment_type'),
+          getFacetedCounts('payment_status', 'payment_status'),
+          getFacetedCounts('payment_method', 'payment_method'),
           getPaymentFyCounts(),
           getOverdueCounts()
         ]);
@@ -2689,9 +2814,9 @@ router.get('/:tableName', async (req, res) => {
           } catch (e) { console.log('Invoice Financials Facet Error:', e.message); return 0; }
         };
         const [invoice_status, invoice_type, currency, total_base_val] = await Promise.all([
-          getFacetedCounts('invoice_status'),
-          getFacetedCounts('invoice_type'),
-          getFacetedCounts('currency'),
+          getFacetedCounts('invoice_status', 'invoice_status'),
+          getFacetedCounts('invoice_type', 'invoice_type'),
+          getFacetedCounts('currency', 'currency'),
           getInvoiceFinancials()
         ]);
         faceted_summary.invoice_status = invoice_status;
@@ -2701,14 +2826,15 @@ router.get('/:tableName', async (req, res) => {
       } else if (tableName === 'request') {
         const getRequestPolicyCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('request_type', financePrefix);
             const qPolicy = `
                    SELECT p.policy_name as name, COUNT("${tableName}".*)::int as count 
                    FROM "${tableName}"
                    JOIN "policy_and_program" p ON "${tableName}".request_type = p.policy_id
-                   ${whereStr}
+                   ${fWhere}
                    GROUP BY p.policy_name
                `;
-            const res = await pool.query(qPolicy, values);
+            const res = await pool.query(qPolicy, fVals);
             return res.rows.reduce((acc, row) => { acc[row.name] = row.count; return acc; }, {});
           } catch (e) {
             console.error('qPolicy Error:', e);
@@ -2718,29 +2844,30 @@ router.get('/:tableName', async (req, res) => {
 
         const [policy_name, sr_status] = await Promise.all([
           getRequestPolicyCounts(),
-          getFacetedCounts('sr_status')
+          getFacetedCounts('sr_status', 'sr_status')
         ]);
         faceted_summary.policy_name = policy_name;
         faceted_summary.sr_status = sr_status;
       } else if (tableName === 'service') {
         const getServiceFyCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('fy', financePrefix);
             const qFy = `
                    SELECT "fy" as name, COUNT(*)::int as count 
                    FROM "${tableName}" 
-                   ${whereStr} 
+                   ${fWhere} 
                    GROUP BY name
                `;
-            const res = await pool.query(qFy, values);
+            const res = await pool.query(qFy, fVals);
             return res.rows.reduce((acc, row) => { if (row.name) acc[row.name] = row.count; return acc; }, {});
           } catch (e) { return {}; }
         };
 
         const [status, service_type, fy, company_id] = await Promise.all([
-          getFacetedCounts('status'),
-          getFacetedCounts('service_type'),
+          getFacetedCounts('status', 'status'),
+          getFacetedCounts('service_type', 'service_type'),
           getServiceFyCounts(),
-          getFacetedCounts('company_id')
+          getFacetedCounts('company_id', 'my_company')
         ]);
         faceted_summary.status = status;
         faceted_summary.service_type = service_type;
@@ -2748,10 +2875,10 @@ router.get('/:tableName', async (req, res) => {
         faceted_summary.company_id = company_id;
       } else if (tableName === 'asset') {
         const [status, type, location, company_id] = await Promise.all([
-          getFacetedCounts('status'),
-          getFacetedCounts('type'),
-          getFacetedCounts('location'),
-          getFacetedCounts('company_id')
+          getFacetedCounts('status', 'status'),
+          getFacetedCounts('type', 'type'),
+          getFacetedCounts('location', 'location'),
+          getFacetedCounts('company_id', 'my_company')
         ]);
         faceted_summary.status = status;
         faceted_summary.type = type;
@@ -2759,11 +2886,11 @@ router.get('/:tableName', async (req, res) => {
         faceted_summary.company_id = company_id;
       } else if (tableName === 'mtr') {
         const [status, transaction_type, company_id, account_status, currency] = await Promise.all([
-          getFacetedCounts('status'),
-          getFacetedCounts('transaction_type'),
-          getFacetedCounts('company_id'),
-          getFacetedCounts('account_status'),
-          getFacetedCounts('currency')
+          getFacetedCounts('status', 'status'),
+          getFacetedCounts('transaction_type', 'transaction_type'),
+          getFacetedCounts('company_id', 'my_company'),
+          getFacetedCounts('account_status', 'account_status'),
+          getFacetedCounts('currency', 'currency')
         ]);
         faceted_summary.status = status;
         faceted_summary.transaction_type = transaction_type;
@@ -2773,15 +2900,16 @@ router.get('/:tableName', async (req, res) => {
       } else if (tableName === 'account') {
         const getAccountCurrencyBalances = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('currency', financePrefix);
             const q = `
               SELECT COALESCE(TRIM(UPPER("currency")), 'VND') as curr,
                      COALESCE(SUM("balance"::numeric), 0) as total_balance,
                      COALESCE(SUM(COALESCE("balance_in_base_currency"::numeric, "balance"::numeric * COALESCE("exchange_rate"::numeric, 1.0))), 0) as total_base_balance
               FROM ${baseTableOrCTE}
-              ${whereStr}
+              ${fWhere}
               GROUP BY curr
             `;
-            const res = await pool.query(q, values);
+            const res = await pool.query(q, fVals);
             let totalBase = 0;
             const balances = res.rows.reduce((acc, row) => {
               if (row.curr) acc[row.curr] = parseFloat(row.total_balance) || 0;
@@ -2792,10 +2920,10 @@ router.get('/:tableName', async (req, res) => {
           } catch (e) { console.log('Account Currency Balances Facet Error:', e.message); return { balances: {}, totalBase: 0 }; }
         };
         const [account_status, type, company_id, currency, accountBalances] = await Promise.all([
-          getFacetedCounts('account_status'),
-          getFacetedCounts('type'),
-          getFacetedCounts('company_entity'),
-          getFacetedCounts('currency'),
+          getFacetedCounts('account_status', 'account_status'),
+          getFacetedCounts('type', 'type'),
+          getFacetedCounts('company_entity', 'my_company'),
+          getFacetedCounts('currency', 'currency'),
           getAccountCurrencyBalances()
         ]);
         faceted_summary.account_status = account_status;
@@ -2807,18 +2935,20 @@ router.get('/:tableName', async (req, res) => {
       } else if (tableName === 'contract') {
         const getContractFyCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('fy', financePrefix);
             const qFy = `
               SELECT EXTRACT(YEAR FROM "contract_signed_date")::text as name, COUNT(*)::int as count 
               FROM "contract" 
-              ${whereStr} 
+              ${fWhere} 
               GROUP BY name
             `;
-            const res = await pool.query(qFy, values);
+            const res = await pool.query(qFy, fVals);
             return res.rows.reduce((acc, row) => { if (row.name) acc[row.name] = row.count; return acc; }, {});
           } catch (e) { console.log('Contract FY Facet Error:', e.message); return {}; }
         };
         const getContractTypeFinancials = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('type', financePrefix);
             const q = `
               SELECT COALESCE("type"::text, 'Unknown') as type_key,
                      COALESCE(TRIM(UPPER("currency")), 'VND') as curr,
@@ -2826,10 +2956,10 @@ router.get('/:tableName', async (req, res) => {
                      COALESCE(SUM(COALESCE("value_before_vat"::numeric, 0) + COALESCE("vat_value"::numeric, 0)), 0) as total_val,
                      COUNT(*)::int as count
               FROM "contract"
-              ${whereStr}
+              ${fWhere}
               GROUP BY "type", curr
             `;
-            const res = await pool.query(q, values);
+            const res = await pool.query(q, fVals);
             const result = {};
             res.rows.forEach(r => {
               const numType = Number(r.type_key);
@@ -2844,9 +2974,9 @@ router.get('/:tableName', async (req, res) => {
           } catch (e) { console.log('Contract Type Financials Error:', e.message); return {}; }
         };
         const [type, my_company, contract_owner, fy, type_financials] = await Promise.all([
-          getFacetedCounts('type'),
-          getFacetedCounts('my_company'),
-          getFacetedCounts('contract_owner'),
+          getFacetedCounts('type', 'type'),
+          getFacetedCounts('my_company', 'my_company'),
+          getFacetedCounts('contract_owner', 'contract_owner'),
           getContractFyCounts(),
           getContractTypeFinancials()
         ]);
@@ -2858,27 +2988,29 @@ router.get('/:tableName', async (req, res) => {
       } else if (tableName === 'finance' || tableName === 'v_finance') {
         const getFinanceCountryCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('country', financePrefix);
             const q = `
               SELECT COALESCE(NULLIF(TRIM("country"), ''), 'Unassigned') as name, COUNT(*)::int as count
               FROM ${baseTableOrCTE}
-              ${whereStr}
+              ${fWhere}
               GROUP BY name
               ORDER BY count DESC
             `;
-            const res = await pool.query(q, values);
+            const res = await pool.query(q, fVals);
             return res.rows.reduce((acc, row) => { if (row.name) acc[row.name] = row.count; return acc; }, {});
           } catch (e) { console.log('Finance Country Facet Error:', e.message); return {}; }
         };
         const getFinanceFyCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('fy', financePrefix);
             const q = `
               SELECT fy as name, COUNT(DISTINCT process_id)::int as count
               FROM ${baseTableOrCTE}
-              WHERE fy IS NOT NULL AND fy <> ''
+              ${fWhere ? `${fWhere} AND` : 'WHERE'} fy IS NOT NULL AND fy <> ''
               GROUP BY fy
               ORDER BY fy DESC
             `;
-            const res = await pool.query(q, values);
+            const res = await pool.query(q, fVals);
             return res.rows.reduce((acc, row) => { if (row.name) acc[row.name] = row.count; return acc; }, {});
           } catch (e) { console.log('Finance FY Facet Error:', e.message); return {}; }
         };
@@ -2898,7 +3030,7 @@ router.get('/:tableName', async (req, res) => {
           } catch (e) { console.log('Finance Financials Error:', e.message); return {}; }
         };
         const [policy_type, country, fy, finance_financials] = await Promise.all([
-          getFacetedCounts('policy_type'),
+          getFacetedCounts('policy_type', 'policy_type'),
           getFinanceCountryCounts(),
           getFinanceFyCounts(),
           getFinanceFinancials()
@@ -2910,20 +3042,22 @@ router.get('/:tableName', async (req, res) => {
       } else if (tableName === 'expense') {
         const getExpenseFyCounts = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('fy', financePrefix);
             const qFy = `
               SELECT COALESCE(NULLIF(TRIM("fy"), ''), EXTRACT(YEAR FROM "created_at")::text, 'N/A') as name,
                      COUNT(*)::int as count
               FROM "expense"
-              ${whereStr}
+              ${fWhere}
               GROUP BY name
               ORDER BY name DESC
             `;
-            const res = await pool.query(qFy, values);
+            const res = await pool.query(qFy, fVals);
             return res.rows.reduce((acc, row) => { if (row.name) acc[row.name] = row.count; return acc; }, {});
           } catch (e) { console.log('Expense FY Facet Error:', e.message); return {}; }
         };
         const getExpenseCostFinancials = async () => {
           try {
+            const { whereStr: fWhere, values: fVals } = buildWhere('id__expense_cost', financePrefix);
             const q = `
               SELECT COALESCE(NULLIF(TRIM("id__expense_cost"::text), ''), 'Unassigned') as cost_key,
                      COALESCE(TRIM(UPPER("id__currency")), 'VND') as curr,
@@ -2931,10 +3065,10 @@ router.get('/:tableName', async (req, res) => {
                      COALESCE(SUM(COALESCE("total_value_in_base_currency"::numeric, "value_before_vat_in_base_currency"::numeric, COALESCE("value_before_vat"::numeric, 0) * COALESCE("exchange_rate"::numeric, 1.0))), 0) as total_base_val,
                      COUNT(*)::int as count
               FROM "expense"
-              ${whereStr}
+              ${fWhere}
               GROUP BY cost_key, curr
             `;
-            const res = await pool.query(q, values);
+            const res = await pool.query(q, fVals);
             const result = {};
             res.rows.forEach(r => {
               const label = r.cost_key;
@@ -2948,9 +3082,9 @@ router.get('/:tableName', async (req, res) => {
           } catch (e) { console.log('Expense Cost Financials Error:', e.message); return {}; }
         };
         const [id__expense_cost, id__expense_type, id__my_company, fy, expense_cost_financials] = await Promise.all([
-          getFacetedCounts('id__expense_cost'),
-          getFacetedCounts('id__expense_type'),
-          getFacetedCounts('id__my_company'),
+          getFacetedCounts('id__expense_cost', 'id__expense_cost'),
+          getFacetedCounts('id__expense_type', 'id__expense_type'),
+          getFacetedCounts('id__my_company', 'my_company'),
           getExpenseFyCounts(),
           getExpenseCostFinancials()
         ]);

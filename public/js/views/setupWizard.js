@@ -1498,13 +1498,22 @@ function renderStep4HTML(counts){
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const p = parsed[i];
+        const t1Display = p.tier1_display || p.tier1_approval || 'Direct Manager';
+        const t2Display = p.tier2_display || p.tier2_approval || '–';
+        const t1Warn = (!p.tier1_matched && p.tier1_approval && p.tier1_approval !== 'Direct Manager')
+          ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
+          : '';
+        const t2Warn = (!p.tier2_matched && p.tier2_approval)
+          ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
+          : '';
+
         rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
           + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
           + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(p.policy_name) + '</td>'
           + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_type) + '</td>'
           + '<td style="padding:7px 10px;color:#ea580c;font-weight:600;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(p.tier1_approval || 'Direct Manager') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(p.tier2_approval || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;" title="' + escapeHTML(p.tier1_approval || '') + '">' + escapeHTML(t1Display) + t1Warn + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;" title="' + escapeHTML(p.tier2_approval || '') + '">' + escapeHTML(t2Display) + t2Warn + '</td>'
           + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
           + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
           + '<td style="padding:7px 10px;"><span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span></td>'
@@ -1558,6 +1567,48 @@ window.handlePolicyExcelUpload = async function(event){
     event.target.value = '';
     return;
   }
+
+  // Pre-load employees to auto-resolve email/username -> employee_id in preview
+  const emailToEmp = new Map();
+  try {
+    const res = await apiGet('/table/employee?limit=1000');
+    const empList = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+    empList.forEach(e => {
+      if (e.employee_id) {
+        const empId = String(e.employee_id).trim();
+        emailToEmp.set(empId.toLowerCase(), e);
+        if (e.email) {
+          const cleanEmail = String(e.email).trim().toLowerCase();
+          emailToEmp.set(cleanEmail, e);
+          const prefix = cleanEmail.split('@')[0];
+          if (prefix && !emailToEmp.has(prefix)) emailToEmp.set(prefix, e);
+        }
+        if (e.username) {
+          const cleanUser = String(e.username).trim().toLowerCase();
+          if (!emailToEmp.has(cleanUser)) emailToEmp.set(cleanUser, e);
+        }
+      }
+    });
+  } catch(e) {
+    console.warn('Could not fetch employees for policy preview:', e);
+  }
+
+  const resolveApprover = (val, isTier1 = false) => {
+    if (!val || typeof val !== 'string') return { id: isTier1 ? 'Direct Manager' : null, display: isTier1 ? 'Direct Manager' : '–', matched: true };
+    const trimmed = val.trim();
+    if (!trimmed) return { id: isTier1 ? 'Direct Manager' : null, display: isTier1 ? 'Direct Manager' : '–', matched: true };
+    if (trimmed.toLowerCase() === 'direct manager' || trimmed.toLowerCase() === 'quản lý trực tiếp') {
+      return { id: 'Direct Manager', display: 'Direct Manager', matched: true };
+    }
+    const lower = trimmed.toLowerCase();
+    if (emailToEmp.has(lower)) {
+      const emp = emailToEmp.get(lower);
+      const name = emp.full_name || emp.username || emp.employee_id;
+      return { id: emp.employee_id, display: `${name} (${emp.employee_id})`, matched: true };
+    }
+    return { id: trimmed, display: trimmed, matched: false };
+  };
+
   const r = new FileReader();
   r.onload = (e) => {
     try {
@@ -1583,20 +1634,32 @@ window.handlePolicyExcelUpload = async function(event){
 
         const name = nk ? String(row[nk]).trim() : '';
         if (name) {
-          const tier2 = t2k ? String(row[t2k]).trim() : '';
-          const tier3 = t3k ? String(row[t3k]).trim() : '';
+          const t1Val = t1k ? String(row[t1k]).trim() : 'Direct Manager';
+          const t2Val = t2k ? String(row[t2k]).trim() : '';
+          const t3Val = t3k ? String(row[t3k]).trim() : '';
+
+          const t1Resolved = resolveApprover(t1Val, true);
+          const t2Resolved = resolveApprover(t2Val, false);
+          const t3Resolved = resolveApprover(t3Val, false);
+
           let lvl = lvk ? String(row[lvk]).trim() : '';
           if (!lvl) {
-            lvl = tier3 ? 'Tier 3' : (tier2 ? 'Tier 2' : 'Tier 1');
+            lvl = t3Val ? 'Tier 3' : (t2Val ? 'Tier 2' : 'Tier 1');
           }
           mapped.push({
             policy_name: name,
             policy_type: tk ? String(row[tk]).trim() : 'Operation',
             sla: slak ? (parseInt(row[slak]) || 3) : 3,
             approval_level: lvl,
-            tier1_approval: t1k ? String(row[t1k]).trim() : 'Direct Manager',
-            tier2_approval: tier2 || null,
-            tier3_approval: tier3 || null,
+            tier1_approval: t1Resolved.id,
+            tier1_display: t1Resolved.display,
+            tier1_matched: t1Resolved.matched,
+            tier2_approval: t2Resolved.id,
+            tier2_display: t2Resolved.display,
+            tier2_matched: t2Resolved.matched,
+            tier3_approval: t3Resolved.id,
+            tier3_display: t3Resolved.display,
+            tier3_matched: t3Resolved.matched,
             elements: elk ? String(row[elk]).trim() : 'ASSIGN_TASK',
             description: dk ? String(row[dk]).trim() : name
           });
