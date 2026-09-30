@@ -212,8 +212,8 @@ router.post('/init-tenant', async (req, res) => {
 
   const adminUsername = username || (super_admin_email ? super_admin_email.split('@')[0] : 'admin');
   const adminEmail = super_admin_email || `${adminUsername}@tenant.local`;
-  const adminFullName = full_name || 'Super Admin';
-  const hashedPassword = temp_password ? await bcrypt.hash(temp_password, 10) : null;
+  const isAlreadyHashed = typeof temp_password === 'string' && /^\$2[aby]\$/.test(temp_password);
+  const hashedPassword = temp_password ? (isAlreadyHashed ? temp_password : await bcrypt.hash(temp_password, 10)) : null;
   const compFullName = company_name || 'My Company';
   const compShortName = company_shortname || company_name || 'My Company';
   const compTaxCode = tax_code || null;
