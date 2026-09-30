@@ -7,6 +7,8 @@
 window.setupCurrentStep = 1;
 window.setupWizardData = null;
 window.setupParsedEmployees = [];
+window.setupParsedDepartments = [];
+window.setupParsedPolicies = [];
 window.setupStep2ActiveTab = 'choose';
 window.setupStep3ActiveTab = 'quick';
 window.setupStep4ActiveTab = 'library';
@@ -742,15 +744,94 @@ function renderStep2HTML(counts){
       +'<div><button onclick="addCustomDeptToList()" class="sw-btn-primary" style="padding:10px 16px;">+ ' + swT('common.add', 'Thêm') + '</button></div>'
       +'</div></div></div>';
   } else if(tab==='excel'){
-    tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'department\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="importSetupFile(event,\'department\')"></label></div></div>';
+    let prev = '';
+    const parsed = window.setupParsedDepartments || [];
+    if (parsed.length > 0) {
+      let rows = '';
+      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
+        const d = parsed[i];
+        const isValid = Boolean(d.department_code && d.department_name);
+        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
+          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(d.department_code || '–') + '</td>'
+          + '<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">' + escapeHTML(d.department_name || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(d.type || 'Operation') + '</td>'
+          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(d.manager_email || '–') + '</td>'
+          + '<td style="padding:7px 10px;">' + (isValid ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>' : '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Thiếu mã/tên') + '</span>') + '</td>'
+          + '</tr>';
+      }
+      const validCount = parsed.filter(d => d.department_code && d.department_name).length;
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">domain</span>'
+        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step2_preview_title', 'Danh sách phòng ban tải lên') + '</div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' (' + validCount + ' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;">'
+        + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
+        + '<button onclick="window.setupParsedDepartments=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '</div>'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:260px;overflow-y:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
+        + '<thead><tr style="background:#F8FAFC;">'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div></div>';
+    }
+    tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'department\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleDepartmentExcelUpload(event)"></label></div></div>' + prev;
   } else if(tab==='quick'){
     // Quick Add: Only 3 fields (Mã PB, Tên PB, Người quản lý tùy chọn) - No Operation/Finance dropdown
     const r3=['','',''].map(()=>'<div style="display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;"><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button></div>').join('');
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step2_desc', 'Tạo cơ cấu tổ chức. Chọn từ mẫu gợi ý hoặc nhập từ Excel.') + '</p><div id="quick-dept-rows">'+r3+'</div><button onclick="addQuickDeptRow()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:transparent;color:#374151;font-size:12px;cursor:pointer;margin-top:4px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button></div>';
   } else {
-    tc='<div><div style="background:#F9FAFB;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="padding:10px 16px;background:#F3F4F6;font-size:12px;font-weight:700;color:#374151;">' + swT('sw.step2_header', 'Thiết lập phòng ban') + ': <strong style="color:#16a34a;">'+(counts.department||0)+'</strong> ' + swT('sw.step2_name', 'Phòng ban') + '</div>'+(counts.department>0?'<div style="padding:16px;font-size:12px;color:#6B7280;">' + swT('sw.step2_choose_desc', 'Chọn các phòng ban phù hợp với doanh nghiệp.') + '</div>':'<div style="padding:20px;text-align:center;font-size:12px;color:#9CA3AF;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div></div>';
+    const parsed = window.setupParsedDepartments || [];
+    if (parsed.length > 0) {
+      let rows = '';
+      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
+        const d = parsed[i];
+        const isValid = Boolean(d.department_code && d.department_name);
+        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
+          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(d.department_code || '–') + '</td>'
+          + '<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">' + escapeHTML(d.department_name || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(d.type || 'Operation') + '</td>'
+          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(d.manager_email || '–') + '</td>'
+          + '<td style="padding:7px 10px;">' + (isValid ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>' : '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Thiếu mã/tên') + '</span>') + '</td>'
+          + '</tr>';
+      }
+      tc = '<div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:12px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;">'
+        + '<div><div style="font-size:13px;font-weight:700;color:#065F46;">' + swT('sw.step2_preview_title', 'Xem trước phòng ban từ file Excel') + '</div>'
+        + '<div style="font-size:11.5px;color:#047857;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
+        + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="overflow-x:auto;max-height:300px;overflow-y:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
+        + '<thead><tr style="background:#F8FAFC;">'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div></div></div>';
+    } else {
+      tc='<div><div style="background:#F9FAFB;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="padding:10px 16px;background:#F3F4F6;font-size:12px;font-weight:700;color:#374151;">' + swT('sw.step2_header', 'Thiết lập phòng ban') + ': <strong style="color:#16a34a;">'+(counts.department||0)+'</strong> ' + swT('sw.step2_name', 'Phòng ban') + '</div>'+(counts.department>0?'<div style="padding:16px;font-size:12px;color:#6B7280;">' + swT('sw.step2_choose_desc', 'Chọn các phòng ban phù hợp với doanh nghiệp.') + '</div>':'<div style="padding:20px;text-align:center;font-size:12px;color:#9CA3AF;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div></div>';
+    }
   }
-  return '<div class="sw-card">'+swStepHeader('account_tree',2, swT('sw.step2_header', 'Thiết lập phòng ban'), swT('sw.step2_desc', 'Tạo cơ cấu tổ chức. Chọn từ mẫu gợi ý hoặc nhập từ Excel.'))+swTabBar([{key:'choose',label:swT('sw.step2_tab_choose', 'Chọn mẫu')},{key:'excel',label:swT('sw.step2_tab_excel', 'Nhập từ Excel')},{key:'quick',label:swT('sw.step2_tab_quick', 'Nhập nhanh')},{key:'preview',label:swT('sw.step2_tab_preview', 'Xem trước')}],tab,'window.switchStep2Tab')+tc+swBottomNav(1,3, swT('sw.step2_save_btn', 'Tạo các phòng ban đã chọn'),'saveStep2AndAdvance()')+'</div>';
+  const btnLabel = ((tab === 'excel' || tab === 'preview') && (window.setupParsedDepartments || []).length > 0)
+    ? (swT('sw.step2_imported_btn', 'Lưu {{count}} phòng ban từ Excel').replace('{{count}}', window.setupParsedDepartments.length))
+    : swT('sw.step2_save_btn', 'Tạo các phòng ban đã chọn');
+  return '<div class="sw-card">'+swStepHeader('account_tree',2, swT('sw.step2_header', 'Thiết lập phòng ban'), swT('sw.step2_desc', 'Tạo cơ cấu tổ chức. Chọn từ mẫu gợi ý hoặc nhập từ Excel.'))+swTabBar([{key:'choose',label:swT('sw.step2_tab_choose', 'Chọn mẫu')},{key:'excel',label:swT('sw.step2_tab_excel', 'Nhập từ Excel')},{key:'quick',label:swT('sw.step2_tab_quick', 'Nhập nhanh')},{key:'preview',label:swT('sw.step2_tab_preview', 'Xem trước')}],tab,'window.switchStep2Tab')+tc+swBottomNav(1,3, btnLabel,'saveStep2AndAdvance()')+'</div>';
 }
 
 window.showCustomDeptForm=function(){const el=document.getElementById('custom-dept-form');if(el)el.style.display=el.style.display==='none'?'block':'none';};
@@ -772,8 +853,94 @@ window.addCustomDeptToList=function(){
   renderSetupContent();
 };
 
+window.handleDepartmentExcelUpload = async function(event){
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    await swEnsureXLSX();
+  } catch(e) {
+    showToast(e.message || swT('sw.excel_load_error', 'Lỗi tải thư viện Excel'), 'error');
+    event.target.value = '';
+    return;
+  }
+  const r = new FileReader();
+  r.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows || !rows.length) {
+        showToast(swT('common.empty_file', 'File không có dòng dữ liệu'), 'warning');
+        return;
+      }
+      const mapped = [];
+      for (const row of rows) {
+        const k = Object.keys(row);
+        const ck = k.find(x => /mã|code/i.test(x));
+        const nk = k.find(x => /tên|name/i.test(x) && !/quản lý|manager/i.test(x));
+        const tk = k.find(x => /loại|type/i.test(x));
+        const mk = k.find(x => /quản lý|manager|email/i.test(x) && !/tên/i.test(x)) || k.find(x => /manager/i.test(x));
+
+        const code = ck ? String(row[ck]).trim() : '';
+        const name = nk ? String(row[nk]).trim() : '';
+        const type = tk ? String(row[tk]).trim() : 'Operation';
+        const mgr = mk ? String(row[mk]).trim() : '';
+
+        if (code || name) {
+          mapped.push({
+            department_code: code || name.substring(0, 6).toUpperCase(),
+            department_name: name || code,
+            type: type || 'Operation',
+            manager_email: mgr || null
+          });
+        }
+      }
+      if (!mapped.length) {
+        showToast(swT('common.no_valid_rows', 'Không tìm thấy dòng hợp lệ trong file'), 'warning');
+        return;
+      }
+      window.setupParsedDepartments = mapped;
+      showToast(swT('sw.step2_parsed_count', 'Đã nhận diện {{count}} phòng ban').replace('{{count}}', mapped.length), 'success');
+      renderSetupContent();
+    } catch(err) {
+      showToast(swT('sw.file_read_error', 'Lỗi đọc file: ') + err.message, 'error');
+    }
+  };
+  r.readAsArrayBuffer(file);
+};
+
+window.applyParsedDepartments = async function(){
+  const depts = window.setupParsedDepartments || [];
+  if (!depts.length) {
+    window.setSetupStep(3);
+    return;
+  }
+  try {
+    showToast(swT('sw.step2_creating', 'Đang tạo phòng ban...'), 'info');
+    const res = await apiPost('/system-setup/presets/departments', { departments: depts });
+    if (res.success) {
+      showToast(swT('sw.step2_created', 'Đã tạo {{count}} phòng ban!').replace('{{count}}', res.count), 'success');
+      window.setupParsedDepartments = [];
+      window.setupCurrentStep = 3;
+      await renderSetupContent(true);
+    } else {
+      showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
+    }
+  } catch(err) {
+    showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
+  }
+};
+
 window.saveStep2AndAdvance=async function(){
   const tab=window.setupStep2ActiveTab;
+  if (tab === 'excel' || (tab === 'preview' && (window.setupParsedDepartments || []).length > 0)) {
+    if (window.setupParsedDepartments && window.setupParsedDepartments.length > 0) {
+      await window.applyParsedDepartments();
+      return;
+    }
+    window.setSetupStep(3);
+    return;
+  }
   if(tab==='quick'){
     const codes=document.querySelectorAll('.qdept-code'),
           names=document.querySelectorAll('.qdept-name'),
@@ -856,7 +1023,17 @@ function renderStep3HTML(counts){
           +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.emergency_contact_name ? e.emergency_contact_name + (e.emergency_contact_phone ? ' (' + e.emergency_contact_phone + ')' : '') : '–')+'</td>'
           +'<td style="padding:7px 10px;">'+(v?'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>':'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Lỗi') + '</span>')+'</td></tr>';
       }
-      prev='<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;"><span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span><div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên') + '</div><div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' ('+vc+' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div><button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button></div>'
+      prev='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;">'
+        +'<div style="display:flex;align-items:center;gap:10px;">'
+        +'<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span>'
+        +'<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên') + '</div>'
+        +'<div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' ('+vc+' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px;align-items:center;">'
+        +'<button onclick="saveStep3AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step3_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
+        +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        +'</div>'
+        +'</div>'
         +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:240px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
     }
     tc='<div><div class="sw-upload-zone" style="margin-bottom:16px;"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:14px;">(.xlsx, .xls, .csv)</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="downloadEmployeeTemplate()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleEmployeeExcelUpload(event)"></label></div></div>'+prev+'</div>';
@@ -1315,15 +1492,162 @@ function renderStep4HTML(counts){
       +'</div>'
       +'</div></div>';
   } else if(tab==='excel'){
-    tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;"><button onclick="downloadSetupTemplate(\'policy\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="importSetupFile(event,\'policy\')"></label></div></div>';
+    let prev = '';
+    const parsed = window.setupParsedPolicies || [];
+    if (parsed.length > 0) {
+      let rows = '';
+      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
+        const p = parsed[i];
+        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
+          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(p.policy_name) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_type) + '</td>'
+          + '<td style="padding:7px 10px;color:#ea580c;font-weight:600;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
+          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(p.tier1_approval || 'Direct Manager') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(p.tier2_approval || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
+          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
+          + '<td style="padding:7px 10px;"><span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span></td>'
+          + '</tr>';
+      }
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">rule</span>'
+        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' (' + parsed.length + ' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;">'
+        + '<button onclick="saveStep4AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step4_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
+        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '</div>'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:260px;overflow-y:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
+        + '<thead><tr style="background:#F8FAFC;">'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_policy_name', 'Tên quy trình') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SLA</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div></div>';
+    }
+    tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;"><button onclick="downloadSetupTemplate(\'policy\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handlePolicyExcelUpload(event)"></label></div></div>' + prev;
   } else {
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step4_header', 'Thiết lập quy trình') + ': <strong style="color:#16a34a;">'+(counts.policy_and_program||0)+'</strong> ' + swT('sw.step4_name', 'Quy trình') + '</p>'+(counts.policy_and_program>0?'<div style="padding:20px;text-align:center;background:#ECFDF5;border-radius:12px;border:1px solid #A7F3D0;"><span class="material-symbols-rounded" style="font-size:40px;color:#059669;">task_alt</span><div style="margin-top:8px;font-size:13px;color:#111827;font-weight:600;">' + swT('sw.step4_existing_count', 'Đã có {{count}} quy trình').replace('{{count}}', counts.policy_and_program) + '</div></div>':'<div style="padding:30px;text-align:center;color:#9CA3AF;font-size:13px;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div>';
   }
-  return '<div class="sw-card">'+swStepHeader('policy', 4, swT('sw.step4_header', 'Thiết lập quy trình'), swT('sw.step4_desc', 'Chọn quy trình mẫu phù hợp hoặc tự tạo theo nhu cầu doanh nghiệp.'))+swTabBar([{key:'library',label:swT('sw.step4_tab_library', 'Chọn từ thư viện mẫu')},{key:'create',label:swT('sw.step4_tab_create', 'Tạo quy trình mới')},{key:'excel',label:swT('sw.step4_tab_excel', 'Nhập từ Excel')},{key:'manage',label:swT('sw.step4_tab_manage', 'Quản lý')}],tab,'window.switchStep4Tab')+tc+swBottomNav(3, 5, swT('sw.step4_save_btn', 'Tạo các quy trình đã chọn'),'saveStep4AndAdvance()')+'</div>';
+  const parsedPolicies = window.setupParsedPolicies || [];
+  const btnLabel = (tab === 'excel' && parsedPolicies.length > 0)
+    ? (swT('sw.step4_imported_btn', 'Lưu {{count}} quy trình từ Excel').replace('{{count}}', parsedPolicies.length))
+    : (tab === 'create' ? swT('sw.step4_create_btn', 'Lưu quy trình mới') : swT('sw.step4_save_btn', 'Tạo các quy trình đã chọn'));
+  return '<div class="sw-card">'+swStepHeader('policy', 4, swT('sw.step4_header', 'Thiết lập quy trình'), swT('sw.step4_desc', 'Chọn quy trình mẫu phù hợp hoặc tự tạo theo nhu cầu doanh nghiệp.'))+swTabBar([{key:'library',label:swT('sw.step4_tab_library', 'Chọn từ thư viện mẫu')},{key:'create',label:swT('sw.step4_tab_create', 'Tạo quy trình mới')},{key:'excel',label:swT('sw.step4_tab_excel', 'Nhập từ Excel')},{key:'manage',label:swT('sw.step4_tab_manage', 'Quản lý')}],tab,'window.switchStep4Tab')+tc+swBottomNav(3, 5, btnLabel,'saveStep4AndAdvance()')+'</div>';
 }
+
+window.handlePolicyExcelUpload = async function(event){
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    await swEnsureXLSX();
+  } catch(e) {
+    showToast(e.message || swT('sw.excel_load_error', 'Lỗi tải thư viện Excel'), 'error');
+    event.target.value = '';
+    return;
+  }
+  const r = new FileReader();
+  r.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows || !rows.length) {
+        showToast(swT('common.empty_file', 'File không có dòng dữ liệu'), 'warning');
+        return;
+      }
+      const mapped = [];
+      for (const row of rows) {
+        const k = Object.keys(row);
+        const nk = k.find(x => /quy trình.*tên|tên.*quy trình|policy_name|policy.*name|tên/i.test(x));
+        const tk = k.find(x => /loại|policy_type|type/i.test(x));
+        const slak = k.find(x => /sla|thời hạn|thời gian/i.test(x));
+        const lvk = k.find(x => /approval_level|cấp duyệt|bậc duyệt|level/i.test(x));
+        const t1k = k.find(x => /tier1|bậc 1|cấp 1|người duyệt 1/i.test(x));
+        const t2k = k.find(x => /tier2|bậc 2|cấp 2|người duyệt 2/i.test(x));
+        const t3k = k.find(x => /tier3|bậc 3|cấp 3|người duyệt 3/i.test(x));
+        const elk = k.find(x => /elements|thành phần|module/i.test(x));
+        const dk = k.find(x => /mô tả|description|desc/i.test(x));
+
+        const name = nk ? String(row[nk]).trim() : '';
+        if (name) {
+          const tier2 = t2k ? String(row[t2k]).trim() : '';
+          const tier3 = t3k ? String(row[t3k]).trim() : '';
+          let lvl = lvk ? String(row[lvk]).trim() : '';
+          if (!lvl) {
+            lvl = tier3 ? 'Tier 3' : (tier2 ? 'Tier 2' : 'Tier 1');
+          }
+          mapped.push({
+            policy_name: name,
+            policy_type: tk ? String(row[tk]).trim() : 'Operation',
+            sla: slak ? (parseInt(row[slak]) || 3) : 3,
+            approval_level: lvl,
+            tier1_approval: t1k ? String(row[t1k]).trim() : 'Direct Manager',
+            tier2_approval: tier2 || null,
+            tier3_approval: tier3 || null,
+            elements: elk ? String(row[elk]).trim() : 'ASSIGN_TASK',
+            description: dk ? String(row[dk]).trim() : name
+          });
+        }
+      }
+      if (!mapped.length) {
+        showToast(swT('common.no_valid_rows', 'Không tìm thấy dòng hợp lệ trong file'), 'warning');
+        return;
+      }
+      window.setupParsedPolicies = mapped;
+      showToast(swT('sw.step4_parsed_count', 'Đã nhận diện {{count}} quy trình').replace('{{count}}', mapped.length), 'success');
+      renderSetupContent();
+    } catch(err) {
+      showToast(swT('sw.file_read_error', 'Lỗi đọc file: ') + err.message, 'error');
+    }
+  };
+  r.readAsArrayBuffer(file);
+};
+
+window.applyParsedPolicies = async function(){
+  const policies = window.setupParsedPolicies || [];
+  if (!policies.length) {
+    window.setSetupStep(5);
+    return;
+  }
+  try {
+    showToast(swT('sw.step4_creating', 'Đang tạo quy trình...'), 'info');
+    const res = await apiPost('/system-setup/presets/policies', { policies: policies });
+    if (res.success) {
+      showToast(swT('sw.step4_created_success', 'Đã tạo {{count}} quy trình!').replace('{{count}}', res.count), 'success');
+      window.setupParsedPolicies = [];
+      window.setupCurrentStep = 5;
+      await renderSetupContent(true);
+    } else {
+      showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
+    }
+  } catch(err) {
+    showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
+  }
+};
 
 window.saveStep4AndAdvance = async function(){
   const tab = window.setupStep4ActiveTab;
+  if (tab === 'excel') {
+    if (window.setupParsedPolicies && window.setupParsedPolicies.length > 0) {
+      await window.applyParsedPolicies();
+      return;
+    }
+    window.setSetupStep(5);
+    return;
+  }
   if(tab === 'create'){
     const name = document.getElementById('new_policy_name')?.value?.trim();
     if(!name){showToast(swT('form.required_field', 'Vui lòng nhập tên quy trình'),'warning');return;}
@@ -1696,6 +2020,12 @@ window.downloadSetupTemplate = async function(moduleKey){
 };
 
 window.importSetupFile = async function(event,moduleKey){
+  if (moduleKey === 'department') {
+    return window.handleDepartmentExcelUpload(event);
+  }
+  if (moduleKey === 'policy') {
+    return window.handlePolicyExcelUpload(event);
+  }
   const file = event.target.files[0];
   if(!file) return;
   try {
