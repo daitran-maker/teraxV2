@@ -98,9 +98,25 @@ kubectl exec -i "${PG_DEPLOY}" -- psql -U "${DB_ADMIN_USER}" -d "${DB_NAME}" -c 
 GRANT ALL ON SCHEMA public TO \"${TENANT_DB_USER}\";
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"${TENANT_DB_USER}\";
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"${TENANT_DB_USER}\";
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO \"${TENANT_DB_USER}\";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"${TENANT_DB_USER}\";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"${TENANT_DB_USER}\";
-REASSIGN OWNED BY \"${DB_ADMIN_USER}\" TO \"${TENANT_DB_USER}\";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO \"${TENANT_DB_USER}\";
+ALTER SCHEMA public OWNER TO \"${TENANT_DB_USER}\";
+DO \$\$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO \"' || '${TENANT_DB_USER}' || '\"';
+    END LOOP;
+    FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public') LOOP
+        EXECUTE 'ALTER SEQUENCE public.' || quote_ident(r.sequence_name) || ' OWNER TO \"' || '${TENANT_DB_USER}' || '\"';
+    END LOOP;
+    FOR r IN (SELECT table_name FROM information_schema.views WHERE table_schema = 'public') LOOP
+        EXECUTE 'ALTER VIEW public.' || quote_ident(r.table_name) || ' OWNER TO \"' || '${TENANT_DB_USER}' || '\"';
+    END LOOP;
+END \$\$;
 "
 
 # 4. Mã hóa Password và Khởi tạo Super Admin dựa trên thông tin CMS Sign Up
