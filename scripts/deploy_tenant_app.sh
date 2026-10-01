@@ -127,24 +127,38 @@ else
   HASHED_PASSWORD=$(node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('${ADMIN_PASSWORD}', 10));" 2>/dev/null || node -e "console.log('${ADMIN_PASSWORD}')")
 fi
 
+ADMIN_NAME_ESCAPED="${ADMIN_NAME//\'/\'\'}"
+ADMIN_USERNAME_ESCAPED="${ADMIN_USERNAME//\'/\'\'}"
+ADMIN_EMAIL_ESCAPED="${ADMIN_EMAIL//\'/\'\'}"
+
 kubectl exec -i "${PG_DEPLOY}" -- psql -U "${DB_ADMIN_USER}" -d "${DB_NAME}" -c "
 ALTER TABLE public.employee ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50);
 ALTER TABLE public.employee ADD COLUMN IF NOT EXISTS username VARCHAR(100);
 ALTER TABLE public.employee ALTER COLUMN email DROP NOT NULL;
 
-DELETE FROM employee WHERE email = '${ADMIN_EMAIL}';
+DELETE FROM public.employee WHERE (email = '${ADMIN_EMAIL_ESCAPED}' OR username = '${ADMIN_USERNAME_ESCAPED}') AND employee_id != 'EMP-001';
 
-INSERT INTO employee (employee_id, full_name, username, email, password, status, role)
+INSERT INTO public.employee (employee_id, full_name, username, email, password, status, role, app_user_enabled)
 VALUES (
   'EMP-001',
-  '${ADMIN_NAME}',
-  '${ADMIN_USERNAME}',
-  '${ADMIN_EMAIL}',
+  '${ADMIN_NAME_ESCAPED}',
+  '${ADMIN_USERNAME_ESCAPED}',
+  '${ADMIN_EMAIL_ESCAPED}',
   '${HASHED_PASSWORD}',
   (SELECT COALESCE((SELECT id FROM status_catalog WHERE table_name='employee' AND status_key='active' LIMIT 1), 17)),
-  'Super Admin'
-);
+  'Super Admin',
+  true
+)
+ON CONFLICT (employee_id) DO UPDATE SET
+  full_name = EXCLUDED.full_name,
+  username = EXCLUDED.username,
+  email = EXCLUDED.email,
+  password = EXCLUDED.password,
+  status = EXCLUDED.status,
+  role = EXCLUDED.role,
+  app_user_enabled = true;
 "
+
 
 # 5. Khởi chạy Container / Process App
 echo "==> 4. Launching Application Container on Port ${APP_PORT}..."

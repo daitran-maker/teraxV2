@@ -282,13 +282,22 @@ router.post('/init-tenant', async (req, res) => {
       ALTER TABLE public.employee ALTER COLUMN email DROP NOT NULL;
     `);
 
-    // 4. Delete existing admin records first to prevent conflicts
-    await pool.query('DELETE FROM "employee" WHERE email = $1 OR employee_id = \'EMP-001\'', [adminEmail]);
+    // 4. Delete conflicting records on email or username (except EMP-001)
+    await pool.query('DELETE FROM "employee" WHERE (email = $1 OR username = $2) AND employee_id != \'EMP-001\'', [adminEmail, adminUsername]);
 
-    // 5. Insert super admin record linked to primary company
+    // 5. Insert or update super admin record linked to primary company
     const { rows } = await pool.query(`
-      INSERT INTO "employee" (employee_id, username, full_name, email, role, password, status, company_id)
-      VALUES ('EMP-001', $1, $2, $3, 'Super Admin', $4, (SELECT COALESCE((SELECT id FROM status_catalog WHERE table_name='employee' AND status_key='active' LIMIT 1), 17)), $5)
+      INSERT INTO "employee" (employee_id, username, full_name, email, role, password, status, company_id, app_user_enabled)
+      VALUES ('EMP-001', $1, $2, $3, 'Super Admin', $4, (SELECT COALESCE((SELECT id FROM status_catalog WHERE table_name='employee' AND status_key='active' LIMIT 1), 17)), $5, true)
+      ON CONFLICT (employee_id) DO UPDATE SET
+        username = EXCLUDED.username,
+        full_name = EXCLUDED.full_name,
+        email = EXCLUDED.email,
+        password = EXCLUDED.password,
+        status = EXCLUDED.status,
+        company_id = EXCLUDED.company_id,
+        role = 'Super Admin',
+        app_user_enabled = true
       RETURNING employee_id, username, full_name, email, role, status, company_id
     `, [adminUsername, adminFullName, adminEmail, hashedPassword, primaryCompanyId]);
 
