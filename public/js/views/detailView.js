@@ -399,21 +399,33 @@ function showCustomPrompt(title, label, defaultValue = '', placeholder = '', fie
 
       // Setup options with proper values and labels
       const resolvedOptions = options.map(o => {
-        const val = typeof o === 'object' ? (o[valKey] !== undefined ? o[valKey] : o.value || o.email) : o;
-        let lbl = typeof o === 'object' ? (o[labelKey] !== undefined ? o[labelKey] : o.label || o.full_name) : o;
-        if ((fieldConfig.optionsFrom === 'employee' || fieldConfig.key === 'sr_owner') && typeof o === 'object' && o.email && o.full_name) {
-          lbl = formatEmployeeLabel(o);
+        const val = typeof o === 'object' ? (o[valKey] !== undefined ? o[valKey] : o.value || o.employee_id || o.email) : o;
+        let lbl = typeof o === 'object' ? (o[labelKey] !== undefined ? o[labelKey] : o.employee_label || o.label || o.full_name) : o;
+        if (fieldConfig.optionsFrom === 'employee' || fieldConfig.key === 'sr_owner') {
+          if (typeof o === 'object') {
+            lbl = o.employee_label || (typeof formatEmployeeLabel === 'function' ? formatEmployeeLabel(o) : '') || o.full_name || lbl;
+          }
         } else if (typeof t_val === 'function' && (fieldConfig.key === 'elements' || fieldConfig.options)) {
           lbl = t_val(lbl);
         }
-        return { value: String(val), label: String(lbl) };
+        return { value: String(val), label: String(lbl || val), raw: o };
       });
 
       // Keep track of selected values in a Set
       const selectedValues = new Set();
       if (defaultValue) {
         currentSelection.forEach(val => {
-          const matchedOpt = resolvedOptions.find(o => o.value.toLowerCase() === val.toLowerCase());
+          const cleanVal = String(val).trim().toLowerCase();
+          const matchedOpt = resolvedOptions.find(o => {
+            const optVal = o.value.toLowerCase();
+            if (optVal === cleanVal) return true;
+            if (o.raw && typeof o.raw === 'object') {
+              if (String(o.raw.employee_id || '').toLowerCase() === cleanVal) return true;
+              if (String(o.raw.email || '').toLowerCase() === cleanVal) return true;
+              if (String(o.raw.username || '').toLowerCase() === cleanVal) return true;
+            }
+            return false;
+          });
           if (matchedOpt) {
             selectedValues.add(matchedOpt.value);
           } else {
@@ -426,8 +438,13 @@ function showCustomPrompt(title, label, defaultValue = '', placeholder = '', fie
       const renderPills = () => {
         pillsContainer.innerHTML = '';
         selectedValues.forEach(val => {
-          const opt = resolvedOptions.find(o => o.value === val);
-          const label = opt ? opt.label : val;
+          const opt = resolvedOptions.find(o => o.value.toLowerCase() === String(val).toLowerCase());
+          let label = opt ? opt.label : val;
+          if (!opt && (fieldConfig.optionsFrom === 'employee' || fieldConfig.key === 'sr_owner')) {
+            if (typeof window.resolveEmployeeLabel === 'function') {
+              label = window.resolveEmployeeLabel(val);
+            }
+          }
           const pill = document.createElement('span');
           pill.className = 'multiselect-pill';
           pill.innerHTML = `
@@ -1743,12 +1760,12 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
         label: 'SR Owner',
         type: 'multiselect',
         optionsFrom: 'employee',
-        optionValue: 'email',
-        optionLabel: 'full_name'
+        optionValue: 'employee_id',
+        optionLabel: 'employee_label'
       };
     } else {
-      // Force multiselect even if config says single select
-      fieldConfig = { ...fieldConfig, type: 'multiselect' };
+      // Force multiselect with employee_label
+      fieldConfig = { ...fieldConfig, type: 'multiselect', optionValue: 'employee_id', optionLabel: 'employee_label' };
     }
     // Build default value from current sr_owner array
     const currentOwners = Array.isArray(currentRecord && currentRecord.sr_owner)
@@ -1756,8 +1773,8 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
       : (currentRecord && currentRecord.sr_owner ? [currentRecord.sr_owner] : []);
     // Fetch employees to build multiselect checkbox options
     const employeeList = await getSelectOptions('employee');
-    const valKey = fieldConfig.optionValue || 'email';
-    const labelKey = fieldConfig.optionLabel || 'full_name';
+    const valKey = 'employee_id';
+    const labelKey = 'employee_label';
     // Build a multiselect config with resolved employee objects
     const multiFieldConfig = {
       key: 'sr_owner',
@@ -3429,7 +3446,7 @@ function buildDetailViewHTML(moduleKey, record) {
           <div class="detail-right-card" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 24px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0,0,0,0.04); flex: 1; min-height: 0;">
             
             <!-- Tab Header (TerAX Design) -->
-            <div style="display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #E5E7EB; padding-bottom: 0; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; width: 100%; align-items: stretch; scrollbar-width: none;" id="detail-tabs-header">
+            <div style="display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #E5E7EB; padding-bottom: 4px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; width: 100%; align-items: stretch; scrollbar-width: thin; scrollbar-color: #CBD5E1 #F1F5F9;" id="detail-tabs-header" onwheel="if(event.deltaY !== 0){ this.scrollLeft += event.deltaY; event.preventDefault(); }">
           `;
 
       allChildren.forEach((childKey, idx) => {

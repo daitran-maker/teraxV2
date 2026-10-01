@@ -78,6 +78,21 @@ body {
   background: var(--text-muted);
 }
 
+#detail-tabs-header::-webkit-scrollbar {
+  height: 6px;
+}
+#detail-tabs-header::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 4px;
+}
+#detail-tabs-header::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+#detail-tabs-header::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
 /* ===== SIDEBAR ===== */
 .sidebar {
   width: 68px;

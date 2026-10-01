@@ -3637,26 +3637,45 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
     const isEmployeeName = (moduleKey === 'employee' || moduleKey === 'employee_active') && k === 'full_name';
     const isPartnerName = moduleKey === 'company' && (k === 'company_fullname' || k === 'company_shortname');
 
+    const extractImageUrl = (raw) => {
+      if (!raw || typeof raw !== 'string') return null;
+      let trimmed = raw.trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed) && parsed.length > 0) trimmed = String(parsed[0]).trim();
+        } catch (e) {}
+      }
+      if (trimmed.toLowerCase().includes('data:image') || trimmed.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (trimmed.startsWith('/uploads/') && trimmed.match(/\.(png|jpe?g|gif|webp|svg)/i))) {
+        return trimmed;
+      }
+      return null;
+    };
+
     if (isEmployeeName || isPartnerName) {
       const imgKey = isEmployeeName ? 'avatar' : 'logo';
-      const imgVal = row[imgKey];
-      const imgHTML = (imgVal && String(imgVal).includes('base64'))
-        ? `<img src="${imgVal}" style="width:24px;height:24px;${isEmployeeName ? 'border-radius:50%;' : 'border-radius:4px;'}object-fit:cover;margin-right:8px;vertical-align:middle;" />`
+      const imgVal = extractImageUrl(row[imgKey]);
+      const imgHTML = imgVal
+        ? `<img src="${escapeHTML(imgVal)}" style="width:24px;height:24px;${isEmployeeName ? 'border-radius:50%;' : 'border-radius:4px;'}object-fit:cover;margin-right:8px;vertical-align:middle;" />`
         : '';
       const stickyStyle = isEmployeeName ? `${getStickyTableColumnStyle(moduleKey, col.key, false, mod)} white-space: nowrap; overflow: hidden; text-overflow: ellipsis;` : '';
       return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" title="${String(val).replace(/"/g, '&quot;')}" style="${stickyStyle}">${imgHTML}${val}</td>`;
     }
 
-    if (typeof val === 'string' && val.trim().toLowerCase().includes('data:image') && val.trim().toLowerCase().includes('base64')) {
-      // If it's a standalone logo column in 'my_company', make it square as requested
-      const isMyCompanyLogo = moduleKey === 'my_company' && k === 'logo';
-      const style = isMyCompanyLogo
-        ? 'width:40px;height:40px;border-radius:4px;object-fit:contain;'
-        : 'width:32px;height:32px;border-radius:50%;object-fit:cover;';
-      return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}"><img src="${val.trim()}" alt="Img" style="${style}vertical-align:middle;" /></td>`;
-    }
-
     let tdStyle = getStickyTableColumnStyle(moduleKey, col.key, false, mod);
+
+    const directImgUrl = extractImageUrl(val);
+    const isLogoCol = k === 'logo' || k === 'avatar';
+    if (directImgUrl || (isLogoCol && val)) {
+      const imgSrc = directImgUrl || (typeof val === 'string' ? val.trim() : '');
+      if (imgSrc) {
+        const isMyCompanyLogo = (moduleKey === 'my_company' || moduleKey === 'company') && k === 'logo';
+        const style = isMyCompanyLogo
+          ? 'width:36px;height:36px;border-radius:6px;object-fit:contain;background:#F8FAFC;border:1px solid #E2E8F0;padding:2px;'
+          : 'width:32px;height:32px;border-radius:50%;object-fit:cover;';
+        return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle}"><img src="${escapeHTML(imgSrc)}" alt="Logo" style="${style}vertical-align:middle;" onerror="this.style.display='none'" /></td>`;
+      }
+    }
 
     if (col.type === 'file' || k === 'file' || k === 'procedure_file' || k === 'attachment' || (typeof val === 'string' && (val.startsWith('/uploads/') || val.startsWith('["/uploads/')))) {
       if (!val) return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle}"></td>`;
@@ -3668,6 +3687,10 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
         fileList = [val];
       }
       const filesHtml = fileList.map(f => {
+        const imgUrl = extractImageUrl(f);
+        if (imgUrl) {
+          return `<a href="${escapeHTML(imgUrl)}" target="_blank" onclick="event.stopPropagation();" style="display:inline-block;margin-right:6px;"><img src="${escapeHTML(imgUrl)}" alt="img" style="width:32px;height:32px;border-radius:4px;object-fit:contain;border:1px solid #E2E8F0;vertical-align:middle;" /></a>`;
+        }
         const clean = formatFileNameDisplay(f);
         return `<a href="${escapeHTML(f)}" target="_blank" download="${escapeHTML(clean)}" style="display:inline-flex; align-items:center; gap:4px; color:#2563EB; font-weight:500; text-decoration:none; margin-right:8px;" onclick="event.stopPropagation();"><span class="material-symbols-rounded" style="font-size:15px;">attach_file</span> ${escapeHTML(clean)}</a>`;
       }).join('');

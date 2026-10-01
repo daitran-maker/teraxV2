@@ -4437,7 +4437,7 @@ router.put('/:tableName/:id', async (req, res) => {
             }
             const automationRes = await pool.query(
               `UPDATE "payment" 
-               SET payment_status = 31, updated_by = $2, updated_date = CURRENT_TIMESTAMP 
+               SET payment_status = 31, updated_by = $2 
                WHERE payment_request = $1 OR (request = $1 AND payment_status IN (30, 121))
                RETURNING payment_id, request, contract_id`,
               [updatedRecord.request_id, userEmployeeId]

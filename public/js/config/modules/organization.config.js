@@ -41,7 +41,14 @@
       { key: 'logo', label: 'Logo', type: 'file', accept: 'image/*', full: true },
     ],
     detailSubtitle: (r) => {
-      const logo = r.logo ? `<img src="${r.logo}" style="width:40px;height:40px;border-radius:4px;margin-right:12px;object-fit:contain;" />` : '';
+      let logoUrl = r.logo;
+      if (logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(logoUrl);
+          if (Array.isArray(parsed) && parsed.length > 0) logoUrl = parsed[0];
+        } catch(e) {}
+      }
+      const logo = logoUrl ? `<img src="${logoUrl}" style="width:40px;height:40px;border-radius:4px;margin-right:12px;object-fit:contain;background:#F8FAFC;border:1px solid #E2E8F0;" />` : '';
       return `${logo} <span style="font-size:18px;font-weight:700;color:var(--text);">${r.company_fullname || ''}</span>`;
     },
     displayName: (r) => {

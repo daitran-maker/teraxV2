@@ -335,10 +335,12 @@ router.post('/presets/departments', async (req, res) => {
       const type = (d.type || 'Operation').trim();
       const managerEmail = (d.manager_email || d.manager || '').trim() || null;
 
+      const targetCompanyId = (d.company_id || '').trim() || companyId;
+
       // Check if code or name already exists for company
       const check = await client.query(
         'SELECT department_id FROM department WHERE company_id = $1 AND (LOWER(department_code) = LOWER($2) OR LOWER(department_name) = LOWER($3))',
-        [companyId, code, name]
+        [targetCompanyId, code, name]
       );
 
       if (check.rows.length === 0) {
@@ -346,8 +348,8 @@ router.post('/presets/departments', async (req, res) => {
         await client.query(`
           INSERT INTO department (department_id, department_name, department_code, type, manager_email, company_id)
           VALUES ($1, $2, $3, $4, $5, $6)
-        `, [id, name, code, type, managerEmail, companyId]);
-        created.push({ department_id: id, department_name: name, department_code: code, type, manager_email: managerEmail });
+        `, [id, name, code, type, managerEmail, targetCompanyId]);
+        created.push({ department_id: id, department_name: name, department_code: code, type, manager_email: managerEmail, company_id: targetCompanyId });
       }
     }
 
@@ -477,14 +479,15 @@ router.post('/presets/policies', async (req, res) => {
   }
 });
 
-// POST /api/system-setup/quick-account (Step 5 bank and petty cash creation)
+// POST /api/system-setup/quick-account (Step 5 bank and petty cash creation - supports multiple accounts)
 router.post('/quick-account', async (req, res) => {
   const {
     account_name,
     bank_name,
     account_number,
     currency,
-    create_cash
+    create_cash,
+    accounts
   } = req.body;
 
   const client = await pool.connect();
@@ -492,12 +495,34 @@ router.post('/quick-account', async (req, res) => {
     await client.query('BEGIN');
     const compRes = await client.query('SELECT my_company_id, base_currency FROM my_company ORDER BY my_company_id ASC LIMIT 1');
     const companyId = compRes.rows[0] ? compRes.rows[0].my_company_id : '1';
-    const baseCur = currency || (compRes.rows[0] ? compRes.rows[0].base_currency : 'VND') || 'VND';
+    const defaultCur = (compRes.rows[0] ? compRes.rows[0].base_currency : 'VND') || 'VND';
 
     const created = [];
 
-    // 1. Bank Account
-    if (account_name || bank_name) {
+    // Support multiple accounts array if passed
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      for (const acc of accounts) {
+        const aName = (acc.account_name || '').trim();
+        const bName = (acc.bank_name || '').trim();
+        const aNum = (acc.account_number || '').trim();
+        const aCur = (acc.currency || defaultCur).trim();
+        const aType = (acc.type || 'Bank').trim();
+
+        if (aName || bName || aNum) {
+          const bId = await generateSequentialId('account', client);
+          const finalAccName = aName || `${bName || 'Ngân hàng'} (${aCur})`;
+          await client.query(`
+            INSERT INTO account (
+              account_id, account_name, type, currency, exchange_rate,
+              account_number, bank_name, account_status, company_entity
+            ) VALUES ($1, $2, $3, $4, 1, $5, $6, 19, $7)
+          `, [bId, finalAccName, aType, aCur, aNum || null, bName || null, companyId]);
+          created.push({ account_id: bId, account_name: finalAccName, type: aType });
+        }
+      }
+    } else if (account_name || bank_name) {
+      // Single account backward compatibility
+      const baseCur = currency || defaultCur;
       const bId = await generateSequentialId('account', client);
       const accName = account_name || `${bank_name || 'Ngân hàng'} (${baseCur})`;
       await client.query(`
@@ -511,6 +536,7 @@ router.post('/quick-account', async (req, res) => {
 
     // 2. Petty cash account if requested
     if (create_cash !== false) {
+      const baseCur = currency || defaultCur;
       const cId = await generateSequentialId('account', client);
       const cashName = `Quỹ tiền mặt (${baseCur})`;
       await client.query(`

@@ -642,25 +642,33 @@ router.get('/:tableName/:recordId', async (req, res) => {
         if (user.role && user.role.toUpperCase() === 'SUPER ADMIN') {
           hasAccess = true;
         } else {
-          // 1. Check exceptions (Email)
-          const exceptions = rule.exceptions ? rule.exceptions.split(',').map(s => s.trim()) : [];
-          if (exceptions.includes(user.employee_id)) hasAccess = true;
+          // 1. Check exceptions (Email, Employee ID, Username)
+          const exceptions = rule.exceptions ? rule.exceptions.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+          const userIds = [user.employee_id, user.email, user.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+          if (exceptions.some(ex => userIds.includes(ex))) hasAccess = true;
         }
       }
 
       // 2. Check levels
-      const levels = rule.levels ? rule.levels.split(',').map(s => s.trim()) : [];
-      if (!hasAccess && levels.includes(String(user.employee_level))) hasAccess = true;
+      const levels = rule.levels ? rule.levels.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+      if (!hasAccess && levels.includes(String(user.employee_level || '').trim().toLowerCase())) hasAccess = true;
 
       // 3. Check positions
-      const positions = rule.positions ? rule.positions.split(',').map(s => s.trim()) : [];
-      if (!hasAccess && positions.includes(user.position)) hasAccess = true;
+      const positions = rule.positions ? rule.positions.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+      if (!hasAccess && positions.includes(String(user.position || '').trim().toLowerCase())) hasAccess = true;
 
       // 4. Check roles (Static and Dynamic with Dot Notation)
       if (!hasAccess) {
-        const roles = rule.roles ? rule.roles.split(',').map(s => s.trim()) : [];
+        const userRole = String(user.role || '').trim().toLowerCase();
+        const roles = rule.roles ? rule.roles.split(',').map(s => s.trim()).filter(Boolean) : [];
         for (const r of roles) {
           if (!r) continue;
+          const cleanRole = r.replace(/^\[|\]$/g, '').trim().toLowerCase();
+          // Check static role match first (e.g. 'staff' === 'staff' or '[staff]' === 'staff')
+          if (cleanRole === userRole) {
+            hasAccess = true;
+            break;
+          }
           if (r.startsWith('[') && r.endsWith(']')) {
             const roleStr = r.slice(1, -1).trim();
             const parts = roleStr.split('.');
@@ -687,9 +695,9 @@ router.get('/:tableName/:recordId', async (req, res) => {
                   } catch (e) {}
                 } else if (pRec[targetField]) {
                   const fieldVal = pRec[targetField];
-                  valArr = Array.isArray(fieldVal) ? fieldVal.map(s => s.toLowerCase()) : [fieldVal.toLowerCase()];
+                  valArr = Array.isArray(fieldVal) ? fieldVal.map(s => String(s).toLowerCase()) : [String(fieldVal).toLowerCase()];
                 }
-                const userIds = [user.employee_id, user.email, user.username].filter(Boolean).map(s => s.toLowerCase());
+                const userIds = [user.employee_id, user.email, user.username].filter(Boolean).map(s => String(s).toLowerCase());
                 if (valArr.some(v => userIds.includes(v))) {
                   hasAccess = true;
                   break;
@@ -714,9 +722,9 @@ router.get('/:tableName/:recordId', async (req, res) => {
                 } catch (e) {}
               } else if (record[targetField]) {
                 const fieldVal = record[targetField];
-                valArr = Array.isArray(fieldVal) ? fieldVal.map(s => s.toLowerCase()) : [fieldVal.toLowerCase()];
+                valArr = Array.isArray(fieldVal) ? fieldVal.map(s => String(s).toLowerCase()) : [String(fieldVal).toLowerCase()];
               }
-              const userIds = [user.employee_id, user.email, user.username].filter(Boolean).map(s => s.toLowerCase());
+              const userIds = [user.employee_id, user.email, user.username].filter(Boolean).map(s => String(s).toLowerCase());
               if (valArr.some(v => userIds.includes(v))) {
                 hasAccess = true;
                 break;
@@ -724,7 +732,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
             }
           } else {
             // Static role
-            if (r.toLowerCase().trim() === String(user.role).toLowerCase().trim()) {
+            if (r.toLowerCase().trim() === userRole) {
               hasAccess = true;
               break;
             }
@@ -1182,18 +1190,25 @@ router.post('/execute', async (req, res) => {
             hasAccess = true;
           } else {
           for (const rule of rules) {
-            const exceptions = rule.exceptions ? rule.exceptions.split(',').map(s => s.trim()) : [];
-            const levels = rule.levels ? rule.levels.split(',').map(s => s.trim()) : [];
-            const positions = rule.positions ? rule.positions.split(',').map(s => s.trim()) : [];
-            const roles = rule.roles ? rule.roles.split(',').map(s => s.trim()) : [];
+            const exceptions = rule.exceptions ? rule.exceptions.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+            const levels = rule.levels ? rule.levels.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+            const positions = rule.positions ? rule.positions.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+            const roles = rule.roles ? rule.roles.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const userRole = String(user.role || '').trim().toLowerCase();
+            const userIds = [user.employee_id, user.email, user.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
 
-            if (exceptions.includes(user.employee_id)) { hasAccess = true; break; }
-            if (roles.some(r => r.toLowerCase() === (user.role || '').toLowerCase())) { hasAccess = true; break; }
-            if (levels.includes(String(user.employee_level))) { hasAccess = true; break; }
-            if (positions.includes(user.position)) { hasAccess = true; break; }
+            if (exceptions.some(ex => userIds.includes(ex))) { hasAccess = true; break; }
+            if (roles.some(r => r.replace(/^\[|\]$/g, '').trim().toLowerCase() === userRole)) { hasAccess = true; break; }
+            if (levels.includes(String(user.employee_level || '').trim().toLowerCase())) { hasAccess = true; break; }
+            if (positions.includes(String(user.position || '').trim().toLowerCase())) { hasAccess = true; break; }
 
             // Dynamic role check: [sr_owner], [policy_lead], [tier_1_approval], etc.
             for (const r of roles) {
+              const cleanRole = r.replace(/^\[|\]$/g, '').trim().toLowerCase();
+              if (cleanRole === userRole) {
+                hasAccess = true;
+                break;
+              }
               if (r.startsWith('[') && r.endsWith(']')) {
                 const roleStr = r.slice(1, -1).trim();
                 const parts = roleStr.split('.');
@@ -1606,7 +1621,7 @@ router.post('/execute', async (req, res) => {
             try {
               const payUpdateRes = await client.query(
                 `UPDATE "payment" 
-                 SET payment_status = 31, updated_date = CURRENT_TIMESTAMP 
+                 SET payment_status = 31 
                  WHERE payment_request = $1 OR (request = $1 AND payment_status IN (30, 121))
                  RETURNING payment_id, request, contract_id`,
                 [record.request_id]
@@ -1692,7 +1707,7 @@ router.post('/execute', async (req, res) => {
           try {
             const payRevertRes = await client.query(
               `UPDATE "payment" 
-               SET payment_status = 30, payment_request = NULL, updated_date = CURRENT_TIMESTAMP 
+               SET payment_status = 30, payment_request = NULL 
                WHERE payment_request = $1
                RETURNING payment_id, request, contract_id`,
               [record.request_id]
@@ -1727,7 +1742,7 @@ router.post('/execute', async (req, res) => {
         try {
           const payRevertRes = await client.query(
             `UPDATE "payment" 
-             SET payment_status = 30, payment_request = NULL, updated_date = CURRENT_TIMESTAMP 
+             SET payment_status = 30, payment_request = NULL 
              WHERE payment_request = $1
              RETURNING payment_id, request, contract_id`,
             [record_id]
@@ -1917,7 +1932,7 @@ router.post('/execute', async (req, res) => {
       // Update payment status (121: Submitted for payment) và payment_request ID
       await client.query(`
         UPDATE payment 
-        SET payment_status = 121, payment_request = $1, updated_date = CURRENT_TIMESTAMP 
+        SET payment_status = 121, payment_request = $1 
         WHERE payment_id = $2
       `, [newPaymentReqId, record_id]);
 

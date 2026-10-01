@@ -2239,8 +2239,9 @@ window.renderFileUploadSlotHTML = function (fieldKey, idx, val = '', acceptStr =
   const displayVal = val ? cleanName : 'Choose File or Drag & Drop here';
   const previewStyle = val ? 'display:block;' : 'display:none;';
   let previewContent = '';
-  if (val && val.startsWith('data:image')) {
-    previewContent = `<img src="${val}" alt="Preview" style="max-width:100px; max-height:100px; border-radius:4px;" />`;
+  const isImageFile = val && (val.startsWith('data:image') || val.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (val.startsWith('/uploads/') && val.match(/\.(png|jpe?g|gif|webp|svg)/i)));
+  if (isImageFile) {
+    previewContent = `<img src="${val}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
   } else if (val) {
     const shortCleanName = typeof truncateFileName === 'function' ? truncateFileName(cleanName, 28) : cleanName;
     previewContent = `<div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--accent); font-weight:600; max-width:100%; min-width:0; overflow:hidden;" title="${escapeHTML(cleanName)}"><span class="material-symbols-rounded" style="font-size:14px; flex-shrink:0;">attach_file</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px;">${escapeHTML(shortCleanName)}</span></div>`;
