@@ -233,6 +233,15 @@ router.put('/:id', async (req, res) => {
       if (Array.isArray(parsed) && parsed.length > 0) logo = parsed[0];
     } catch (e) {}
   }
+
+  if (logo === undefined) {
+    try {
+      const existingComp = await pool.query('SELECT logo FROM MY_COMPANY WHERE my_company_id = $1', [req.params.id]);
+      if (existingComp.rows.length > 0) {
+        logo = existingComp.rows[0].logo;
+      }
+    } catch (e) {}
+  }
   const isSuperAdmin = req.user && req.user.role && req.user.role.toUpperCase() === 'SUPER ADMIN';
 
   // Verify custom branding support

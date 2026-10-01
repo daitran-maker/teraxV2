@@ -2049,8 +2049,10 @@ function collectFormData(moduleKey) {
     if (field.section) continue;
     if (field.virtual) continue;
     const isSrOwner = field.key === 'sr_owner';
-    const el = document.getElementById(`f-${field.key}`);
-    if (!el && field.type !== 'multiselect' && field.type !== 'target_record_multiselect' && !isSrOwner) continue;
+    const isFile = field.type === 'file';
+    const isMulti = field.type === 'multiselect' || field.type === 'target_record_multiselect' || isSrOwner;
+    const el = document.getElementById(`f-${field.key}`) || (isFile ? document.getElementById(`files-list-container-${field.key}`) : null);
+    if (!el && !isMulti && !isFile) continue;
     if (field.arrayField) {
       // Convert comma-separated string to array
       data[field.key] = el.value.split(',').map(s => s.trim()).filter(Boolean);
@@ -2274,8 +2276,15 @@ window.renderFileUploadSlotHTML = function (fieldKey, idx, val = '', acceptStr =
   const cleanName = val ? (val.startsWith('data:') ? 'Attached Image' : formatFileNameDisplay(val, 28)) : '';
   const displayVal = val ? cleanName : 'Choose File or Drag & Drop here';
   const previewStyle = val ? 'display:block;' : 'display:none;';
-  let previewContent = '';
-  const isImageFile = val && (val.startsWith('data:image') || val.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (val.startsWith('/uploads/') && (val.match(/\.(png|jpe?g|gif|webp|svg)/i) || val.includes('/uploads/'))) || val.startsWith('uploads/') || val.startsWith('http://') || val.startsWith('https://'));
+  const isImageFile = val && (
+    val.startsWith('data:image') ||
+    val.startsWith('data:') ||
+    /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(val) ||
+    val.startsWith('/uploads/') ||
+    val.startsWith('uploads/') ||
+    val.startsWith('http://') ||
+    val.startsWith('https://')
+  );
   if (isImageFile) {
     previewContent = `<img src="${val}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
   } else if (val) {

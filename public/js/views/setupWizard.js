@@ -543,6 +543,8 @@ function renderStep1HTML(comp) {
   const defaultCountry = comp.country || 'Vietnam';
   const defaultCurrency = (comp.base_currency || 'VND').toUpperCase();
 
+  window.step1LogoBase64 = comp.logo || null;
+
   // Async load lookups from CMS database via /system-setup/lookups
   setTimeout(async () => {
     // Populate timezones
