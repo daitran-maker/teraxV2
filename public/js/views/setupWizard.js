@@ -86,6 +86,11 @@ function injectSetupStyles() {
     .sw-search-item.selected { font-weight:700; background:#FFF7ED; color:#EA580C; }
     .sw-emp-card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:14px; margin-bottom:12px; transition:box-shadow 0.2s; }
     .sw-emp-card:hover { box-shadow:0 2px 10px rgba(0,0,0,0.04); }
+    .sw-table-scroll-container { scrollbar-width:thin; scrollbar-color:#94a3b8 #f1f5f9; }
+    .sw-table-scroll-container::-webkit-scrollbar { width:8px; height:8px; }
+    .sw-table-scroll-container::-webkit-scrollbar-track { background:#f1f5f9; border-radius:4px; }
+    .sw-table-scroll-container::-webkit-scrollbar-thumb { background:#94a3b8; border-radius:4px; }
+    .sw-table-scroll-container::-webkit-scrollbar-thumb:hover { background:#64748b; }
   `;
   document.head.appendChild(style);
 }
@@ -1041,8 +1046,7 @@ function renderStep3HTML(counts){
   const todayStr=new Date().toISOString().split('T')[0];
   const modes=[
     {key:'quick',icon:'bolt',color:'#EA580C',bg:'#FFF7ED',title:swT('sw.step3_tab_quick', 'Thêm nhanh'),desc:swT('sw.step3_desc', 'Nhập trực tiếp các nhân viên chính.')},
-    {key:'excel',icon:'table_view',color:'#059669',bg:'#ECFDF5',title:swT('sw.step3_tab_excel', 'Nhập từ Excel'),desc:swT('sw.step3_drag_drop', 'Tải lên file Excel đầy đủ cột.')},
-    {key:'sample',icon:'description',color:'#7C3AED',bg:'#F5F3FF',title:swT('sw.step3_tab_sample', 'Dùng dữ liệu mẫu'),desc:swT('sw.step3_download_tpl', 'Tải file mẫu chuẩn TeraX.')}
+    {key:'excel',icon:'table_view',color:'#059669',bg:'#ECFDF5',title:swT('sw.step3_tab_excel', 'Nhập từ Excel'),desc:swT('sw.step3_drag_drop', 'Tải lên file Excel đầy đủ cột.')}
   ];
   let modeCards='';
   for(const m of modes)modeCards+='<label onclick="window.switchStep3Tab(\''+m.key+'\')" class="sw-mode-card '+(tab===m.key?'active':'')+'"><div style="width:38px;height:38px;border-radius:10px;background:'+m.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="font-size:20px;color:'+m.color+';">'+m.icon+'</span></div><div><div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:3px;">'+m.title+'</div><div style="font-size:11px;color:#6B7280;line-height:1.4;">'+m.desc+'</div></div></label>';
@@ -1057,7 +1061,7 @@ function renderStep3HTML(counts){
       +'</div>'
       +'<button onclick="addQuickEmpCard()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:1px dashed #D1D5DB;background:transparent;color:#374151;font-size:12px;cursor:pointer;margin-top:6px;"><span class="material-symbols-rounded" style="font-size:16px;">person_add</span> ' + swT('sw.step3_add_emp', 'Thêm nhân viên') + '</button>'
       +'</div>';
-  } else if(tab==='excel'){
+  } else {
     let prev='';
     if(parsed.length>0){
       const vc=parsed.filter(e=>e.full_name&&e.email).length;
@@ -1092,14 +1096,12 @@ function renderStep3HTML(counts){
         +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         +'</div>'
         +'</div>'
-        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:240px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th><th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th><th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
     }
     tc='<div><div class="sw-upload-zone" style="margin-bottom:16px;"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:14px;">(.xlsx, .xls, .csv)</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="downloadEmployeeTemplate()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleEmployeeExcelUpload(event)"></label></div></div>'+prev+'</div>';
-  } else {
-    tc='<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:14px;padding:24px;text-align:center;"><div style="width:56px;height:56px;border-radius:14px;background:#EDE9FE;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;"><span class="material-symbols-rounded" style="font-size:28px;color:#7C3AED;">description</span></div><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;line-height:1.6;">' + swT('sw.step3_sample_desc', 'File mẫu nhân viên chuẩn TeraX gồm đầy đủ các cột bắt buộc: Họ tên, Tên đăng nhập, Email, Phòng ban, Chức vụ, Ngày bắt đầu, Quản lý trực tiếp, Quản lý nhân sự, Người liên hệ khẩn cấp và SĐT.') + '</div><button onclick="downloadEmployeeTemplate()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;font-size:13px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:17px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + ' (.xlsx)</button></div>';
   }
   const btnLabel = parsed.length>0 ? (swT('sw.step3_imported', 'Nhập {{count}} nhân viên').replace('{{count}}', parsed.length)) : swT('sw.btn_continue', 'Tiếp tục bước tiếp theo');
-  return '<div class="sw-card">'+swStepHeader('group', 3, swT('sw.step3_header', 'Thiết lập nhân viên'), swT('sw.step3_desc', 'Nhập danh sách nhân sự. Có thể nhập từ Excel, thêm nhanh hoặc dùng dữ liệu mẫu.'))+'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">'+modeCards+'</div>'+tc+swBottomNav(2,4,btnLabel,'saveStep3AndAdvance()')+'</div>';
+  return '<div class="sw-card">'+swStepHeader('group', 3, swT('sw.step3_header', 'Thiết lập nhân viên'), swT('sw.step3_desc', 'Nhập danh sách nhân sự. Có thể nhập từ Excel hoặc thêm nhanh.'))+'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">'+modeCards+'</div>'+tc+swBottomNav(2,4,btnLabel,'saveStep3AndAdvance()')+'</div>';
 }
 
 function renderQuickEmpCard(idx, data) {
@@ -1509,6 +1511,105 @@ window.setStep4ApprovalLevel=function(lvl){
   if(t3) t3.style.display=(lvl==='Tier 3')?'block':'none';
 };
 
+window.getSetupAvailableEmployees = function() {
+  const list = [];
+  const seen = new Set();
+
+  const addEmp = (emp) => {
+    if (!emp) return;
+    const email = (emp.email || '').trim();
+    const username = (emp.username || '').trim();
+    const empId = (emp.employee_id || emp.id || '').trim();
+    const fullName = (emp.full_name || emp.name || '').trim();
+
+    const val = email || empId || username || fullName;
+    if (!val) return;
+    const key = val.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (email) seen.add(email.toLowerCase());
+    if (empId) seen.add(empId.toLowerCase());
+    if (username) seen.add(username.toLowerCase());
+
+    const label = fullName
+      ? `${fullName} (${email || username || empId})`
+      : (email || username || empId);
+
+    list.push({
+      value: val,
+      email: email,
+      employee_id: empId,
+      username: username,
+      full_name: fullName,
+      label: label
+    });
+  };
+
+  // 1. From setup wizard cache (Step 3 employees parsed/entered, not yet in DB)
+  if (Array.isArray(window.setupParsedEmployees)) {
+    window.setupParsedEmployees.forEach(addEmp);
+  }
+
+  // 2. From setupWizardData
+  if (Array.isArray(window.setupWizardData?.employees)) {
+    window.setupWizardData.employees.forEach(addEmp);
+  }
+
+  // 3. From setup lookup cache
+  if (Array.isArray(window._setupLookupCache?.['employee'])) {
+    window._setupLookupCache['employee'].forEach(addEmp);
+  }
+
+  // 4. From selectCache if already fetched
+  if (typeof selectCache !== 'undefined' && Array.isArray(selectCache['employee'])) {
+    selectCache['employee'].forEach(addEmp);
+  }
+
+  // 5. Default Admin fallback
+  const adminEmail = window.setupWizardData?.admin?.email || 'admin@company.com';
+  const adminName = window.setupWizardData?.admin?.full_name || 'Super Admin';
+  addEmp({ full_name: adminName, email: adminEmail, username: 'admin' });
+
+  return list;
+};
+
+window.buildSetupEmployeeOptions = function(selectedVal, allowDirectManager = false, placeholder = '') {
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  const employees = window.getSetupAvailableEmployees();
+  let opts = '';
+
+  if (allowDirectManager) {
+    // Only Tier 1 allows Direct Manager
+    const isDm = !selectedVal || selectedVal === 'Direct Manager' || selectedVal.toLowerCase() === 'quản lý trực tiếp';
+    opts += '<option value="Direct Manager" ' + (isDm ? 'selected' : '') + '>'
+      + (isVi ? 'Direct Manager (Quản lý trực tiếp)' : 'Direct Manager')
+      + '</option>';
+  } else {
+    // Other tiers and columns MUST select from employees
+    const ph = placeholder || (isVi ? 'Chọn nhân viên' : 'Select Employee');
+    opts += '<option value="">-- ' + escapeHTML(ph) + ' --</option>';
+  }
+
+  let foundSelected = false;
+  for (const emp of employees) {
+    const isSel = selectedVal && (
+      String(selectedVal).toLowerCase() === emp.value.toLowerCase() ||
+      String(selectedVal).toLowerCase() === (emp.email || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === (emp.employee_id || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === (emp.username || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === (emp.full_name || '').toLowerCase()
+    );
+    if (isSel) foundSelected = true;
+    opts += '<option value="' + escapeHTML(emp.value) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(emp.label) + '</option>';
+  }
+
+  if (selectedVal && !foundSelected && selectedVal !== 'Direct Manager' && selectedVal !== 'Auto') {
+    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
+  }
+
+  return opts;
+};
+
 window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
   const lvl = data.approval_level || 'Tier 1';
   const name = data.policy_name || '';
@@ -1528,6 +1629,24 @@ window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
   const tierBtns = ['Tier 0', 'Tier 1', 'Tier 2', 'Tier 3'].map(l => 
     '<button type="button" class="sw-tier-btn" data-lvl="' + l + '" onclick="window.setStep4RowApprovalLevel(this, \'' + l + '\')" style="padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid ' + (lvl === l ? '#ea580c' : '#D1D5DB') + ';background:' + (lvl === l ? '#ea580c' : '#FFFFFF') + ';color:' + (lvl === l ? '#FFFFFF' : '#374151') + ';">' + l + '</button>'
   ).join('');
+
+  const isVi = swIsVi();
+  const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
+    ? window.setupParsedDepartments
+    : (window.setupWizardData?.departments || []);
+  let deptOpts = '<option value="">-- ' + (isVi ? 'Chọn phòng ban (tùy chọn)' : 'Select Department (Optional)') + ' --</option>';
+  for (const d of deptList) {
+    const code = d.department_code || d.code || '';
+    const dname = d.department_name || d.name || code;
+    const isSel = (data.department_id && (data.department_id === code || data.department_id === dname || data.department_id === d.department_id));
+    deptOpts += '<option value="' + escapeHTML(code || dname) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + dname) + '</option>';
+  }
+
+  const t1Opts = window.buildSetupEmployeeOptions(t1, true);
+  const t2Opts = window.buildSetupEmployeeOptions(t2, false, isVi ? 'Chọn người duyệt Bậc 2' : 'Select Tier 2 Approver');
+  const t3Opts = window.buildSetupEmployeeOptions(t3, false, isVi ? 'Chọn người duyệt Bậc 3' : 'Select Tier 3 Approver');
+  const leadOpts = window.buildSetupEmployeeOptions(data.policy_lead || '', false, isVi ? 'Chọn Policy Lead (tùy chọn)' : 'Select Policy Lead (Optional)');
+  const ownerOpts = window.buildSetupEmployeeOptions(data.sr_owner || '', false, isVi ? 'Chọn SR Owner (tùy chọn)' : 'Select SR Owner (Optional)');
 
   return '<div class="step4-policy-row" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:14px;position:relative;">'
     + '<input type="hidden" class="step4-pol-level" value="' + escapeHTML(lvl) + '">'
@@ -1553,6 +1672,18 @@ window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
     + swLabel(swT('sw.step4_sla', 'SLA (ngày)'), false)
     + '<input type="number" min="1" class="sw-input step4-pol-sla" value="' + escapeHTML(String(sla)) + '">'
     + '</div>'
+    + '<div>'
+    + swLabel(isVi ? 'Policy Lead (Trưởng QT)' : 'Policy Lead', false)
+    + '<select class="sw-select step4-pol-lead">' + leadOpts + '</select>'
+    + '</div>'
+    + '<div>'
+    + swLabel(isVi ? 'SR Owner (Người xử lý)' : 'SR Owner', false)
+    + '<select class="sw-select step4-pol-owner">' + ownerOpts + '</select>'
+    + '</div>'
+    + '<div style="grid-column:span 2;">'
+    + swLabel(swT('sw.step3_emp_dept', 'Phòng ban phụ trách'), false)
+    + '<select class="sw-select step4-pol-dept">' + deptOpts + '</select>'
+    + '</div>'
     + '<div style="grid-column:span 2;">'
     + swLabel(swT('sw.step4_desc_field', 'Mô tả'), false)
     + '<textarea class="sw-input step4-pol-desc" rows="2" style="resize:vertical;" placeholder="' + swT('sw.step4_policy_desc_ph', 'Mô tả ngắn gọn về mục đích quy trình...') + '">' + escapeHTML(desc) + '</textarea>'
@@ -1568,17 +1699,17 @@ window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
     + '</div>'
     + '<div class="step4-tier1-container" style="margin-top:8px;display:' + (lvl === 'Tier 0' ? 'none' : 'block') + ';">'
     + swLabel(swT('sw.step4_tier1', 'Bậc 1 (Tier 1)'), true)
-    + '<input type="text" list="new-policy-approver-datalist" class="sw-input step4-pol-t1" value="' + escapeHTML(t1) + '" placeholder="' + swT('sw.step4_tier1_ph', 'Direct Manager / Email / Tên người duyệt') + '">'
+    + '<select class="sw-select step4-pol-t1">' + t1Opts + '</select>'
     + '</div>'
     + '<div class="step4-tier2-container" style="margin-top:8px;display:' + (lvl === 'Tier 2' || lvl === 'Tier 3' ? 'block' : 'none') + ';">'
     + swLabel(swT('sw.step4_tier2', 'Bậc 2 (Tier 2)'), true)
-    + '<input type="text" list="new-policy-approver-datalist" class="sw-input step4-pol-t2" value="' + escapeHTML(t2) + '" placeholder="' + swT('sw.step4_tier2_ph', 'VD: Trưởng phòng / HR Manager / Finance Lead / Email') + '">'
+    + '<select class="sw-select step4-pol-t2">' + t2Opts + '</select>'
     + '</div>'
     + '<div class="step4-tier3-container" style="margin-top:8px;display:' + (lvl === 'Tier 3' ? 'block' : 'none') + ';">'
     + swLabel(swT('sw.step4_tier3', 'Bậc 3 (Tier 3)'), true)
-    + '<input type="text" list="new-policy-approver-datalist" class="sw-input step4-pol-t3" value="' + escapeHTML(t3) + '" placeholder="' + swT('sw.step4_tier3_ph', 'VD: Ban Giám đốc / Tổng giám đốc / Email') + '">'
+    + '<select class="sw-select step4-pol-t3">' + t3Opts + '</select>'
     + '</div>'
-    + '<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">* ' + swT('sw.tip4', 'Quy trình nên dùng vai trò thay vì chỉ định cụ thể') + ' (VD: Direct Manager, HR Manager, Finance Lead)</div>'
+    + '<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">* ' + (isVi ? 'Duy nhất Bậc 1 hỗ trợ Direct Manager. Các bậc khác và người phụ trách chọn trực tiếp từ nhân viên.' : 'Only Tier 1 supports Direct Manager. Other tiers and leads are selected from employees.') + '</div>'
     + '</div>'
     + '</div>'
     + '</div>';
@@ -1781,10 +1912,17 @@ function renderStep4HTML(counts){
         const p = parsed[i];
         const t1Display = p.tier1_display || p.tier1_approval || 'Direct Manager';
         const t2Display = p.tier2_display || p.tier2_approval || '–';
+        const t3Display = p.tier3_display || p.tier3_approval || '–';
+        const leadDisplay = p.policy_lead_display || p.policy_lead || '–';
+        const ownerDisplay = p.sr_owner_display || p.sr_owner || '–';
+        const deptDisplay = p.department_id || '–';
         const t1Warn = (!p.tier1_matched && p.tier1_approval && p.tier1_approval !== 'Direct Manager')
           ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
           : '';
         const t2Warn = (!p.tier2_matched && p.tier2_approval)
+          ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
+          : '';
+        const t3Warn = (!p.tier3_matched && p.tier3_approval)
           ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
           : '';
 
@@ -1795,8 +1933,12 @@ function renderStep4HTML(counts){
           + '<td style="padding:7px 10px;color:#ea580c;font-weight:600;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
           + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;" title="' + escapeHTML(p.tier1_approval || '') + '">' + escapeHTML(t1Display) + t1Warn + '</td>'
           + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;" title="' + escapeHTML(p.tier2_approval || '') + '">' + escapeHTML(t2Display) + t2Warn + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;" title="' + escapeHTML(p.tier3_approval || '') + '">' + escapeHTML(t3Display) + t3Warn + '</td>'
+          + '<td style="padding:7px 10px;color:#059669;font-size:11.5px;" title="' + escapeHTML(p.policy_lead || '') + '">' + escapeHTML(leadDisplay) + '</td>'
+          + '<td style="padding:7px 10px;color:#6366F1;font-size:11.5px;" title="' + escapeHTML(p.sr_owner || '') + '">' + escapeHTML(ownerDisplay) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(deptDisplay) + '</td>'
           + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
-          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
+          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
           + '<td style="padding:7px 10px;"><span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span></td>'
           + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
           + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
@@ -1815,7 +1957,7 @@ function renderStep4HTML(counts){
         + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:260px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
@@ -1824,6 +1966,10 @@ function renderStep4HTML(counts){
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier3', 'Bậc 3') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Policy Lead</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SR Owner</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th>'
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SLA</th>'
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
         + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
@@ -1856,6 +2002,27 @@ window.handlePolicyExcelUpload = async function(event){
 
   // Pre-load employees to auto-resolve email/username -> employee_id in preview
   const emailToEmp = new Map();
+
+  // 1. From setup wizard cache (Step 3 employees in RAM/state)
+  try {
+    const cachedEmps = window.getSetupAvailableEmployees ? window.getSetupAvailableEmployees() : [];
+    cachedEmps.forEach(e => {
+      const empObj = { employee_id: e.employee_id || e.value, email: e.email, full_name: e.full_name, username: e.username };
+      if (e.employee_id) emailToEmp.set(String(e.employee_id).toLowerCase(), empObj);
+      if (e.email) {
+        const cleanEmail = String(e.email).trim().toLowerCase();
+        emailToEmp.set(cleanEmail, empObj);
+        const prefix = cleanEmail.split('@')[0];
+        if (prefix && !emailToEmp.has(prefix)) emailToEmp.set(prefix, empObj);
+      }
+      if (e.username) emailToEmp.set(String(e.username).toLowerCase(), empObj);
+      if (e.full_name) emailToEmp.set(String(e.full_name).toLowerCase(), empObj);
+    });
+  } catch(e) {
+    console.warn('Error reading setup cached employees for policy preview:', e);
+  }
+
+  // 2. From DB
   try {
     const res = await apiGet('/table/employee?limit=1000');
     const empList = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
@@ -1884,13 +2051,18 @@ window.handlePolicyExcelUpload = async function(event){
     const trimmed = val.trim();
     if (!trimmed) return { id: isTier1 ? 'Direct Manager' : null, display: isTier1 ? 'Direct Manager' : '–', matched: true };
     if (trimmed.toLowerCase() === 'direct manager' || trimmed.toLowerCase() === 'quản lý trực tiếp') {
-      return { id: 'Direct Manager', display: 'Direct Manager', matched: true };
+      if (isTier1) {
+        return { id: 'Direct Manager', display: 'Direct Manager', matched: true };
+      } else {
+        // Chỉ duy nhất Tier 1 mới cho phép Direct Manager!
+        return { id: '', display: '– (Chỉ Tier 1 dùng Direct Manager)', matched: false };
+      }
     }
     const lower = trimmed.toLowerCase();
     if (emailToEmp.has(lower)) {
       const emp = emailToEmp.get(lower);
       const name = emp.full_name || emp.username || emp.employee_id;
-      return { id: emp.employee_id, display: `${name} (${emp.employee_id})`, matched: true };
+      return { id: emp.email || emp.employee_id, display: `${name} (${emp.email || emp.employee_id})`, matched: true };
     }
     return { id: trimmed, display: trimmed, matched: false };
   };
@@ -1915,6 +2087,9 @@ window.handlePolicyExcelUpload = async function(event){
         const t1k = k.find(x => /tier1|bậc 1|cấp 1|người duyệt 1/i.test(x));
         const t2k = k.find(x => /tier2|bậc 2|cấp 2|người duyệt 2/i.test(x));
         const t3k = k.find(x => /tier3|bậc 3|cấp 3|người duyệt 3/i.test(x));
+        const leadk = k.find(x => /policy_lead|lead|trưởng.*quy trình|phụ trách/i.test(x));
+        const ownerk = k.find(x => /sr_owner|owner|xử lý|chủ sở hữu/i.test(x));
+        const deptk = k.find(x => /department|phòng.*ban|bộ phận/i.test(x));
         const elk = k.find(x => /elements|thành phần|module/i.test(x));
         const dk = k.find(x => /mô tả|description|desc/i.test(x));
 
@@ -1923,10 +2098,15 @@ window.handlePolicyExcelUpload = async function(event){
           const t1Val = t1k ? String(row[t1k]).trim() : 'Direct Manager';
           const t2Val = t2k ? String(row[t2k]).trim() : '';
           const t3Val = t3k ? String(row[t3k]).trim() : '';
+          const leadVal = leadk ? String(row[leadk]).trim() : '';
+          const ownerVal = ownerk ? String(row[ownerk]).trim() : '';
+          const deptVal = deptk ? String(row[deptk]).trim() : '';
 
           const t1Resolved = resolveApprover(t1Val, true);
           const t2Resolved = resolveApprover(t2Val, false);
           const t3Resolved = resolveApprover(t3Val, false);
+          const leadResolved = resolveApprover(leadVal, false);
+          const ownerResolved = resolveApprover(ownerVal, false);
 
           let lvl = lvk ? String(row[lvk]).trim() : '';
           if (!lvl) {
@@ -1946,6 +2126,13 @@ window.handlePolicyExcelUpload = async function(event){
             tier3_approval: t3Resolved.id,
             tier3_display: t3Resolved.display,
             tier3_matched: t3Resolved.matched,
+            policy_lead: leadResolved.id || leadVal || '',
+            policy_lead_display: leadResolved.display || leadVal || '–',
+            policy_lead_matched: leadResolved.matched,
+            sr_owner: ownerResolved.id || ownerVal || '',
+            sr_owner_display: ownerResolved.display || ownerVal || '–',
+            sr_owner_matched: ownerResolved.matched,
+            department_id: deptVal,
             elements: elk ? String(row[elk]).trim() : 'ASSIGN_TASK',
             description: dk ? String(row[dk]).trim() : name
           });
@@ -2010,6 +2197,9 @@ window.saveStep4AndAdvance = async function(){
       const tier1 = (lvl === 'Tier 0') ? 'Auto' : (r.querySelector('.step4-pol-t1')?.value?.trim() || 'Direct Manager');
       const tier2 = (lvl === 'Tier 2' || lvl === 'Tier 3') ? (r.querySelector('.step4-pol-t2')?.value?.trim() || null) : null;
       const tier3 = (lvl === 'Tier 3') ? (r.querySelector('.step4-pol-t3')?.value?.trim() || null) : null;
+      const lead = r.querySelector('.step4-pol-lead')?.value?.trim() || null;
+      const owner = r.querySelector('.step4-pol-owner')?.value?.trim() || null;
+      const dept = r.querySelector('.step4-pol-dept')?.value?.trim() || null;
       policies.push({
         policy_name: name,
         policy_type: type,
@@ -2019,7 +2209,10 @@ window.saveStep4AndAdvance = async function(){
         approval_level: lvl,
         tier1_approval: tier1,
         tier2_approval: tier2,
-        tier3_approval: tier3
+        tier3_approval: tier3,
+        policy_lead: lead,
+        sr_owner: owner,
+        department_id: dept
       });
     });
 
@@ -2073,11 +2266,7 @@ window.saveStep4AndAdvance = async function(){
 window.renderStep5AccountRowHTML = function(idx, data = {}) {
   const comp = window.setupWizardData?.company || {};
   const cur = data.currency || comp.base_currency || 'VND';
-  const banks = ['Vietcombank','Vietinbank','BIDV','Techcombank','MB Bank','ACB','Agribank','TPBank','VPBank','OCB','SHB','HDBank','MSB','VIB','SeABank','Sacombank','Kienlongbank','LPBank','Viet Capital Bank'];
-  let bopts = '<option value="">-- ' + swT('sw.step5_bank', 'Chọn ngân hàng') + ' --</option>';
-  for (const b of banks) {
-    bopts += '<option value="' + b + '" ' + (data.bank_name === b ? 'selected' : '') + '>' + b + '</option>';
-  }
+  const defaultBank = data.bank_name || 'MBV';
   return '<div class="step5-account-row" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:12px;position:relative;">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #F3F4F6;">'
     + '<div style="font-size:12.5px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:6px;">'
@@ -2094,8 +2283,8 @@ window.renderStep5AccountRowHTML = function(idx, data = {}) {
     + '<input type="text" list="step5-acct-name-datalist" class="sw-input step5-acct-name" placeholder="' + swT('sw.step5_acct_name_ph', 'VD: Tài khoản thanh toán chính Vietcombank') + '" value="' + escapeHTML(data.account_name || '') + '">'
     + '</div>'
     + '<div>'
-    + swLabel(swT('sw.step5_bank', 'Ngân hàng'), false)
-    + '<select class="sw-select step5-bank-name">' + bopts + '</select>'
+    + swLabel(swT('sw.step5_bank', 'Ngân hàng (chọn hoặc tự nhập)'), false)
+    + '<input type="text" list="step5-banks-datalist" class="sw-input step5-bank-name" placeholder="' + swT('sw.step5_bank_ph', 'VD: MBV, Vietcombank...') + '" value="' + escapeHTML(defaultBank) + '">'
     + '</div>'
     + '<div>'
     + swLabel(swT('sw.step5_acct_num', 'Số tài khoản'), false)
@@ -2144,7 +2333,7 @@ function renderStep5HTML(comp, counts) {
 
   const initialRowHTML = window.renderStep5AccountRowHTML(0, {
     account_name: '',
-    bank_name: 'Vietcombank',
+    bank_name: 'MBV',
     account_number: '',
     currency: cur
   });
@@ -2169,12 +2358,43 @@ function renderStep5HTML(comp, counts) {
   for (const as of acctSuggestions) acctNameDatalist += '<option value="' + escapeHTML(as) + '">';
   acctNameDatalist += '</datalist>';
 
+  const popularBanks = [
+    'MBV',
+    'MB Bank (MBV)',
+    'Vietcombank',
+    'Vietinbank',
+    'BIDV',
+    'Techcombank',
+    'ACB',
+    'Agribank',
+    'TPBank',
+    'VPBank',
+    'OCB',
+    'SHB',
+    'HDBank',
+    'MSB',
+    'VIB',
+    'SeABank',
+    'Sacombank',
+    'Kienlongbank',
+    'LPBank',
+    'Viet Capital Bank',
+    'Shinhan Bank',
+    'Standard Chartered',
+    'HSBC',
+    'Woori Bank'
+  ];
+  let banksDatalist = '<datalist id="step5-banks-datalist">';
+  for (const b of popularBanks) banksDatalist += '<option value="' + escapeHTML(b) + '">';
+  banksDatalist += '</datalist>';
+
   const currencyDatalist = '<datalist id="step5-currency-datalist"><option value="VND"><option value="USD"><option value="EUR"><option value="JPY"><option value="SGD"><option value="CNY"></datalist>';
 
   return '<div class="sw-card">'
     + swStepHeader('account_balance', 5, swT('sw.step5_header', 'Tài khoản ngân hàng'), swT('sw.step5_desc', 'Thiết lập các tài khoản thanh toán để quản lý dòng tiền thu chi.'))
     + acctInfo
     + acctNameDatalist
+    + banksDatalist
     + currencyDatalist
     + '<form id="form-step5" onsubmit="event.preventDefault();saveStep5AndAdvance();">'
     + '<p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step5_multi_desc', 'Bạn có thể nhập một hoặc nhiều tài khoản ngân hàng của doanh nghiệp.') + '</p>'
@@ -2415,6 +2635,10 @@ window.downloadSetupTemplate = async function(moduleKey){
       'approval_level',
       'tier1_approval',
       'tier2_approval',
+      'tier3_approval',
+      'policy_lead',
+      'sr_owner',
+      'department_id',
       'elements',
       'description'
     ];
@@ -2426,6 +2650,10 @@ window.downloadSetupTemplate = async function(moduleKey){
         'approval_level': 'Tier 1',
         'tier1_approval': 'Direct Manager',
         'tier2_approval': '',
+        'tier3_approval': '',
+        'policy_lead': 'manager@company.com',
+        'sr_owner': 'accountant@company.com',
+        'department_id': 'TCKT',
         'elements': 'PAYMENT,EXPENSE',
         'description': 'Quy trình xét duyệt và thanh toán các khoản chi phí hoạt động'
       },
@@ -2436,6 +2664,10 @@ window.downloadSetupTemplate = async function(moduleKey){
         'approval_level': 'Tier 2',
         'tier1_approval': 'Direct Manager',
         'tier2_approval': 'admin@company.com',
+        'tier3_approval': '',
+        'policy_lead': 'manager@company.com',
+        'sr_owner': 'accountant@company.com',
+        'department_id': 'TCKT',
         'elements': 'PAYMENT',
         'description': 'Quy trình tạm ứng kinh phí trước khi đi công tác'
       },
@@ -2443,9 +2675,13 @@ window.downloadSetupTemplate = async function(moduleKey){
         'policy_name': 'Đề xuất cấp phát tài sản / thiết bị',
         'policy_type': 'Operation',
         'sla': 3,
-        'approval_level': 'Tier 1',
+        'approval_level': 'Tier 3',
         'tier1_approval': 'Direct Manager',
-        'tier2_approval': '',
+        'tier2_approval': 'it.lead@company.com',
+        'tier3_approval': 'admin@company.com',
+        'policy_lead': 'it.lead@company.com',
+        'sr_owner': 'it.support@company.com',
+        'department_id': 'KT',
         'elements': 'ASSET',
         'description': 'Quy trình cấp phát laptop, công cụ dụng cụ làm việc cho nhân viên'
       }
@@ -2457,6 +2693,10 @@ window.downloadSetupTemplate = async function(moduleKey){
         'approval_level': 'Tier 1',
         'tier1_approval': 'Direct Manager',
         'tier2_approval': '',
+        'tier3_approval': '',
+        'policy_lead': 'manager@company.com',
+        'sr_owner': 'accountant@company.com',
+        'department_id': 'TCKT',
         'elements': 'PAYMENT,EXPENSE',
         'description': 'Workflow for reviewing and paying operational business expenses'
       },
@@ -2467,6 +2707,10 @@ window.downloadSetupTemplate = async function(moduleKey){
         'approval_level': 'Tier 2',
         'tier1_approval': 'Direct Manager',
         'tier2_approval': 'admin@company.com',
+        'tier3_approval': '',
+        'policy_lead': 'manager@company.com',
+        'sr_owner': 'accountant@company.com',
+        'department_id': 'TCKT',
         'elements': 'PAYMENT',
         'description': 'Workflow for requesting travel funds before business trips'
       },
@@ -2474,9 +2718,13 @@ window.downloadSetupTemplate = async function(moduleKey){
         'policy_name': 'Equipment & Asset Allocation Request',
         'policy_type': 'Operation',
         'sla': 3,
-        'approval_level': 'Tier 1',
+        'approval_level': 'Tier 3',
         'tier1_approval': 'Direct Manager',
-        'tier2_approval': '',
+        'tier2_approval': 'it.lead@company.com',
+        'tier3_approval': 'admin@company.com',
+        'policy_lead': 'it.lead@company.com',
+        'sr_owner': 'it.support@company.com',
+        'department_id': 'KT',
         'elements': 'ASSET',
         'description': 'Workflow for allocating laptops, tools, and office equipment to employees'
       }
@@ -2609,8 +2857,15 @@ window.editSetupParsedItem = function(type, index) {
     title = (isVi ? 'Sửa thông tin phòng ban #' : 'Edit Department #') + (index + 1);
     const types = ['Operation', 'Finance', 'Technical', 'Sale and MKT'];
     const typeOpts = types.map(t => '<option value="' + t + '" ' + ((item.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+    const comp = window.setupWizardData?.company || {};
+    const compShort = comp.company_shortname || window.authUser?.company_shortname || '';
+    const compFull = comp.company_fullname || window.authUser?.company_name || '';
+    const compDisplay = (compShort && compFull) ? `${compShort} - ${compFull}` : (compShort || compFull || (item.company_id ? `ID: ${item.company_id}` : (isVi ? 'Công ty mặc định' : 'Default Company')));
+
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      + '<div>' + swLabel('Company ID', false) + '<input type="text" id="sw-edit-comp-id" class="sw-input" value="' + escapeHTML(item.company_id || '') + '"></div>'
+      + '<input type="hidden" id="sw-edit-comp-id" value="' + escapeHTML(item.company_id || comp.my_company_id || '') + '">'
+      + '<div style="grid-column:span 2;">' + swLabel(isVi ? 'Công ty' : 'Company', false)
+      + '<div style="padding:9px 12px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:10px;font-size:12.5px;font-weight:600;color:#1F2937;display:flex;align-items:center;gap:6px;"><span class="material-symbols-rounded" style="font-size:18px;color:#EA580C;">business</span>' + escapeHTML(compDisplay) + '</div></div>'
       + '<div>' + swLabel(swT('sw.step2_dept_code', 'Mã phòng ban'), true) + '<input type="text" id="sw-edit-dept-code" class="sw-input" value="' + escapeHTML(item.department_code || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step2_dept_name', 'Tên phòng ban'), true) + '<input type="text" id="sw-edit-dept-name" class="sw-input" value="' + escapeHTML(item.department_name || '') + '"></div>'
       + '<div>' + swLabel(swT('common.type', 'Loại'), false) + '<select id="sw-edit-dept-type" class="sw-select">' + typeOpts + '</select></div>'
@@ -2618,15 +2873,56 @@ window.editSetupParsedItem = function(type, index) {
       + '</div>';
   } else if (type === 'employee') {
     title = (isVi ? 'Sửa thông tin nhân viên #' : 'Edit Employee #') + (index + 1);
+
+    // Build Department dropdown options
+    const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
+      ? window.setupParsedDepartments
+      : (window.setupWizardData?.departments || []);
+    let deptOpts = '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
+    let curDeptMatched = false;
+    for (const d of deptList) {
+      const code = d.department_code || d.code || '';
+      const name = d.department_name || d.name || code;
+      const isSel = (item.department_code && (item.department_code === code || item.department_code === name));
+      if (isSel) curDeptMatched = true;
+      deptOpts += '<option value="' + escapeHTML(code || name) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + name) + '</option>';
+    }
+    if (item.department_code && !curDeptMatched) {
+      deptOpts += '<option value="' + escapeHTML(item.department_code) + '" selected>' + escapeHTML(item.department_code) + '</option>';
+    }
+
+    // Build Manager dropdown options (Direct & HR)
+    const empList = (window.setupParsedEmployees && window.setupParsedEmployees.length > 0)
+      ? window.setupParsedEmployees
+      : (window.setupWizardData?.employees || []);
+    const buildMgrOpts = (curVal) => {
+      let opts = '<option value="Super Admin" ' + (curVal === 'Super Admin' || !curVal ? 'selected' : '') + '>Super Admin</option>';
+      let matched = (curVal === 'Super Admin' || !curVal);
+      for (const e of empList) {
+        if (!e.full_name && !e.email) continue;
+        const val = e.email || e.full_name || e.username;
+        const isSel = (curVal && (curVal === val || curVal === e.full_name || curVal === e.email));
+        if (isSel) matched = true;
+        opts += '<option value="' + escapeHTML(val) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(e.full_name + (e.email ? ' (' + e.email + ')' : '')) + '</option>';
+      }
+      if (curVal && !matched) {
+        opts += '<option value="' + escapeHTML(curVal) + '" selected>' + escapeHTML(curVal) + '</option>';
+      }
+      return opts;
+    };
+
+    const directOpts = buildMgrOpts(item.direct_manager || 'Super Admin');
+    const hrOpts = buildMgrOpts(item.hr_manager || 'Super Admin');
+
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       + '<div>' + swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true) + '<input type="text" id="sw-edit-emp-name" class="sw-input" value="' + escapeHTML(item.full_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true) + '<input type="text" id="sw-edit-emp-user" class="sw-input" value="' + escapeHTML(item.username || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_email', 'Email'), true) + '<input type="email" id="sw-edit-emp-email" class="sw-input" value="' + escapeHTML(item.email || '') + '"></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false) + '<input type="text" id="sw-edit-emp-dept" class="sw-input" value="' + escapeHTML(item.department_code || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false) + '<select id="sw-edit-emp-dept" class="sw-select">' + deptOpts + '</select></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false) + '<input type="text" id="sw-edit-emp-pos" class="sw-input" value="' + escapeHTML(item.position || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true) + '<input type="date" id="sw-edit-emp-start" class="sw-input" value="' + escapeHTML(item.start_date || '') + '"></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true) + '<input type="text" id="sw-edit-emp-direct" class="sw-input" value="' + escapeHTML(item.direct_manager || '') + '"></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), false) + '<input type="text" id="sw-edit-emp-hr" class="sw-input" value="' + escapeHTML(item.hr_manager || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true) + '<select id="sw-edit-emp-direct" class="sw-select">' + directOpts + '</select></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), false) + '<select id="sw-edit-emp-hr" class="sw-select">' + hrOpts + '</select></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), false) + '<input type="text" id="sw-edit-emp-emg-name" class="sw-input" value="' + escapeHTML(item.emergency_contact_name || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), false) + '<input type="text" id="sw-edit-emp-emg-phone" class="sw-input" value="' + escapeHTML(item.emergency_contact_phone || '') + '"></div>'
       + '</div>';
@@ -2639,11 +2935,32 @@ window.editSetupParsedItem = function(type, index) {
       '<button type="button" class="sw-modal-tier-btn" data-lvl="' + l + '" onclick="window.handleEditPolLevelChange(\'' + l + '\')" style="padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid ' + (lvl === l ? '#ea580c' : '#D1D5DB') + ';background:' + (lvl === l ? '#ea580c' : '#FFFFFF') + ';color:' + (lvl === l ? '#FFFFFF' : '#374151') + ';">' + l + '</button>'
     ).join('');
 
+    // Department options for policy
+    const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
+      ? window.setupParsedDepartments
+      : (window.setupWizardData?.departments || []);
+    let deptOpts = '<option value="">-- ' + (isVi ? 'Chọn phòng ban (tùy chọn)' : 'Select Department (Optional)') + ' --</option>';
+    for (const d of deptList) {
+      const code = d.department_code || d.code || '';
+      const name = d.department_name || d.name || code;
+      const isSel = (item.department_id && (item.department_id === code || item.department_id === name || item.department_id === d.department_id));
+      deptOpts += '<option value="' + escapeHTML(code || name) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + name) + '</option>';
+    }
+
+    const t1Opts = window.buildSetupEmployeeOptions(item.tier1_approval || 'Direct Manager', true);
+    const t2Opts = window.buildSetupEmployeeOptions(item.tier2_approval || '', false, isVi ? 'Chọn người duyệt Bậc 2' : 'Select Tier 2 Approver');
+    const t3Opts = window.buildSetupEmployeeOptions(item.tier3_approval || '', false, isVi ? 'Chọn người duyệt Bậc 3' : 'Select Tier 3 Approver');
+    const leadOpts = window.buildSetupEmployeeOptions(item.policy_lead || '', false, isVi ? 'Chọn Policy Lead (tùy chọn)' : 'Select Policy Lead (Optional)');
+    const ownerOpts = window.buildSetupEmployeeOptions(item.sr_owner || '', false, isVi ? 'Chọn SR Owner (tùy chọn)' : 'Select SR Owner (Optional)');
+
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       + '<input type="hidden" id="sw-edit-pol-level" value="' + escapeHTML(lvl) + '">'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step4_policy_name', 'Tên quy trình'), true) + '<input type="text" id="sw-edit-pol-name" class="sw-input" value="' + escapeHTML(item.policy_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step4_policy_type', 'Loại'), false) + '<select id="sw-edit-pol-type" class="sw-select">' + typeOpts + '</select></div>'
       + '<div>' + swLabel(swT('sw.step4_sla', 'SLA (ngày)'), false) + '<input type="number" min="1" id="sw-edit-pol-sla" class="sw-input" value="' + escapeHTML(String(item.sla || 3)) + '"></div>'
+      + '<div>' + swLabel(isVi ? 'Policy Lead (Trưởng QT)' : 'Policy Lead', false) + '<select id="sw-edit-pol-lead" class="sw-select">' + leadOpts + '</select></div>'
+      + '<div>' + swLabel(isVi ? 'SR Owner (Người xử lý)' : 'SR Owner', false) + '<select id="sw-edit-pol-owner" class="sw-select">' + ownerOpts + '</select></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban phụ trách'), false) + '<select id="sw-edit-pol-dept" class="sw-select">' + deptOpts + '</select></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step4_desc_field', 'Mô tả'), false) + '<textarea id="sw-edit-pol-desc" class="sw-input" rows="2" style="resize:vertical;">' + escapeHTML(item.description || '') + '</textarea></div>'
       + '<div style="grid-column:span 2;padding:12px;border:1px solid #E5E7EB;border-radius:10px;background:#F9FAFB;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
@@ -2656,16 +2973,17 @@ window.editSetupParsedItem = function(type, index) {
       + '</div>'
       + '<div id="sw-edit-pol-t1-cont" style="margin-top:8px;display:' + (lvl === 'Tier 0' ? 'none' : 'block') + ';">'
       + swLabel(swT('sw.step4_tier1', 'Bậc 1 (Tier 1)'), true)
-      + '<input type="text" id="sw-edit-pol-t1" class="sw-input" value="' + escapeHTML(item.tier1_approval || 'Direct Manager') + '">'
+      + '<select id="sw-edit-pol-t1" class="sw-select">' + t1Opts + '</select>'
       + '</div>'
       + '<div id="sw-edit-pol-t2-cont" style="margin-top:8px;display:' + (lvl === 'Tier 2' || lvl === 'Tier 3' ? 'block' : 'none') + ';">'
       + swLabel(swT('sw.step4_tier2', 'Bậc 2 (Tier 2)'), true)
-      + '<input type="text" id="sw-edit-pol-t2" class="sw-input" value="' + escapeHTML(item.tier2_approval || '') + '">'
+      + '<select id="sw-edit-pol-t2" class="sw-select">' + t2Opts + '</select>'
       + '</div>'
       + '<div id="sw-edit-pol-t3-cont" style="margin-top:8px;display:' + (lvl === 'Tier 3' ? 'block' : 'none') + ';">'
       + swLabel(swT('sw.step4_tier3', 'Bậc 3 (Tier 3)'), true)
-      + '<input type="text" id="sw-edit-pol-t3" class="sw-input" value="' + escapeHTML(item.tier3_approval || '') + '">'
+      + '<select id="sw-edit-pol-t3" class="sw-select">' + t3Opts + '</select>'
       + '</div>'
+      + '<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">* ' + (isVi ? 'Duy nhất Bậc 1 hỗ trợ Direct Manager. Các bậc khác và người phụ trách chọn trực tiếp từ nhân viên.' : 'Only Tier 1 supports Direct Manager. Other tiers and leads are selected from employees.') + '</div>'
       + '</div>'
       + '</div>';
   }
@@ -2748,8 +3066,8 @@ window.saveSwParsedEditModal = function(type, index) {
     const dept = document.getElementById('sw-edit-emp-dept')?.value?.trim() || '';
     const pos = document.getElementById('sw-edit-emp-pos')?.value?.trim() || '';
     const startDate = document.getElementById('sw-edit-emp-start')?.value?.trim() || new Date().toISOString().split('T')[0];
-    const directMgr = document.getElementById('sw-edit-emp-direct')?.value?.trim() || '';
-    const hrMgr = document.getElementById('sw-edit-emp-hr')?.value?.trim() || '';
+    const directMgr = document.getElementById('sw-edit-emp-direct')?.value?.trim() || 'Super Admin';
+    const hrMgr = document.getElementById('sw-edit-emp-hr')?.value?.trim() || 'Super Admin';
     const emgName = document.getElementById('sw-edit-emp-emg-name')?.value?.trim() || '';
     const emgPhone = document.getElementById('sw-edit-emp-emg-phone')?.value?.trim() || '';
 
@@ -2784,6 +3102,24 @@ window.saveSwParsedEditModal = function(type, index) {
     const t1 = (lvl === 'Tier 0') ? 'Auto' : (document.getElementById('sw-edit-pol-t1')?.value?.trim() || 'Direct Manager');
     const t2 = (lvl === 'Tier 2' || lvl === 'Tier 3') ? (document.getElementById('sw-edit-pol-t2')?.value?.trim() || '') : '';
     const t3 = (lvl === 'Tier 3') ? (document.getElementById('sw-edit-pol-t3')?.value?.trim() || '') : '';
+    const polLead = document.getElementById('sw-edit-pol-lead')?.value?.trim() || '';
+    const srOwner = document.getElementById('sw-edit-pol-owner')?.value?.trim() || '';
+    const deptId = document.getElementById('sw-edit-pol-dept')?.value?.trim() || '';
+
+    const empList = window.getSetupAvailableEmployees ? window.getSetupAvailableEmployees() : [];
+    const empMap = new Map();
+    empList.forEach(e => {
+      if (e.value) empMap.set(e.value.toLowerCase(), e);
+      if (e.email) empMap.set(e.email.toLowerCase(), e);
+      if (e.employee_id) empMap.set(e.employee_id.toLowerCase(), e);
+      if (e.username) empMap.set(e.username.toLowerCase(), e);
+    });
+    const resolveDisplay = (val, isT1 = false) => {
+      if (!val) return isT1 ? 'Direct Manager' : '–';
+      if (val === 'Direct Manager') return 'Direct Manager';
+      const found = empMap.get(val.toLowerCase());
+      return found ? found.label : val;
+    };
 
     if (window.setupParsedPolicies && window.setupParsedPolicies[index]) {
       window.setupParsedPolicies[index] = {
@@ -2794,11 +3130,21 @@ window.saveSwParsedEditModal = function(type, index) {
         description: desc,
         approval_level: lvl,
         tier1_approval: t1,
-        tier1_display: t1,
+        tier1_display: resolveDisplay(t1, true),
+        tier1_matched: true,
         tier2_approval: t2,
-        tier2_display: t2 || '–',
+        tier2_display: resolveDisplay(t2, false),
+        tier2_matched: !!t2,
         tier3_approval: t3,
-        tier3_display: t3 || '–'
+        tier3_display: resolveDisplay(t3, false),
+        tier3_matched: !!t3,
+        policy_lead: polLead,
+        policy_lead_display: resolveDisplay(polLead, false),
+        policy_lead_matched: !!polLead,
+        sr_owner: srOwner,
+        sr_owner_display: resolveDisplay(srOwner, false),
+        sr_owner_matched: !!srOwner,
+        department_id: deptId
       };
       showToast(swT('sw.row_updated', 'Đã cập nhật dòng thành công'), 'success');
       window.closeSwParsedEditModal();

@@ -26,7 +26,8 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
   const user = localStorage.getItem('crc_user');
 
   const headers = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Accept-Language': (typeof getLang === 'function' ? getLang() : localStorage.getItem('crc_lang')) || 'en'
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -112,7 +113,8 @@ function getRecordEndpoint(moduleKey, pkVal, withParams = true) {
   if (endpoint.startsWith('/my-views/') && moduleKey !== 'request_activity_log') {
     endpoint = `/table/${mod.writeTable || 'request'}`;
   }
-  let path = `${endpoint}/${pkVal}`;
+  const basePath = endpoint.split('?')[0];
+  let path = `${basePath}/${pkVal}`;
   if (withParams && mod.pk) {
     path += `?pk=${mod.pk}`;
   }

@@ -985,7 +985,7 @@ const ALLOWED_TABLES = [
   'ticket', 'ticket_comment', 'ticket_type',
   'v_finance', 'finance',
   'v_department', 'v_department_select', 'target_table',
-  'assigned_task', 'task_subtask', 'request_rating', 'expense'
+  'assigned_task', 'task_subtask', 'request_rating', 'expense', 'status_catalog'
 ];
 
 // Validate dynamic table names to prevent SQL Injection and unauthorized table access
@@ -3427,8 +3427,9 @@ router.post('/:tableName', async (req, res) => {
   const validationErrors = validateTableData(tableName, data, false);
   if (validationErrors) {
     const errorDetails = Object.entries(validationErrors).map(([field, msg]) => `${field}: ${msg}`).join(', ');
-    console.warn(`[validation] tableName=${tableName} validationErrors:`, validationErrors, `data:`, data);
-    return res.status(400).json({ error: `Dữ liệu không hợp lệ: ${errorDetails}`, details: validationErrors });
+    const isEn = (req.headers['accept-language'] || '').toLowerCase().startsWith('en');
+    const errMsg = isEn ? `Invalid data: ${errorDetails}` : `Dữ liệu không hợp lệ: ${errorDetails}`;
+    return res.status(400).json({ error: errMsg, details: validationErrors, error_code: 'common.invalid_data' });
   }
   const pk = getPrimaryKey(tableName);
   let dbCols = await getTableColumns(tableName);
@@ -3968,8 +3969,9 @@ router.put('/:tableName/:id', async (req, res) => {
   const validationErrors = validateTableData(tableName, data, true);
   if (validationErrors) {
     const errorDetails = Object.entries(validationErrors).map(([field, msg]) => `${field}: ${msg}`).join(', ');
-    console.warn(`[validation] tableName=${tableName} (update) validationErrors:`, validationErrors, `data:`, data);
-    return res.status(400).json({ error: `Dữ liệu không hợp lệ: ${errorDetails}`, details: validationErrors });
+    const isEn = (req.headers['accept-language'] || '').toLowerCase().startsWith('en');
+    const errMsg = isEn ? `Invalid data: ${errorDetails}` : `Dữ liệu không hợp lệ: ${errorDetails}`;
+    return res.status(400).json({ error: errMsg, details: validationErrors, error_code: 'common.invalid_data' });
   }
 
   let dbCols = await getTableColumns(tableName);

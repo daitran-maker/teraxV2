@@ -111,52 +111,54 @@ window.handleContractNoValidation = function () {
 };
 
 async function openAddModal(moduleKey, initialData = null) {
-  const mod = MODULES[moduleKey];
-  const isRequestForm = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
-  document.getElementById('form-modal').classList.toggle('request-form-modal', isRequestForm);
+  try {
+    const mod = MODULES[moduleKey];
+    const isRequestForm = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
+    const formModalEl = document.getElementById('form-modal');
+    if (formModalEl) {
+      formModalEl.classList.toggle('request-form-modal', isRequestForm);
+    }
 
-  if (!initialData) initialData = {};
+    if (!initialData) initialData = {};
 
-  // Auto-inject and lock company field when adding child records under My Company or Company
-  if (initialData._lock_company || (window.location.hash && (window.location.hash.startsWith('#my_company/') || window.location.hash.startsWith('#company/')))) {
-    initialData._lock_company = true;
-    if (mod && mod.fields) {
-      const compField = mod.fields.find(f => f.optionsFrom === 'my_company' || f.optionsFrom === 'company' || f.key === 'company_id' || f.key === 'my_company' || f.key === 'company_entity');
-      if (compField) {
-        let valToSet = initialData[compField.key] || initialData.my_company || initialData.company_id || initialData.company_entity;
-        if (compField.optionValue === 'company_shortname' && valToSet && !isNaN(valToSet)) {
-          const companies = selectCache['my_company'] || [];
-          const matched = companies.find(c => String(c.my_company_id) === String(valToSet));
-          if (matched && matched.company_shortname) {
-            valToSet = matched.company_shortname;
+    // Auto-inject and lock company field when adding child records under My Company or Company
+    if (initialData._lock_company || (window.location.hash && (window.location.hash.startsWith('#my_company/') || window.location.hash.startsWith('#company/')))) {
+      initialData._lock_company = true;
+      if (mod && mod.fields) {
+        const compField = mod.fields.find(f => f.optionsFrom === 'my_company' || f.optionsFrom === 'company' || f.key === 'company_id' || f.key === 'my_company' || f.key === 'company_entity');
+        if (compField) {
+          let valToSet = initialData[compField.key] || initialData.my_company || initialData.company_id || initialData.company_entity;
+          if (compField.optionValue === 'company_shortname' && valToSet && !isNaN(valToSet)) {
+            const companies = selectCache['my_company'] || [];
+            const matched = companies.find(c => String(c.my_company_id) === String(valToSet));
+            if (matched && matched.company_shortname) {
+              valToSet = matched.company_shortname;
+            }
           }
-        }
-        if (valToSet) {
-          initialData[compField.key] = valToSet;
+          if (valToSet) {
+            initialData[compField.key] = valToSet;
+          }
         }
       }
     }
-  }
 
-
-
-  // Auto-inject default company for all modules that have a my_company field if not already provided
-  if (authUser && authUser.company_id && mod && mod.fields) {
-    const compField = mod.fields.find(f => f.optionsFrom === 'my_company' || f.key === 'my_company' || f.key === 'company_id' || f.key === 'id__my_company' || f.key === 'company_entity');
-    if (compField && !initialData[compField.key]) {
-      if (compField.optionValue === 'company_shortname') {
-        const companies = selectCache['my_company'] || [];
-        const matched = companies.find(c => String(c.my_company_id) === String(authUser.company_id));
-        if (matched && matched.company_shortname) {
-          initialData[compField.key] = matched.company_shortname;
+    // Auto-inject default company for all modules that have a my_company field if not already provided
+    if (!initialData._lock_company && authUser && authUser.company_id && mod && mod.fields) {
+      const compField = mod.fields.find(f => f.optionsFrom === 'my_company' || f.key === 'my_company' || f.key === 'company_id' || f.key === 'id__my_company' || f.key === 'company_entity');
+      if (compField && !initialData[compField.key]) {
+        if (compField.optionValue === 'company_shortname') {
+          const companies = selectCache['my_company'] || [];
+          const matched = companies.find(c => String(c.my_company_id) === String(authUser.company_id));
+          if (matched && matched.company_shortname) {
+            initialData[compField.key] = matched.company_shortname;
+          } else {
+            initialData[compField.key] = authUser.company_id;
+          }
         } else {
           initialData[compField.key] = authUser.company_id;
         }
-      } else {
-        initialData[compField.key] = authUser.company_id;
       }
     }
-  }
 
   // Auto-inject company_id defaults for request module
   if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey)) {
@@ -309,7 +311,7 @@ async function openAddModal(moduleKey, initialData = null) {
       await handleOperationProgramCompanyChange();
     }
   }
-  if (moduleKey === 'employee') {
+  if (moduleKey === 'employee' || moduleKey === 'employee_active') {
     const companySelect = document.getElementById('f-company_id');
     if (companySelect) {
       companySelect.addEventListener('change', handleEmployeeCompanyChange);
@@ -376,19 +378,30 @@ async function openAddModal(moduleKey, initialData = null) {
     await handleRequestTypeChange(moduleKey === 'support' ? 'ticket_type' : 'request_type');
     await initProcessDescriptionAndVisibility();
   }
+  } catch (err) {
+    console.error('Error opening Add Modal:', err);
+    showToast(typeof t === 'function' ? t('form.open_add_error', 'Không thể mở form: ' + err.message) : 'Không thể mở form: ' + err.message, 'error');
+  }
 }
 
 
 
 async function openEditModal(moduleKey, pkVal) {
-  if (shouldHideRequestEditDeleteActions(moduleKey)) {
-    return;
-  }
+  try {
+    if (shouldHideRequestEditDeleteActions(moduleKey)) {
+      return;
+    }
 
-  const mod = MODULES[moduleKey];
-  const isRequestForm = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
-  document.getElementById('form-modal').classList.toggle('request-form-modal', isRequestForm);
-  document.getElementById('form-modal-title').textContent = `${t('form.edit_title', 'Edit Record')}`;
+    const mod = MODULES[moduleKey];
+    const isRequestForm = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
+    const formModalEl = document.getElementById('form-modal');
+    if (formModalEl) {
+      formModalEl.classList.toggle('request-form-modal', isRequestForm);
+    }
+    const titleEl = document.getElementById('form-modal-title');
+    if (titleEl) {
+      titleEl.textContent = `${t('form.edit_title', 'Edit Record')}`;
+    }
 
   // Fetch latest record
   const endpointPath = getRecordEndpoint(moduleKey, pkVal);
@@ -443,7 +456,7 @@ async function openEditModal(moduleKey, pkVal) {
       await handleOperationProgramCompanyChange();
     }
   }
-  if (moduleKey === 'employee') {
+  if (moduleKey === 'employee' || moduleKey === 'employee_active') {
     const companySelect = document.getElementById('f-company_id');
     if (companySelect) {
       companySelect.addEventListener('change', handleEmployeeCompanyChange);
@@ -505,6 +518,10 @@ async function openEditModal(moduleKey, pkVal) {
   if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey)) {
     await handleRequestCompanyChange();
     await initProcessDescriptionAndVisibility();
+  }
+  } catch (err) {
+    console.error('Error opening Edit Modal:', err);
+    showToast(typeof t === 'function' ? t('form.open_edit_error', 'Không thể mở form sửa: ' + err.message) : 'Không thể mở form sửa: ' + err.message, 'error');
   }
 }
 
@@ -1271,7 +1288,8 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         }
       });
     }
-    currentData.forEach(r => {
+    const dataList = (typeof currentData !== 'undefined' && Array.isArray(currentData)) ? currentData : [];
+    dataList.forEach(r => {
       let val = r[field.key];
       if (val) {
         val = String(val).trim().replace(/^\[|\]$/g, '');
@@ -1446,7 +1464,8 @@ function shouldHideFormField(moduleKey, field) {
   if (!field || field.key !== 'elements') return false;
 
   const hashModule = window.location.hash.replace('#', '').split('/')[0];
-  return [moduleKey, hashModule, currentModule]
+  const activeModule = typeof currentModule !== 'undefined' ? currentModule : null;
+  return [moduleKey, hashModule, activeModule]
     .map(v => String(v || '').toLowerCase())
     .includes('my_request');
 }
@@ -2310,6 +2329,7 @@ window.renderFileUploadSlotHTML = function (fieldKey, idx, val = '', acceptStr =
     val.startsWith('http://') ||
     val.startsWith('https://')
   );
+  let previewContent = '';
   if (isImageFile) {
     previewContent = `<img src="${val}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
   } else if (val) {

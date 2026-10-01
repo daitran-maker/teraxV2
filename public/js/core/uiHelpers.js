@@ -547,7 +547,8 @@ function getRecordEndpoint(moduleKey, pkVal, withParams = true) {
   if (endpoint.startsWith('/my-views/') && moduleKey !== 'request_activity_log') {
     endpoint = `/table/${mod.writeTable || 'request'}`;
   }
-  let path = `${endpoint}/${pkVal}`;
+  const basePath = endpoint.split('?')[0];
+  let path = `${basePath}/${pkVal}`;
   if (withParams && mod.pk) {
     path += `?pk=${mod.pk}`;
   }

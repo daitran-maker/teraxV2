@@ -2940,7 +2940,7 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
 
     const dropdownFiltersHTML = buildDropdownFiltersHTML(moduleKey);
     const isSidebarModule = (moduleKey === 'employee' || moduleKey === 'employee_active' || moduleKey === 'payment' || moduleKey === 'invoice' || moduleKey === 'request' || moduleKey === 'service' || moduleKey === 'asset' || moduleKey === 'mtr' || moduleKey === 'account' || moduleKey === 'my_company' || moduleKey === 'request_activity_log' || moduleKey === 'finance' || moduleKey === 'contract' || !!(mod && mod.groupBy));
-    const noAddButtonModules = new Set(['employee', 'employee_active', 'payment', 'invoice', 'account', 'service', 'asset', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'policy', 'oppotunity']);
+    const noAddButtonModules = new Set(['employee', 'employee_active', 'payment', 'invoice', 'account', 'service', 'asset', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'policy', 'oppotunity', 'expense']);
 
     const actionsHTML = `
       ${await buildActionButtons(moduleKey)}

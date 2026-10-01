@@ -114,7 +114,14 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const isSuperAdmin = req.user && req.user.role && req.user.role.toUpperCase() === 'SUPER ADMIN';
   try {
-    let query = 'SELECT * FROM MY_COMPANY WHERE my_company_id = $1';
+    let query = `
+      SELECT * FROM MY_COMPANY 
+      WHERE (CAST(my_company_id AS TEXT) = $1 
+         OR company_shortname = $1 
+         OR company_fullname = $1 
+         OR LOWER(company_shortname) = LOWER($1) 
+         OR LOWER(company_fullname) = LOWER($1))
+    `;
     if (!isSuperAdmin) {
       query += ' AND deleted_at IS NULL';
     }

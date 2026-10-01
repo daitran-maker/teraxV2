@@ -590,9 +590,36 @@ function buildFilterSidebar(viewKey, data) {
 
 function getDashboardFilterValue(viewKey, row, filterKey) {
   if (filterKey === 'fy') return row._cache?.fy || getFiscalYear(row.sr_submitted_date || row.sr_created_date || row.created_date);
-  if (filterKey === 'sr_status') return row.sr_status_key || row.sr_status || 'Unknown';
-  if (filterKey === 'process_status') return row.process_status_key || row.process_status || 'Unknown';
-  if (filterKey === 'approval_status') return row._cache?.approvalStatus || getApprovalStatusForUser(row);
+  if (filterKey === 'sr_status') {
+    const srNum = Number(row.sr_status);
+    const srKey = String(row.sr_status_key || row.sr_status || '').toLowerCase().trim();
+    if (srNum === 1 || srKey === 'draft') return ['Draft', '1', 'draft', row.sr_status];
+    if (srNum === 4 || srKey === 'rejected') return ['Rejected', '4', 'rejected', row.sr_status];
+    if (srNum === 2 || srKey === 'pending_approval' || srKey === 'submitted' || srKey === 'pending approval' || srKey === 'pending') {
+      return ['Pending Approval', '2', 'pending_approval', 'submitted', 'pending', row.sr_status];
+    }
+    if (srNum === 3 || srKey === 'approved') return ['Approved', '3', 'approved', row.sr_status];
+    if (Number(row.process_status) === 9 || srNum === 5 || srKey === 'completed' || srKey === 'closed') {
+      return ['Completed', '5', 'completed', 'closed', row.sr_status];
+    }
+    return [row.sr_status_key || row.sr_status || 'Unknown'];
+  }
+  if (filterKey === 'process_status') {
+    const procNum = Number(row.process_status);
+    const procKey = String(row.process_status_key || row.process_status || '').toLowerCase().trim();
+    if (procNum === 8 || procKey === 'processing') return ['Processing', '8', 'processing', row.process_status];
+    if (procNum === 9 || procKey === 'completed') return ['Completed', '9', 'completed', row.process_status];
+    return ['Not started yet', '7', 'not_started', 'not started yet', 'not started', row.process_status];
+  }
+  if (filterKey === 'approval_status') {
+    const s = row._cache?.approvalStatus || getApprovalStatusForUser(row);
+    if (s === 'Pending Approval' || s === 'Pending' || s === 'pending_approval' || s === '2' || s === 2) {
+      return ['Pending Approval', 'Pending', 'pending_approval', '2', s];
+    }
+    if (s === 'Approved' || s === 'approved' || s === '3' || s === 3) return ['Approved', 'approved', '3', s];
+    if (s === 'Rejected' || s === 'rejected' || s === '4' || s === 4) return ['Rejected', 'rejected', '4', s];
+    return ['Not started yet', 'not_started', s];
+  }
   if (filterKey === 'rating_status') {
     return row._cache?.ratingStatus || ((row.rating && typeof row.rating === 'object' && row.rating.point !== undefined && row.rating.point !== null) ? 'Rated' : 'Pending Rating');
   }

@@ -46,6 +46,12 @@ window.isActionAllowed = function (viewName, actionId) {
         return actionRules['request'];
       }
     }
+    // Fallback for employee_active mapped to employee
+    if (viewKey === 'employee_active') {
+      if (actionRules['employee'] !== undefined) {
+        return actionRules['employee'];
+      }
+    }
     return false;
   }
 

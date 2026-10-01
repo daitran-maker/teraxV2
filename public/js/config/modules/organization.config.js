@@ -261,6 +261,7 @@
     label: 'Active Employees',
     subtitle: 'Currently active workforce',
     endpoint: '/employees?status=Active',
+    writeTable: 'employee',
     pk: 'employee_id',
     icon: '👷',
     columns: [

@@ -436,6 +436,15 @@ router.post('/presets/policies', async (req, res) => {
       }
     });
 
+    // Fetch departments to resolve department_code/name -> department_id
+    const deptRes = await client.query('SELECT department_id, department_code, department_name FROM department');
+    const deptMap = new Map();
+    deptRes.rows.forEach(d => {
+      if (d.department_id) deptMap.set(String(d.department_id).trim().toLowerCase(), d.department_id);
+      if (d.department_code) deptMap.set(String(d.department_code).trim().toLowerCase(), d.department_id);
+      if (d.department_name) deptMap.set(String(d.department_name).trim().toLowerCase(), d.department_id);
+    });
+
     const resolveEmployeeVal = (val, isTier1 = false) => {
       if (!val || typeof val !== 'string') return isTier1 ? 'Direct Manager' : null;
       const trimmed = val.trim();
@@ -465,6 +474,12 @@ router.post('/presets/policies', async (req, res) => {
       const approvalLevel = String(p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
       const lead = resolveEmployeeVal(p.policy_lead, false) || defaultLead;
       const owner = resolveEmployeeVal(p.sr_owner, false) || defaultLead;
+      const rawDept = p.department_id || p.department || '';
+      let deptId = null;
+      if (rawDept) {
+        const cleanDept = String(rawDept).trim().toLowerCase();
+        deptId = deptMap.get(cleanDept) || String(rawDept).trim();
+      }
 
       const check = await client.query(
         'SELECT policy_id FROM POLICY_AND_PROGRAM WHERE LOWER(policy_name) = LOWER($1)',
@@ -477,8 +492,8 @@ router.post('/presets/policies', async (req, res) => {
           INSERT INTO POLICY_AND_PROGRAM (
             policy_id, policy_name, policy_type, description,
             tier1_approval, tier2_approval, tier3_approval, approval_level,
-            policy_lead, sr_owner, elements, company_id, sla
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            policy_lead, sr_owner, department_id, elements, company_id, sla
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         `, [
           id,
           name,
@@ -490,6 +505,7 @@ router.post('/presets/policies', async (req, res) => {
           approvalLevel,
           lead,
           owner,
+          deptId,
           elements,
           companyId,
           p.sla || 3
