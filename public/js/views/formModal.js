@@ -1341,6 +1341,7 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         </div>
       `;
   } else if (field.type === 'file') {
+    const isSingle = field.single || field.key === 'logo' || field.key === 'avatar' || field.key === 'picture';
     const acceptStr = field.accept ? `accept="${field.accept}"` : '';
     html += `<div class="files-list-container" id="files-list-container-${field.key}" style="width: 100%;">`;
 
@@ -1358,11 +1359,14 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         }
       }
       if (!existingFiles.length && typeof val === 'string') {
+        val = val.trim();
         try {
           if (val.startsWith('[')) {
             existingFiles = JSON.parse(val);
+          } else if (val.startsWith('data:') || val.startsWith('data:image')) {
+            existingFiles = [val];
           } else {
-            existingFiles = String(val).split(',').map(s => s.trim()).filter(Boolean);
+            existingFiles = val.split(',').map(s => s.trim()).filter(Boolean);
           }
         } catch (e) {
           existingFiles = [val];
@@ -1374,7 +1378,9 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
       existingFiles.forEach((fileUrl, idx) => {
         html += window.renderFileUploadSlotHTML(field.key, idx, fileUrl, acceptStr);
       });
-      html += window.renderFileUploadSlotHTML(field.key, existingFiles.length, '', acceptStr);
+      if (!isSingle) {
+        html += window.renderFileUploadSlotHTML(field.key, existingFiles.length, '', acceptStr);
+      }
     } else {
       html += window.renderFileUploadSlotHTML(field.key, 0, '', acceptStr);
     }
@@ -2060,7 +2066,7 @@ function collectFormData(moduleKey) {
       const hiddenEls = document.querySelectorAll(`input[id^="f-${field.key}-base64-"]`);
       if (hiddenEls.length > 0) {
         const vals = Array.from(hiddenEls).map(el => el.value).filter(Boolean);
-        if (field.key === 'logo' || field.key === 'avatar') {
+        if (field.key === 'logo' || field.key === 'avatar' || field.key === 'picture' || field.single) {
           data[field.key] = vals.length > 0 ? vals[0] : null;
         } else {
           data[field.key] = vals.length > 0 ? JSON.stringify(vals) : null;
@@ -2264,11 +2270,12 @@ window.renderFileUploadSlotHTML = function (fieldKey, idx, val = '', acceptStr =
     }
   }
   if (typeof val !== 'string') val = val ? String(val) : '';
-  const cleanName = val ? formatFileNameDisplay(val, 28) : '';
+  val = val.trim();
+  const cleanName = val ? (val.startsWith('data:') ? 'Attached Image' : formatFileNameDisplay(val, 28)) : '';
   const displayVal = val ? cleanName : 'Choose File or Drag & Drop here';
   const previewStyle = val ? 'display:block;' : 'display:none;';
   let previewContent = '';
-  const isImageFile = val && (val.startsWith('data:image') || val.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (val.startsWith('/uploads/') && (val.match(/\.(png|jpe?g|gif|webp|svg)/i) || val.includes('/uploads/'))) || val.startsWith('uploads/'));
+  const isImageFile = val && (val.startsWith('data:image') || val.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (val.startsWith('/uploads/') && (val.match(/\.(png|jpe?g|gif|webp|svg)/i) || val.includes('/uploads/'))) || val.startsWith('uploads/') || val.startsWith('http://') || val.startsWith('https://'));
   if (isImageFile) {
     previewContent = `<img src="${val}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
   } else if (val) {
@@ -2288,7 +2295,7 @@ window.renderFileUploadSlotHTML = function (fieldKey, idx, val = '', acceptStr =
             <span class="material-symbols-rounded" style="font-size:16px;">close</span>
           </button>
         </div>
-        <input type="hidden" id="f-${fieldKey}-base64-${idx}" value="${val}" />
+        <input type="hidden" id="f-${fieldKey}-base64-${idx}" value="${escapeHTML(val)}" />
         <div id="preview-${fieldKey}-${idx}" style="margin-top:8px;${previewStyle}; max-width:100%; min-width:0; overflow:hidden;">${previewContent}</div>
       </div>
     `;
@@ -2331,9 +2338,11 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
   }
 
   const parentContainer = document.getElementById(`files-list-container-${fieldKey}`);
+  const isSingle = fieldKey === 'logo' || fieldKey === 'avatar' || fieldKey === 'picture';
 
   const appendNextSlotIfNeeded = () => {
     showRemoveBtn();
+    if (isSingle) return;
     if (!parentContainer) return;
     const allSlots = Array.from(parentContainer.querySelectorAll('.file-upload-slot'));
     const hasEmptySlot = allSlots.some(s => {
@@ -2349,16 +2358,25 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
     }
   };
 
-  const isImage = file.type.startsWith('image/');
+  const isImage = file.type.startsWith('image/') || ext.match(/^(png|jpe?g|gif|webp|svg)$/i);
   if (isImage && previewEl) {
     try {
       previewEl.style.display = 'block';
-      previewEl.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Preview" style="max-width:100px; max-height:100px; border-radius:4px;" />`;
+      previewEl.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
     } catch (e) {}
   } else if (previewEl) {
     const shortUploadName = typeof truncateFileName === 'function' ? truncateFileName(file.name, 28) : file.name;
     previewEl.style.display = 'block';
     previewEl.innerHTML = `<div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--accent); font-weight:600; max-width:100%; min-width:0; overflow:hidden;" title="${escapeHTML(file.name)}"><span class="material-symbols-rounded" style="font-size:14px; flex-shrink:0;">attach_file</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px;">${escapeHTML(shortUploadName)}</span></div>`;
+  }
+
+  // Prevent user from clicking save while upload is running!
+  const saveBtn = document.getElementById('form-modal-save');
+  const originalSaveText = saveBtn ? saveBtn.textContent : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.dataset.uploading = 'true';
+    saveBtn.textContent = typeof t === 'function' ? t('form.uploading_file', 'Đang tải file...') : 'Đang tải file...';
   }
 
   const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
@@ -2378,13 +2396,37 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
         hiddenEl.value = url;
         hiddenEl.dispatchEvent(new Event('change'));
       }
-      if (textEl) textEl.innerHTML = renderGmailProgressHTML(file.name, fileSizeMB, 100, true, null, false);
+      if (textEl) {
+        textEl.style.whiteSpace = 'nowrap';
+        const cleanName = formatFileNameDisplay(url, 28);
+        textEl.textContent = cleanName;
+        textEl.title = cleanName;
+      }
+      if (iconEl) {
+        iconEl.style.display = 'inline-block';
+        iconEl.textContent = 'attach_file';
+      }
+      if (isImage && previewEl) {
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = `<img src="${url}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
+      }
       appendNextSlotIfNeeded();
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.dataset.uploading = 'false';
+        saveBtn.textContent = originalSaveText || 'Save';
+        if (typeof validateFormAndNotify === 'function') validateFormAndNotify(currentFormModuleKey, false);
+      }
     })
     .catch(err => {
       console.error('Binary chunked upload failed:', err);
       showToast('File upload failed: ' + err.message, 'error');
       if (textEl) textEl.innerHTML = renderGmailProgressHTML(file.name, fileSizeMB, 0, false, err.message, false);
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.dataset.uploading = 'false';
+        saveBtn.textContent = originalSaveText || 'Save';
+      }
     });
 };
 
@@ -2840,6 +2882,10 @@ function resetSaveButton(saveBtn) {
 async function submitAdd(moduleKey, extraData = {}) {
   const saveBtn = document.getElementById('form-modal-save');
   const draftBtn = document.getElementById('form-modal-draft');
+  if (saveBtn && saveBtn.dataset.uploading === 'true') {
+    showToast(typeof t === 'function' ? t('form.uploading_file', 'Tệp tin đang được tải lên, vui lòng đợi trong giây lát...') : 'Tệp tin đang được tải lên, vui lòng đợi trong giây lát...', 'warning');
+    return;
+  }
   if ((saveBtn && saveBtn._isSaving) || (draftBtn && draftBtn._isSaving)) return;
   if (saveBtn) {
     saveBtn._isSaving = true;
@@ -3078,6 +3124,10 @@ async function submitAdd(moduleKey, extraData = {}) {
 async function submitEdit(moduleKey, pkVal, extraData = {}) {
   const saveBtn = document.getElementById('form-modal-save');
   const draftBtn = document.getElementById('form-modal-draft');
+  if (saveBtn && saveBtn.dataset.uploading === 'true') {
+    showToast(typeof t === 'function' ? t('form.uploading_file', 'Tệp tin đang được tải lên, vui lòng đợi trong giây lát...') : 'Tệp tin đang được tải lên, vui lòng đợi trong giây lát...', 'warning');
+    return;
+  }
   if ((saveBtn && saveBtn._isSaving) || (draftBtn && draftBtn._isSaving)) return;
   if (saveBtn) {
     saveBtn._isSaving = true;

@@ -294,7 +294,11 @@ const ACTION_LOGIC = {
     label: 'Request Start',
     color: 'var(--accent)',
     icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
-    when: (r) => getRecordStatusId(r, 'request', 'sr_status') === 3 && getRecordStatusId(r, 'request', 'process_status') === 7 // 3=Approved, 7=Not started
+    when: (r) => {
+      const pt = String(r.request_type || '').toUpperCase();
+      if (pt === '5' || pt === 'RPM' || pt === 'PAYMENT') return false;
+      return getRecordStatusId(r, 'request', 'sr_status') === 3 && getRecordStatusId(r, 'request', 'process_status') === 7; // 3=Approved, 7=Not started
+    }
   },
   'ACT-REQUEST-09': {
     label: 'Submit',
@@ -1606,7 +1610,7 @@ router.post('/execute', async (req, res) => {
           values.push(finalSrStatusId);
 
           const reqTypeStr = String(record.request_type || '');
-          const isPaymentReq = reqTypeStr === '5' || reqTypeStr.toUpperCase() === 'RPM';
+          const isPaymentReq = reqTypeStr === '5' || reqTypeStr.toUpperCase() === 'RPM' || reqTypeStr.toUpperCase() === 'PAYMENT';
 
           // Approval-only requests (like Payment Request): auto-complete without requiring manual Start -> Completed
           if (isPaymentReq && Number(finalSrStatusId) === 3) {
@@ -2059,6 +2063,14 @@ router.post('/execute', async (req, res) => {
 
       await RequestModel.resolveApprovals(requestData, client);
 
+      const ptUpper = String(requestData.request_type || '').toUpperCase();
+      const isPay = ptUpper === '5' || ptUpper === 'RPM' || ptUpper === 'PAYMENT';
+      if (isPay && Number(requestData.sr_status) === 3) {
+        requestData.process_status = 9;
+        requestData.process_start_date = requestData.process_start_date || new Date().toISOString();
+        requestData.process_end_date = requestData.process_end_date || new Date().toISOString();
+      }
+
       // Normalize sr_owner if present
       if (requestData.sr_owner !== undefined && requestData.sr_owner !== null) {
         if (Array.isArray(requestData.sr_owner)) {
@@ -2074,13 +2086,16 @@ router.post('/execute', async (req, res) => {
           sr_status, process_status, 
           sr_submitted_date, sr_created_date,  
           policy_lead, sr_owner, approval_flow, approval_level, log,
-          parent__id_request
+          parent__id_request,
+          process_start_date, process_end_date
         ) VALUES (
           $1, $2, $3, $4, $5, 
           $6, $7, 
           CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 
           $8, $9, $10, $11, $12,
-          $13
+          $13,
+          CASE WHEN $7 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END,
+          CASE WHEN $7 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END
         )
       `, [
         requestData.request_id,
@@ -2097,6 +2112,23 @@ router.post('/execute', async (req, res) => {
         requestData.log || null,
         requestData.parent__id_request || null
       ]);
+
+      if (isPay && Number(requestData.sr_status) === 3) {
+        try {
+          await client.query(
+            `UPDATE "payment" SET payment_status = 31 WHERE payment_id = $1`,
+            [record_id]
+          );
+          broadcastSSE('db_change', {
+            action: 'update',
+            table: 'payment',
+            id: record_id,
+            record: { payment_id: record_id, payment_status: 31, payment_request: newPaymentReqId, request: record.request, contract_id: record.contract_id }
+          });
+        } catch (paySyncErr) {
+          console.warn('Failed to sync payment status on auto-approval:', paySyncErr);
+        }
+      }
 
       try {
         broadcastSSE('db_change', { action: 'insert', table: 'request', record: requestData });

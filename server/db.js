@@ -2864,6 +2864,52 @@ async function runIncrementalMigrations() {
   } catch (e) {
     console.error('Failed to run migrateByteaImageColumns migration:', e);
   }
+  try {
+    await migrateAutoCompleteApprovedPaymentRequests();
+  } catch (e) {
+    console.error('Failed to run migrateAutoCompleteApprovedPaymentRequests migration:', e);
+  }
+}
+
+async function migrateAutoCompleteApprovedPaymentRequests() {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(`
+      UPDATE request 
+      SET process_status = 9, 
+          process_start_date = COALESCE(process_start_date, sr_submitted_date, sr_created_date, CURRENT_TIMESTAMP), 
+          process_end_date = COALESCE(process_end_date, CURRENT_TIMESTAMP)
+      WHERE (request_type IN ('5', 'RPM') OR UPPER(request_type) = 'PAYMENT') 
+        AND sr_status = 3 
+        AND process_status != 9;
+    `);
+    if (res.rowCount > 0) {
+      console.log(`[Migration] Auto-completed ${res.rowCount} approved payment requests.`);
+    }
+
+    const payRes = await client.query(`
+      UPDATE "payment"
+      SET payment_status = 31
+      WHERE payment_status IN (30, 121)
+        AND (
+          payment_request IN (
+            SELECT request_id FROM request 
+            WHERE (request_type IN ('5', 'RPM') OR UPPER(request_type) = 'PAYMENT') AND sr_status = 3
+          )
+          OR request IN (
+            SELECT request_id FROM request 
+            WHERE (request_type IN ('5', 'RPM') OR UPPER(request_type) = 'PAYMENT') AND sr_status = 3
+          )
+        );
+    `);
+    if (payRes.rowCount > 0) {
+      console.log(`[Migration] Synced ${payRes.rowCount} linked payments to Ready for payment (31).`);
+    }
+  } catch (err) {
+    console.error('Error running migrateAutoCompleteApprovedPaymentRequests:', err);
+  } finally {
+    client.release();
+  }
 }
 
 async function migrateByteaImageColumns() {

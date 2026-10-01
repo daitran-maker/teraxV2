@@ -3001,10 +3001,13 @@ function buildDetailViewHTML(moduleKey, record) {
           }
           if (!fileList.length && val) {
             try {
-              if (String(val).startsWith('[')) {
-                fileList = JSON.parse(val);
+              const strVal = String(val).trim();
+              if (strVal.startsWith('[')) {
+                fileList = JSON.parse(strVal);
+              } else if (strVal.startsWith('data:') || strVal.startsWith('data:image')) {
+                fileList = [strVal];
               } else {
-                fileList = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                fileList = strVal.split(',').map(s => s.trim()).filter(Boolean);
               }
             } catch (e) {
               fileList = [val];
@@ -3017,7 +3020,7 @@ function buildDetailViewHTML(moduleKey, record) {
           valHTML = `<div style="display:flex; flex-direction:column; gap:6px;">` + fileList.map(fileUrl => {
             if (!fileUrl || typeof fileUrl !== 'string') return '';
             const lowerVal = String(fileUrl).toLowerCase();
-            if (lowerVal.match(/[.](jpeg|jpg|gif|png|webp|svg)/) || lowerVal.includes('data:image') || lowerVal.startsWith('/uploads/') || lowerVal.startsWith('uploads/')) {
+            if (lowerVal.match(/[.](jpeg|jpg|gif|png|webp|svg)/) || lowerVal.includes('data:image') || lowerVal.startsWith('/uploads/') || lowerVal.startsWith('uploads/') || lowerVal.startsWith('http://') || lowerVal.startsWith('https://')) {
               return `<a href="${escapeHTML(fileUrl)}" target="_blank" style="display:inline-block;"><img src="${escapeHTML(fileUrl)}" style="max-width:180px; max-height:180px; border-radius:8px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" /></a>`;
             } else {
               const cleanFileName = formatFileNameDisplay(fileUrl);

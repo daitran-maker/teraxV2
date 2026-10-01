@@ -192,12 +192,19 @@ class RequestModel {
       }
 
       // Calculate current_level based on step statuses
+      const reqTypeStr = String(data.request_type || '').toUpperCase();
+      const isPaymentReq = reqTypeStr === '5' || reqTypeStr === 'RPM' || reqTypeStr === 'PAYMENT';
+
       let currentLevel = 1;
       if (max_tiers === 0) {
         currentLevel = 0;
         if (isSubmitted || Number(data.sr_status) === 2 || Number(data.sr_status) === 3) {
           data.sr_status = 3; // Auto-approved (Tier 0)
-          if (!data.process_status || Number(data.process_status) === 0) {
+          if (isPaymentReq) {
+            data.process_status = 9; // 9 = Completed for payment requests
+            data.process_start_date = data.process_start_date || new Date().toISOString();
+            data.process_end_date = data.process_end_date || new Date().toISOString();
+          } else if (!data.process_status || Number(data.process_status) === 0) {
             data.process_status = 7; // Not started yet
           }
         }
@@ -211,6 +218,12 @@ class RequestModel {
             currentLevel = steps[nextNotStartedIdx].level;
           } else if (steps.every(s => s.status === 3)) {
             currentLevel = max_tiers + 1;
+            if (isPaymentReq) {
+              data.sr_status = 3;
+              data.process_status = 9; // Completed
+              data.process_start_date = data.process_start_date || new Date().toISOString();
+              data.process_end_date = data.process_end_date || new Date().toISOString();
+            }
           }
         }
       }

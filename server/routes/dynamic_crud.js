@@ -3801,6 +3801,44 @@ router.post('/:tableName', async (req, res) => {
       }
     }
 
+    if (tableName === 'request') {
+      const isNowApproved = Number(responseData.sr_status) === 3;
+      const reqTypeStr = String(responseData.request_type || '').toUpperCase();
+      const isPayment = reqTypeStr === '5' || reqTypeStr === 'RPM' || reqTypeStr === 'PAYMENT';
+      if (isNowApproved && isPayment) {
+        try {
+          if (Number(responseData.process_status) !== 9) {
+            await client.query(
+              `UPDATE request SET process_status = 9, process_start_date = COALESCE(process_start_date, CURRENT_TIMESTAMP), process_end_date = CURRENT_TIMESTAMP WHERE request_id = $1`,
+              [responseData.request_id]
+            );
+            responseData.process_status = 9;
+            responseData.process_start_date = responseData.process_start_date || new Date().toISOString();
+            responseData.process_end_date = new Date().toISOString();
+          }
+          const payRes = await client.query(
+            `UPDATE "payment" 
+             SET payment_status = 31, updated_by = $2 
+             WHERE payment_request = $1 OR (request = $1 AND payment_status IN (30, 121))
+             RETURNING payment_id, request, contract_id`,
+            [responseData.request_id, userEmployeeId]
+          );
+          payRes.rows.forEach(pRow => {
+            try {
+              broadcastSSE('db_change', {
+                action: 'update',
+                table: 'payment',
+                id: pRow.payment_id,
+                record: { payment_id: pRow.payment_id, payment_status: 31, request: pRow.request || responseData.request_id, contract_id: pRow.contract_id }
+              });
+            } catch (bErr) {}
+          });
+        } catch (autoErr) {
+          console.error('Error auto-completing payment request in POST dynamic_crud:', autoErr);
+        }
+      }
+    }
+
     if (tableName === 'ticket') {
       const commentText = req.body.comment;
       const fileText = req.body.file;
@@ -4424,9 +4462,56 @@ router.put('/:tableName/:id', async (req, res) => {
       const wasApproved = oldRecord && Number(oldRecord.sr_status) === 3;
 
       const dynamicApprovalAutomationId = 'app_dynamic_request_approval_sync_payment_invoice';
-      if (isNowApproved && !wasApproved && await isAutomationActive(dynamicApprovalAutomationId)) {
-        const requestType = String(updatedRecord.request_type || '');
-        if (requestType === '5' || requestType.toUpperCase() === 'RPM') {
+      const requestType = String(updatedRecord.request_type || '').toUpperCase();
+      const isPayment = requestType === '5' || requestType === 'RPM' || requestType === 'PAYMENT';
+
+      if (isNowApproved && (!wasApproved || isPayment)) {
+        if (isPayment) {
+          try {
+            // Auto-complete request if not already completed
+            if (Number(updatedRecord.process_status) !== 9) {
+              await pool.query(
+                `UPDATE request SET process_status = 9, process_start_date = COALESCE(process_start_date, CURRENT_TIMESTAMP), process_end_date = CURRENT_TIMESTAMP WHERE request_id = $1`,
+                [updatedRecord.request_id]
+              );
+              updatedRecord.process_status = 9;
+            }
+            const automationRes = await pool.query(
+              `UPDATE "payment" 
+               SET payment_status = 31, updated_by = $2 
+               WHERE payment_request = $1 OR (request = $1 AND payment_status IN (30, 121))
+               RETURNING payment_id, request, contract_id`,
+              [updatedRecord.request_id, userEmployeeId]
+            );
+            automationRes.rows.forEach(pRow => {
+              try {
+                broadcastSSE('db_change', {
+                  action: 'update',
+                  table: 'payment',
+                  id: pRow.payment_id,
+                  record: { payment_id: pRow.payment_id, payment_status: 31, request: pRow.request || updatedRecord.request_id, contract_id: pRow.contract_id }
+                });
+              } catch (bErr) {}
+            });
+            await logAutomationRun(dynamicApprovalAutomationId, {
+              table_name: 'payment',
+              record_id: updatedRecord.request_id,
+              changed_columns: ['payment_status', 'updated_by'],
+              condition_snapshot: { request_id: updatedRecord.request_id, request_type: requestType, old_approval: oldApproval, new_approval: newApproval },
+              output_snapshot: { payment_status: 31, affected_rows: automationRes.rowCount }
+            });
+          } catch (e) {
+            await logAutomationRun(dynamicApprovalAutomationId, {
+              table_name: 'payment',
+              record_id: updatedRecord.request_id,
+              changed_columns: ['payment_status', 'updated_by'],
+              condition_snapshot: { request_id: updatedRecord.request_id, request_type: requestType, old_approval: oldApproval, new_approval: newApproval },
+              output_snapshot: { error: e.message }
+            });
+          }
+        }
+      } else if (isNowApproved && !wasApproved && await isAutomationActive(dynamicApprovalAutomationId)) {
+        if (requestType === '5' || requestType === 'RPM' || requestType === 'PAYMENT') {
           try {
             // Auto-complete request if not already completed
             if (Number(updatedRecord.process_status) !== 9) {

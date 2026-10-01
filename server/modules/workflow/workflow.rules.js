@@ -151,7 +151,11 @@ const ACTION_LOGIC = {
     label: 'Request Start',
     color: 'var(--accent)',
     icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
-    when: (r) => getRecordStatusId(r, 'request', 'sr_status') === 3 && getRecordStatusId(r, 'request', 'process_status') === 7 // 3=Approved, 7=Not started
+    when: (r) => {
+      const pt = String(r.request_type || '').toUpperCase();
+      if (pt === '5' || pt === 'RPM' || pt === 'PAYMENT') return false;
+      return getRecordStatusId(r, 'request', 'sr_status') === 3 && getRecordStatusId(r, 'request', 'process_status') === 7; // 3=Approved, 7=Not started
+    }
   },
   'ACT-REQUEST-09': {
     label: 'Submit',
