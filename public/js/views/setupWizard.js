@@ -876,7 +876,7 @@ window.renderSetupContent = async function (forceRefresh) {
     + '<div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;"><span class="material-symbols-rounded" style="font-size:17px;color:#f59e0b;">lightbulb</span><span style="font-size:12px;font-weight:700;color:#111827;">' + swT('sw.useful_tips', 'Mẹo hữu ích') + '</span></div>'
     + '<div style="display:flex;flex-direction:column;gap:6px;">'+tipsHtml+'</div>'
     + '</div>'
-    + '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:14px;padding:14px;cursor:pointer;">'
+    + '<div onclick="window.open(\'https://terax.ai/\', \'_blank\')" style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:14px;padding:14px;cursor:pointer;">'
     + '<div style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:18px;color:#1D4ED8;">menu_book</span>'
     + '<div><div style="font-size:12px;font-weight:700;color:#1E40AF;">' + swT('sw.guide_doc', 'Tài liệu hướng dẫn') + '</div>'
     + '<div style="font-size:10.5px;color:#3B82F6;margin-top:2px;">' + swT('sw.guide_doc_link', 'Xem hướng dẫn chi tiết ↗') + '</div></div></div>'
@@ -887,7 +887,7 @@ window.renderSetupContent = async function (forceRefresh) {
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
     + '<div style="width:36px;height:36px;border-radius:50%;background:#FFF7ED;border:1px solid #FED7AA;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:18px;color:#f97316;">headset_mic</span></div>'
     + '<div><div style="font-size:13px;font-weight:700;color:#111827;">' + swT('sw.need_support', 'Cần hỗ trợ?') + '</div><div style="font-size:11px;color:#6B7280;">' + swT('sw.support_desc', 'Đội ngũ TeraX luôn sẵn sàng hỗ trợ bạn') + '</div></div></div>'
-    + '<button style="width:100%;padding:9px;border-radius:10px;border:1.5px solid #f97316;background:transparent;color:#f97316;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><span class="material-symbols-rounded" style="font-size:15px;">chat</span> ' + swT('sw.contact_support', 'Liên hệ hỗ trợ') + '</button>'
+    + '<button onclick="window.open(\'https://terax.ai/\', \'_blank\')" style="width:100%;padding:9px;border-radius:10px;border:1.5px solid #f97316;background:transparent;color:#f97316;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><span class="material-symbols-rounded" style="font-size:15px;">chat</span> ' + swT('sw.contact_support', 'Liên hệ hỗ trợ') + '</button>'
     + '</div>';
 
   const mainBodyHTML = currentStep===6 ? renderStep6HTML(counts, comp) : renderCurrentStepHTML(currentStep, comp, window.setupWizardData.admin||{}, counts);
@@ -902,7 +902,7 @@ window.renderSetupContent = async function (forceRefresh) {
     + '<div style="flex:1;min-width:0;display:flex;flex-direction:column;">'
     + '<div class="sw-card" style="padding:20px 24px 10px;">'+stepperHtml+'</div>'
     + '<div id="setup-step-container" style="margin-top:16px;">'+mainBodyHTML+'</div>'
-    + supportWidget
+    + (currentStep < 6 ? supportWidget : '')
     + '</div>'
     + (currentStep < 6 ? progressSidebar : '')
     + '</div></div>';
@@ -3351,7 +3351,7 @@ window.saveStep5AndAdvance = async function() {
 function renderStep6HTML(counts,comp){
   const draft = window.setupDraft || {};
   const effectiveCounts = {
-    my_company: draft.company ? 1 : (counts.my_company || 0),
+    my_company: draft.company ? (Array.isArray(draft.company) ? draft.company.length : 1) : (counts.my_company || 0),
     department: (draft.departments && draft.departments.length > 0) ? draft.departments.length : (counts.department || 0),
     employee: (draft.employees && draft.employees.length > 0) ? draft.employees.length : (counts.employee || 0),
     policy_and_program: (draft.policies && draft.policies.length > 0) ? draft.policies.length : (counts.policy_and_program || 0),
@@ -3384,37 +3384,47 @@ function renderStep6HTML(counts,comp){
     qaCards+='<div style="padding:16px;border-radius:14px;background:white;border:1px solid #E5E7EB;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);"><div style="width:38px;height:38px;border-radius:10px;background:'+q.bg+';display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:20px;color:'+q.color+';">'+q.icon+'</span></div><div style="font-size:13px;font-weight:700;color:#111827;">'+q.title+'</div><div style="font-size:11.5px;color:#6B7280;line-height:1.4;flex:1;">'+q.desc+'</div><button onclick="completeSetupWizard(\''+q.action+'\')" style="width:100%;padding:8px;border-radius:9px;border:1px solid #E5E7EB;background:#F9FAFB;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:var(--transition);">'+q.btn+'</button></div>';
   }
   const resources=[
-    {icon:'menu_book',color:'#2563EB',title:swT('sw.guide_doc', 'Hướng dẫn sử dụng'),desc:swT('sw.step6_res1_desc', 'Tìm hiểu các tính năng cơ bản')},
-    {icon:'play_circle',color:'#EA580C',title:swT('sw.step6_res2_title', 'Video hướng dẫn'),desc:swT('sw.step6_res2_desc', 'Xem video thao tác chi tiết')},
-    {icon:'table_chart',color:'#059669',title:swT('sw.step6_res3_title', 'Thư viện quy trình mẫu'),desc:swT('sw.step6_res3_desc', 'Tham khảo các quy trình phổ biến')},
-    {icon:'help',color:'#7C3AED',title:swT('sw.step6_res4_title', 'Câu hỏi thường gặp'),desc:swT('sw.step6_res4_desc', 'Giải đáp các thắc mắc')}
+    {icon:'menu_book',color:'#2563EB',title:swT('sw.guide_doc', 'Hướng dẫn sử dụng'),desc:swT('sw.step6_res1_desc', 'Tìm hiểu các tính năng cơ bản'),url:'https://terax.ai/'},
+    {icon:'play_circle',color:'#EA580C',title:swT('sw.step6_res2_title', 'Video hướng dẫn'),desc:swT('sw.step6_res2_desc', 'Xem video thao tác chi tiết'),url:'https://terax.ai/'},
+    {icon:'table_chart',color:'#059669',title:swT('sw.step6_res3_title', 'Thư viện quy trình mẫu'),desc:swT('sw.step6_res3_desc', 'Tham khảo các quy trình phổ biến'),url:'https://terax.ai/'},
+    {icon:'help',color:'#7C3AED',title:swT('sw.step6_res4_title', 'Câu hỏi thường gặp'),desc:swT('sw.step6_res4_desc', 'Giải đáp các thắc mắc'),url:'https://terax.ai/'}
   ];
   let resItems='';
   for(const r of resources) {
-    resItems+='<button style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;border:none;background:transparent;cursor:pointer;text-align:left;width:100%;transition:var(--transition);" onmouseover="this.style.background=\'#F9FAFB\'" onmouseout="this.style.background=\'transparent\'"><div style="width:34px;height:34px;border-radius:9px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="font-size:18px;color:'+r.color+';">'+r.icon+'</span></div><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+r.title+'</div><div style="font-size:10.5px;color:#9CA3AF;">'+r.desc+'</div></div><span class="material-symbols-rounded" style="font-size:15px;color:#D1D5DB;flex-shrink:0;">chevron_right</span></button>';
+    resItems+='<button onclick="window.open(\''+r.url+'\', \'_blank\')" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;border:none;background:transparent;cursor:pointer;text-align:left;width:100%;transition:var(--transition);" onmouseover="this.style.background=\'#F9FAFB\'" onmouseout="this.style.background=\'transparent\'"><div style="width:34px;height:34px;border-radius:9px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-rounded" style="font-size:18px;color:'+r.color+';">'+r.icon+'</span></div><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+r.title+'</div><div style="font-size:10.5px;color:#9CA3AF;">'+r.desc+'</div></div><span class="material-symbols-rounded" style="font-size:15px;color:#D1D5DB;flex-shrink:0;">chevron_right</span></button>';
   }
+
   return '<div style="display:flex;gap:20px;align-items:flex-start;">'
-    +'<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;">'
-    +'<div style="background:linear-gradient(135deg,#1E3A5F,#1D4ED8);border-radius:18px;padding:32px;color:white;overflow:hidden;position:relative;">'
-    +'<div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%);pointer-events:none;"></div>'
-    +'<div style="display:flex;align-items:center;gap:24px;"><div style="flex:1;">'
-    +'<div style="font-size:13px;color:#FCD34D;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:5px;"><span>🎉</span> ' + swT('sw.step6_ready_subtitle', 'Hoàn tất thiết lập!') + '</div>'
-    +'<h2 style="font-size:24px;font-weight:800;color:white;margin-bottom:10px;">' + swT('sw.step6_ready_title', 'TeraX đã sẵn sàng để sử dụng') + '</h2>'
-    +'<p style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:20px;">' + swT('sw.step6_ready_message', 'Môi trường làm việc của {{name}} đã được thiết lập. Hãy bắt đầu khám phá TeraX.').replace('{{name}}', '<strong style="color:white;">'+name+'</strong>') + '</p>'
-    +'<div style="display:flex;gap:12px;flex-wrap:wrap;"><button onclick="completeSetupWizard()" class="sw-btn-primary" style="background:linear-gradient(135deg,#f97316,#ea580c);"><span class="material-symbols-rounded" style="font-size:18px;">rocket_launch</span> ' + swT('sw.step6_enter_app', 'Vào hệ thống ngay') + '</button>'
-    +'<div style="width:100px;flex-shrink:0;text-align:center;"><div style="width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto;"><span class="material-symbols-rounded" style="font-size:48px;color:#FCD34D;">verified</span></div><div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;">' + swT('sw.step6_tagline', 'Cùng TeraX vận hành tốt hơn') + '</div></div>'
-    +'</div></div>'
-    +'<div class="sw-card">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#111827;">' + swT('sw.step6_overview', 'Tổng quan thiết lập') + '</div><button onclick="window.setSetupStep(1)" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid #E5E7EB;background:#F9FAFB;color:#374151;font-size:11.5px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">settings</span> ' + swT('sw.step6_edit', 'Chỉnh sửa') + '</button></div>'
-    +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">'+sumCards+'</div>'
-    +'</div>'
-    +'<div><div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:12px;">' + swT('sw.step6_get_started', 'Bắt đầu với TeraX') + '</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">'+qaCards+'</div></div>'
-    +'</div>'
-    +'<div style="width:250px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;">'
-    +'<div class="sw-card"><div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:12px;">' + swT('sw.step6_useful_resources', 'Tài nguyên hữu ích') + '</div><div style="display:flex;flex-direction:column;gap:2px;">'+resItems+'</div></div>'
-    +'<div class="sw-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><div style="width:34px;height:34px;border-radius:50%;background:#FFF7ED;border:1px solid #FED7AA;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:18px;color:#f97316;">headset_mic</span></div><div><div style="font-size:12px;font-weight:700;color:#111827;">' + swT('sw.need_support', 'Bạn cần hỗ trợ?') + '</div><div style="font-size:10.5px;color:#6B7280;">' + swT('sw.support_desc', 'Đội ngũ TeraX luôn sẵn sàng.') + '</div></div></div><button class="sw-btn-primary" style="width:100%;justify-content:center;"><span class="material-symbols-rounded" style="font-size:15px;">chat</span> ' + swT('sw.contact_support', 'Liên hệ hỗ trợ') + '</button></div>'
-    +'<div class="sw-card" style="background:rgba(255,255,255,0.7);"><div style="font-size:11.5px;color:#6B7280;line-height:1.6;font-style:italic;margin-bottom:10px;">"' + swT('sw.step6_quote', 'Cảm ơn bạn đã tin tưởng TeraX. Chúng tôi cam kết tiếp tục đồng hành để doanh nghiệp của bạn vận hành hiệu quả và phát triển bền vững.') + '"</div><div style="font-size:11px;color:#9CA3AF;font-weight:600;">' + swT('sw.step6_team', '— Đội ngũ TeraX') + '</div></div>'
-    +'</div></div>';
+    + '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;">'
+    + '<div style="background:linear-gradient(135deg,#1E3A5F,#1D4ED8);border-radius:18px;padding:32px;color:white;overflow:hidden;position:relative;">'
+    + '<div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%);pointer-events:none;"></div>'
+    + '<div style="display:flex;align-items:center;gap:24px;">'
+    + '<div style="flex:1;">'
+    + '<div style="font-size:13px;color:#FCD34D;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:5px;"><span>🎉</span> ' + swT('sw.step6_ready_subtitle', 'Hoàn tất thiết lập!') + '</div>'
+    + '<h2 style="font-size:24px;font-weight:800;color:white;margin-bottom:10px;">' + swT('sw.step6_ready_title', 'TeraX đã sẵn sàng để sử dụng') + '</h2>'
+    + '<p style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:20px;">' + swT('sw.step6_ready_message', 'Môi trường làm việc của {{name}} đã được thiết lập. Hãy bắt đầu khám phá TeraX.').replace('{{name}}', '<strong style="color:white;">'+name+'</strong>') + '</p>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;">'
+    + '<button onclick="completeSetupWizard()" class="sw-btn-primary" style="background:linear-gradient(135deg,#f97316,#ea580c);"><span class="material-symbols-rounded" style="font-size:18px;">rocket_launch</span> ' + swT('sw.step6_enter_app', 'Vào hệ thống ngay') + '</button>'
+    + '</div>'
+    + '</div>'
+    + '<div style="width:100px;flex-shrink:0;text-align:center;">'
+    + '<div style="width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto;"><span class="material-symbols-rounded" style="font-size:48px;color:#FCD34D;">verified</span></div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;">' + swT('sw.step6_tagline', 'Cùng TeraX vận hành tốt hơn') + '</div>'
+    + '</div>'
+    + '</div>'
+    + '</div>' // close hero banner
+    + '<div class="sw-card">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#111827;">' + swT('sw.step6_overview', 'Tổng quan thiết lập') + '</div><button onclick="window.setSetupStep(1)" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid #E5E7EB;background:#F9FAFB;color:#374151;font-size:11.5px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">settings</span> ' + swT('sw.step6_edit', 'Chỉnh sửa') + '</button></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">'+sumCards+'</div>'
+    + '</div>'
+    + '<div><div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:12px;">' + swT('sw.step6_get_started', 'Bắt đầu với TeraX') + '</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">'+qaCards+'</div></div>'
+    + '</div>' // close left column
+    + '<div style="width:250px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;">'
+    + '<div class="sw-card"><div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:12px;">' + swT('sw.step6_useful_resources', 'Tài nguyên hữu ích') + '</div><div style="display:flex;flex-direction:column;gap:2px;">'+resItems+'</div></div>'
+    + '<div class="sw-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><div style="width:34px;height:34px;border-radius:50%;background:#FFF7ED;border:1px solid #FED7AA;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:18px;color:#f97316;">headset_mic</span></div><div><div style="font-size:12px;font-weight:700;color:#111827;">' + swT('sw.need_support', 'Bạn cần hỗ trợ?') + '</div><div style="font-size:10.5px;color:#6B7280;">' + swT('sw.support_desc', 'Đội ngũ TeraX luôn sẵn sàng.') + '</div></div></div><button onclick="window.open(\'https://terax.ai/\', \'_blank\')" class="sw-btn-primary" style="width:100%;justify-content:center;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">chat</span> ' + swT('sw.contact_support', 'Liên hệ hỗ trợ') + '</button></div>'
+    + '<div class="sw-card" style="background:rgba(255,255,255,0.7);"><div style="font-size:11.5px;color:#6B7280;line-height:1.6;font-style:italic;margin-bottom:10px;">"' + swT('sw.step6_quote', 'Cảm ơn bạn đã tin tưởng TeraX. Chúng tôi cam kết tiếp tục đồng hành để doanh nghiệp của bạn vận hành hiệu quả và phát triển bền vững.') + '"</div><div style="font-size:11px;color:#9CA3AF;font-weight:600;">' + swT('sw.step6_team', '— Đội ngũ TeraX') + '</div></div>'
+    + '</div>' // close right column
+    + '</div>'; // close main layout flex
 }
 
 // ─────────────────────────────────────────────────────────────
