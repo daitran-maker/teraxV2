@@ -1363,7 +1363,18 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         try {
           if (val.startsWith('[')) {
             existingFiles = JSON.parse(val);
-          } else if (val.startsWith('data:') || val.startsWith('data:image')) {
+          } else if (
+            val.startsWith('data:') ||
+            val.startsWith('data:image') ||
+            isSingle ||
+            field.key === 'logo' ||
+            field.key === 'avatar' ||
+            field.key === 'picture' ||
+            val.startsWith('/uploads/') ||
+            val.startsWith('uploads/') ||
+            val.startsWith('http://') ||
+            val.startsWith('https://')
+          ) {
             existingFiles = [val];
           } else {
             existingFiles = val.split(',').map(s => s.trim()).filter(Boolean);

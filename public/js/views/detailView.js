@@ -2800,10 +2800,16 @@ function buildDetailViewHTML(moduleKey, record) {
 
           <!-- Title & Subtitle -->
           <div style="margin-bottom: 24px; width: 100%;">
-            <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 16px 0; line-height: 1.2; display: flex; align-items: center; gap: 8px;">
-              ${record.deleted_at ? `<span class="material-symbols-rounded" style="font-size: 20px; color: #EF4444; flex-shrink: 0;" title="Soft Deleted">block</span>` : ''}
-              <span>${escapeHTML(headerTitle)}</span>
-            </h2>
+            ${typeof mod.detailSubtitle === 'function' ? `
+              <div style="margin-bottom: 16px; display: flex; align-items: center;">
+                ${mod.detailSubtitle(record)}
+              </div>
+            ` : `
+              <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 16px 0; line-height: 1.2; display: flex; align-items: center; gap: 8px;">
+                ${record.deleted_at ? `<span class="material-symbols-rounded" style="font-size: 20px; color: #EF4444; flex-shrink: 0;" title="Soft Deleted">block</span>` : ''}
+                <span>${escapeHTML(headerTitle)}</span>
+              </h2>
+            `}
             ${statusGridHTML}
           </div>
     `;
@@ -3004,7 +3010,18 @@ function buildDetailViewHTML(moduleKey, record) {
               const strVal = String(val).trim();
               if (strVal.startsWith('[')) {
                 fileList = JSON.parse(strVal);
-              } else if (strVal.startsWith('data:') || strVal.startsWith('data:image')) {
+              } else if (
+                strVal.startsWith('data:') ||
+                strVal.startsWith('data:image') ||
+                row.key === 'logo' ||
+                row.key === 'avatar' ||
+                row.key === 'picture' ||
+                (fieldCfg && fieldCfg.single) ||
+                strVal.startsWith('/uploads/') ||
+                strVal.startsWith('uploads/') ||
+                strVal.startsWith('http://') ||
+                strVal.startsWith('https://')
+              ) {
                 fileList = [strVal];
               } else {
                 fileList = strVal.split(',').map(s => s.trim()).filter(Boolean);

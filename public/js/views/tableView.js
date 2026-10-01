@@ -3703,8 +3703,18 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
       if (!val) return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle}"></td>`;
       let fileList = [];
       try {
-        if (typeof val === 'string' && val.startsWith('[')) fileList = JSON.parse(val);
-        else fileList = String(val).split(',').map(s => s.trim()).filter(Boolean);
+        if (typeof val === 'string' && val.startsWith('[')) {
+          fileList = JSON.parse(val);
+        } else if (
+          col.key === 'logo' ||
+          col.key === 'avatar' ||
+          col.key === 'picture' ||
+          (typeof val === 'string' && (val.startsWith('data:') || val.startsWith('/uploads/') || val.startsWith('uploads/') || val.startsWith('http://') || val.startsWith('https://')))
+        ) {
+          fileList = [val];
+        } else {
+          fileList = String(val).split(',').map(s => s.trim()).filter(Boolean);
+        }
       } catch (e) {
         fileList = [val];
       }

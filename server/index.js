@@ -158,8 +158,8 @@ function sanitizeUploadFileName(rawName) {
   let decoded = rawName;
   try { decoded = decodeURIComponent(rawName); } catch (e) {}
   const base = path.basename(decoded, path.extname(decoded)).trim();
-  // Only replace characters forbidden by operating systems (\ / : * ? " < > | and control chars)
-  const sanitized = base.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim();
+  // Strip commas, quotes, brackets, semicolons, and illegal filesystem characters
+  const sanitized = base.replace(/[,;[\]'"\\/:*?<>|\x00-\x1f]/g, '_').trim();
   return sanitized || 'file';
 }
 
