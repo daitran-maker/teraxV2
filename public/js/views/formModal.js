@@ -1074,6 +1074,20 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
           displayOpts = displayOpts.concat([{ [field.optionValue]: val, [field.optionLabel]: val }]);
         }
       }
+
+      if ((field.key === 'request_type' || field.key === 'policy_id' || field.key === 'ticket_type') && (sourceKey === 'policy' || sourceKey === 'helpdesk_policy')) {
+        const checkAutoCreated = (typeof window.isAutoCreatedPolicy === 'function')
+          ? window.isAutoCreatedPolicy
+          : (p) => {
+              const pid = String(p.policy_id || p.id || '').trim().toUpperCase();
+              const pname = String(p.policy_name || p.ticket_name || p.name || '').trim().toUpperCase();
+              return pid === '5' || pid === 'RPM' || pid === 'PAYMENT' || pname === 'PAYMENT' || pname === 'PAYMENT REQUEST (RPM)' || pname === 'PAYMENT REQUEST';
+            };
+        displayOpts = displayOpts.filter(p => {
+          if (isEdit && val && String(p[field.optionValue] || p.policy_id || p.id) === String(val)) return true;
+          return !checkAutoCreated(p);
+        });
+      }
       let hasCurrentVal = false;
       const optHTML = displayOpts.map(o => {
         const ov = o[field.optionValue];

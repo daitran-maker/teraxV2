@@ -988,7 +988,21 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   });
 });
 
+function isAutoCreatedPolicy(p) {
+  if (!p) return false;
+  if (typeof p === 'string' || typeof p === 'number') {
+    const s = String(p).trim().toUpperCase();
+    return s === '5' || s === 'RPM' || s === 'PAYMENT';
+  }
+  const pid = String(p.policy_id || p.ticket_type_id || p.id || '').trim().toUpperCase();
+  const pname = String(p.policy_name || p.ticket_name || p.name || '').trim().toUpperCase();
+  if (pid === '5' || pid === 'RPM' || pid === 'PAYMENT') return true;
+  if (pname === 'PAYMENT' || pname === 'PAYMENT REQUEST (RPM)' || pname === 'PAYMENT REQUEST') return true;
+  return false;
+}
+
 // Window Bridge for UI Helpers
+window.isAutoCreatedPolicy = isAutoCreatedPolicy;
 window.isColumnPinned = isColumnPinned;
 window.getStickyTableColumnStyle = getStickyTableColumnStyle;
 window.logout = logout;

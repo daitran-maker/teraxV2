@@ -932,11 +932,11 @@ window.handleDepartmentExcelUpload = async function(event){
         const tk = k.find(x => /loại|type/i.test(x));
         const mk = k.find(x => /quản lý|manager|email/i.test(x) && !/tên/i.test(x)) || k.find(x => /manager/i.test(x));
 
-        const compId = compk ? String(row[compk]).trim() : (window.setupWizardData?.company?.my_company_id || window.setupWizardData?.company?.company_id || '');
-        const code = ck ? String(row[ck]).trim() : '';
-        const name = nk ? String(row[nk]).trim() : '';
-        const type = tk ? String(row[tk]).trim() : 'Operation';
-        const mgr = mk ? String(row[mk]).trim() : '';
+        const compId = compk ? String(row[compk] != null ? row[compk] : '').trim() : String(window.setupWizardData?.company?.my_company_id || window.setupWizardData?.company?.company_id || '').trim();
+        const code = ck ? String(row[ck] != null ? row[ck] : '').trim() : '';
+        const name = nk ? String(row[nk] != null ? row[nk] : '').trim() : '';
+        const type = tk ? String(row[tk] != null ? row[tk] : '').trim() : 'Operation';
+        const mgr = mk ? String(row[mk] != null ? row[mk] : '').trim() : '';
 
         if (code || name) {
           mapped.push({
@@ -2542,9 +2542,10 @@ window.importSetupFile = async function(event,moduleKey){
       // Tự động gán company_id nếu bảng cần
       const compId = window.setupWizardData?.company?.my_company_id || window.setupWizardData?.company?.company_id;
       if (compId) {
+        const compIdStr = String(compId);
         jd = jd.map(row => {
           if (!row.company_id && !row.company) {
-            return { ...row, company_id: compId };
+            return { ...row, company_id: compIdStr };
           }
           return row;
         });

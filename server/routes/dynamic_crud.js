@@ -3670,6 +3670,13 @@ router.post('/:tableName', async (req, res) => {
           }
         }
       }
+      if (tableName === 'request') {
+        const ptUpper = String(data.request_type || '').toUpperCase();
+        if (ptUpper === '5' || ptUpper === 'RPM' || ptUpper === 'PAYMENT') {
+          throw new Error('Process type "Payment" (ID 5 / RPM) được tạo tự động bởi quy trình thanh toán và không thể tạo thủ công.');
+        }
+      }
+
       const requestChildren = ['payment', 'invoice', 'service', 'asset', 'contract', 'expense', 'target_table'];
       if (requestChildren.includes(tableName)) {
         const userRole = req.user && req.user.role ? req.user.role : '';

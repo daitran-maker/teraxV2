@@ -755,8 +755,21 @@ window.handleRequestCompanyChange = async function () {
     const compObj = companies.find(c => String(c.my_company_id) === String(selectedCompany) || c.company_shortname === selectedCompany);
     const companyId = compObj ? String(compObj.my_company_id) : null;
 
-    const filteredPolicies = policies;
     const currentVal = typeEl.value;
+    const isEdit = document.getElementById('form-modal-title')?.textContent?.includes(typeof t === 'function' ? t('form.edit_title', 'Edit') : 'Edit');
+
+    const checkAutoCreated = (typeof window.isAutoCreatedPolicy === 'function')
+      ? window.isAutoCreatedPolicy
+      : (p) => {
+          const pid = String(p.policy_id || p.id || '').trim().toUpperCase();
+          const pname = String(p.policy_name || p.ticket_name || p.name || '').trim().toUpperCase();
+          return pid === '5' || pid === 'RPM' || pid === 'PAYMENT' || pname === 'PAYMENT' || pname === 'PAYMENT REQUEST (RPM)' || pname === 'PAYMENT REQUEST';
+        };
+
+    const filteredPolicies = policies.filter(p => {
+      if (isEdit && currentVal && String(p.policy_id) === String(currentVal)) return true;
+      return !checkAutoCreated(p);
+    });
 
     typeEl.innerHTML = '<option value="">-- Select --</option>' +
       filteredPolicies.map(p => {

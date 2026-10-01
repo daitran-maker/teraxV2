@@ -360,12 +360,12 @@ router.post('/presets/departments', async (req, res) => {
 
     const created = [];
     for (const d of departments) {
-      const code = (d.department_code || '').trim();
-      const name = (d.department_name || '').trim();
-      const type = (d.type || 'Operation').trim();
-      const managerEmail = (d.manager_email || d.manager || '').trim() || null;
+      const code = String(d.department_code != null ? d.department_code : '').trim();
+      const name = String(d.department_name != null ? d.department_name : '').trim();
+      const type = String(d.type != null ? d.type : 'Operation').trim();
+      const managerEmail = String(d.manager_email || d.manager || '').trim() || null;
 
-      const targetCompanyId = (d.company_id || '').trim() || companyId;
+      const targetCompanyId = String(d.company_id != null ? d.company_id : '').trim() || companyId;
 
       // Check if code or name already exists for company
       const check = await client.query(
@@ -455,14 +455,14 @@ router.post('/presets/policies', async (req, res) => {
 
     const created = [];
     for (const p of policies) {
-      const name = (p.policy_name || '').trim();
-      const pType = (p.policy_type || 'Operation').trim();
-      const desc = (p.description || name).trim();
+      const name = String(p.policy_name != null ? p.policy_name : '').trim();
+      const pType = String(p.policy_type != null ? p.policy_type : 'Operation').trim();
+      const desc = String(p.description != null ? p.description : name).trim();
       const elements = p.elements || 'ASSIGN_TASK';
       const tier1 = resolveEmployeeVal(p.tier1_approval, true);
       const tier2 = resolveEmployeeVal(p.tier2_approval, false);
       const tier3 = resolveEmployeeVal(p.tier3_approval, false);
-      const approvalLevel = (p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
+      const approvalLevel = String(p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
       const lead = resolveEmployeeVal(p.policy_lead, false) || defaultLead;
       const owner = resolveEmployeeVal(p.sr_owner, false) || defaultLead;
 
@@ -532,11 +532,11 @@ router.post('/quick-account', async (req, res) => {
     // Support multiple accounts array if passed
     if (Array.isArray(accounts) && accounts.length > 0) {
       for (const acc of accounts) {
-        const aName = (acc.account_name || '').trim();
-        const bName = (acc.bank_name || '').trim();
-        const aNum = (acc.account_number || '').trim();
-        const aCur = (acc.currency || defaultCur).trim();
-        const aType = (acc.type || 'Bank').trim();
+        const aName = String(acc.account_name != null ? acc.account_name : '').trim();
+        const bName = String(acc.bank_name != null ? acc.bank_name : '').trim();
+        const aNum = String(acc.account_number != null ? acc.account_number : '').trim();
+        const aCur = String(acc.currency != null ? acc.currency : defaultCur).trim();
+        const aType = String(acc.type != null ? acc.type : 'Bank').trim();
 
         if (aName || bName || aNum) {
           const bId = await generateSequentialId('account', client);
@@ -612,8 +612,8 @@ router.post('/import-employees', async (req, res) => {
 
     const created = [];
     for (const emp of employees) {
-      const fullName = (emp.full_name || '').trim();
-      const email = (emp.email || '').trim().toLowerCase();
+      const fullName = String(emp.full_name != null ? emp.full_name : '').trim();
+      const email = String(emp.email != null ? emp.email : '').trim().toLowerCase();
       if (!fullName || !email) continue;
 
       // Check if employee already exists by email
@@ -621,20 +621,22 @@ router.post('/import-employees', async (req, res) => {
       if (check.rows.length > 0) continue;
 
       const empId = await generateSequentialId('employee', client);
-      const username = (emp.username || '').trim() || email.split('@')[0];
-      const position = (emp.position || '').trim() || 'Nhân viên';
-      const startDate = (emp.start_date || '').trim() || new Date().toISOString().split('T')[0];
-      const emgName = (emp.emergency_contact_name || '').trim() || null;
-      const emgPhone = (emp.emergency_contact_phone || '').trim() || null;
-      const directMgr = (emp.direct_manager || '').trim() || null;
-      const headMgr = (emp.head_manager || '').trim() || null;
+      const username = String(emp.username != null ? emp.username : '').trim() || email.split('@')[0];
+      const position = String(emp.position != null ? emp.position : '').trim() || 'Nhân viên';
+      const startDate = String(emp.start_date != null ? emp.start_date : '').trim() || new Date().toISOString().split('T')[0];
+      const emgName = String(emp.emergency_contact_name != null ? emp.emergency_contact_name : '').trim() || null;
+      const emgPhone = String(emp.emergency_contact_phone != null ? emp.emergency_contact_phone : '').trim() || null;
+      const directMgr = String(emp.direct_manager != null ? emp.direct_manager : '').trim() || null;
+      const headMgr = String(emp.head_manager != null ? emp.head_manager : '').trim() || null;
 
       // Map department
       let deptId = null;
-      if (emp.department_code && deptMap.has(emp.department_code.trim().toLowerCase())) {
-        deptId = deptMap.get(emp.department_code.trim().toLowerCase());
-      } else if (emp.department_name && deptMap.has(emp.department_name.trim().toLowerCase())) {
-        deptId = deptMap.get(emp.department_name.trim().toLowerCase());
+      const empDeptCode = String(emp.department_code != null ? emp.department_code : '').trim().toLowerCase();
+      const empDeptName = String(emp.department_name != null ? emp.department_name : '').trim().toLowerCase();
+      if (empDeptCode && deptMap.has(empDeptCode)) {
+        deptId = deptMap.get(empDeptCode);
+      } else if (empDeptName && deptMap.has(empDeptName)) {
+        deptId = deptMap.get(empDeptName);
       } else if (emp.department_id) {
         deptId = emp.department_id;
       }
