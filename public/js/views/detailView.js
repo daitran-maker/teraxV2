@@ -2985,28 +2985,46 @@ function buildDetailViewHTML(moduleKey, record) {
         } else {
           valHTML = `<span style="color: #94A3B8; font-style: italic;">—</span>`;
         }
-      } else if ((fieldCfg && fieldCfg.type === 'file') || row.key === 'file') {
+      } else if ((fieldCfg && fieldCfg.type === 'file') || row.key === 'file' || row.key === 'logo' || row.key === 'avatar') {
         let fileList = [];
         if (val) {
-          try {
-            if (String(val).startsWith('[')) {
-              fileList = JSON.parse(val);
-            } else {
-              fileList = String(val).split(',').map(s => s.trim()).filter(Boolean);
+          if (typeof val === 'object') {
+            if (val.type === 'Buffer' && Array.isArray(val.data)) {
+              try {
+                val = new TextDecoder('utf-8').decode(new Uint8Array(val.data));
+              } catch (e) {
+                val = '';
+              }
+            } else if (Array.isArray(val)) {
+              fileList = val;
             }
-          } catch (e) {
-            fileList = [val];
+          }
+          if (!fileList.length && val) {
+            try {
+              if (String(val).startsWith('[')) {
+                fileList = JSON.parse(val);
+              } else {
+                fileList = String(val).split(',').map(s => s.trim()).filter(Boolean);
+              }
+            } catch (e) {
+              fileList = [val];
+            }
           }
         }
-        valHTML = `<div style="display:flex; flex-direction:column; gap:6px;">` + fileList.map(fileUrl => {
-          const lowerVal = String(fileUrl).toLowerCase();
-          if (lowerVal.match(/[.](jpeg|jpg|gif|png|webp|svg)/) || lowerVal.includes('data:image')) {
-            return `<a href="${escapeHTML(fileUrl)}" target="_blank" style="display:inline-block;"><img src="${escapeHTML(fileUrl)}" style="max-width:200px; max-height:200px; border-radius:8px; border:1px solid #E2E8F0;" /></a>`;
-          } else {
-            const cleanFileName = formatFileNameDisplay(fileUrl);
-            return `<a href="${escapeHTML(fileUrl)}" target="_blank" download="${escapeHTML(cleanFileName)}" style="display:inline-flex; align-items:center; gap:6px; color:#2563EB; font-weight:600; text-decoration:none;"><span class="material-symbols-rounded" style="font-size:16px;">attach_file</span> ${escapeHTML(cleanFileName)}</a>`;
-          }
-        }).join('') + `</div>`;
+        if (fileList.length === 0) {
+          valHTML = `<span style="color: #94A3B8; font-style: italic;">—</span>`;
+        } else {
+          valHTML = `<div style="display:flex; flex-direction:column; gap:6px;">` + fileList.map(fileUrl => {
+            if (!fileUrl || typeof fileUrl !== 'string') return '';
+            const lowerVal = String(fileUrl).toLowerCase();
+            if (lowerVal.match(/[.](jpeg|jpg|gif|png|webp|svg)/) || lowerVal.includes('data:image') || lowerVal.startsWith('/uploads/') || lowerVal.startsWith('uploads/')) {
+              return `<a href="${escapeHTML(fileUrl)}" target="_blank" style="display:inline-block;"><img src="${escapeHTML(fileUrl)}" style="max-width:180px; max-height:180px; border-radius:8px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" /></a>`;
+            } else {
+              const cleanFileName = formatFileNameDisplay(fileUrl);
+              return `<a href="${escapeHTML(fileUrl)}" target="_blank" download="${escapeHTML(cleanFileName)}" style="display:inline-flex; align-items:center; gap:6px; color:#2563EB; font-weight:600; text-decoration:none;"><span class="material-symbols-rounded" style="font-size:16px;">attach_file</span> ${escapeHTML(cleanFileName)}</a>`;
+            }
+          }).filter(Boolean).join('') + `</div>`;
+        }
       } else if (row.key === 'changes') {
         let formattedChanges = '';
         try {

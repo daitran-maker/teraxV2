@@ -7,6 +7,26 @@ const { validateTableData } = require('../helpers/validation');
 const { checkPermission } = require('../helpers/permissionHelper');
 const { getRecordAuditLogs } = require('../helpers/auditHelper');
 
+function normalizeCompanyRecord(rec) {
+  if (!rec) return rec;
+  if (rec.logo) {
+    if (Buffer.isBuffer(rec.logo)) {
+      rec.logo = rec.logo.toString('utf8');
+    } else if (typeof rec.logo === 'object' && rec.logo.type === 'Buffer' && Array.isArray(rec.logo.data)) {
+      rec.logo = Buffer.from(rec.logo.data).toString('utf8');
+    } else if (Array.isArray(rec.logo) && rec.logo.length > 0) {
+      rec.logo = rec.logo[0];
+    }
+    if (typeof rec.logo === 'string' && rec.logo.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(rec.logo);
+        if (Array.isArray(parsed) && parsed.length > 0) rec.logo = parsed[0];
+      } catch (e) {}
+    }
+  }
+  return rec;
+}
+
 // GET all
 router.get('/', async (req, res) => {
   const { page, limit, search, sort_by, sort_dir, summary, ...filters } = req.query;
@@ -69,6 +89,7 @@ router.get('/', async (req, res) => {
 
       const queryParams = [...values, l, offset];
       const result = await pool.query(`${baseQuery} ${whereStr} ORDER BY ${orderBy} LIMIT $${valIdx} OFFSET $${valIdx + 1}`, queryParams);
+      result.rows.forEach(normalizeCompanyRecord);
 
       return res.json({
         data: result.rows,
@@ -82,6 +103,7 @@ router.get('/', async (req, res) => {
     }
 
     const result = await pool.query(`${baseQuery} ${whereStr} ORDER BY ${orderBy}`, values);
+    result.rows.forEach(normalizeCompanyRecord);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -98,7 +120,7 @@ router.get('/:id', async (req, res) => {
     }
     const result = await pool.query(query, [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    const record = result.rows[0];
+    const record = normalizeCompanyRecord(result.rows[0]);
     try {
       record.log = await getRecordAuditLogs('my_company', record.my_company_id || req.params.id, record.log);
     } catch (e) {
@@ -123,20 +145,30 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Validation failed', details: validationErrors });
   }
 
-  const { company_shortname, company_fullname, logo, tax_code, website, address, country, city, state, province, currency_list, status } = req.body;
+  let { company_shortname, company_fullname, logo, tax_code, website, address, country, city, state, province, currency_list, status } = req.body;
+  if (Array.isArray(logo) && logo.length > 0) {
+    logo = logo[0];
+  } else if (typeof logo === 'string' && logo.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(logo);
+      if (Array.isArray(parsed) && parsed.length > 0) logo = parsed[0];
+    } catch (e) {}
+  }
   
   // Verify custom branding support
   try {
     const scaleRes = await pool.query('SELECT features FROM cms_tenant_info LIMIT 1');
     if (scaleRes.rows.length && scaleRes.rows[0].features) {
       const features = typeof scaleRes.rows[0].features === 'string' ? JSON.parse(scaleRes.rows[0].features) : scaleRes.rows[0].features;
-      const branding = features.custom_branding || '❌';
-      const isBrandingAllowed = branding !== '❌' && branding !== 'none' && branding !== 'Không';
-      if (!isBrandingAllowed && logo) {
-        return res.status(403).json({
-          error: 'Gói dịch vụ hiện tại không hỗ trợ tải lên logo riêng. Vui lòng nâng cấp gói trên CMS.',
-          error_code: 'my_company.error.branding_not_supported'
-        });
+      if (features.custom_branding !== undefined && features.custom_branding !== null) {
+        const branding = String(features.custom_branding).trim().toLowerCase();
+        const isBrandingDisallowed = branding === '❌' || branding === 'none' || branding === 'không' || branding === 'false';
+        if (isBrandingDisallowed && logo) {
+          return res.status(403).json({
+            error: 'Gói dịch vụ hiện tại không hỗ trợ tải lên logo riêng. Vui lòng nâng cấp gói trên CMS.',
+            error_code: 'my_company.error.branding_not_supported'
+          });
+        }
       }
     }
   } catch (err) {
@@ -168,8 +200,9 @@ router.post('/', async (req, res) => {
       [id, company_shortname, company_fullname, logo, tax_code, website, address, country, city, state, province, systemBaseCurrency, currency_list, status || 'Active']
     );
     await client.query('COMMIT');
-    broadcastSSE('db_change', { action: 'insert', table: 'my_company', record: result.rows[0] });
-    res.status(201).json(result.rows[0]);
+    const created = normalizeCompanyRecord(result.rows[0]);
+    broadcastSSE('db_change', { action: 'insert', table: 'my_company', record: created });
+    res.status(201).json(created);
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
@@ -191,7 +224,15 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'Validation failed', details: validationErrors });
   }
 
-  const { company_shortname, company_fullname, logo, tax_code, website, address, country, city, state, province, currency_list, status } = req.body;
+  let { company_shortname, company_fullname, logo, tax_code, website, address, country, city, state, province, currency_list, status } = req.body;
+  if (Array.isArray(logo) && logo.length > 0) {
+    logo = logo[0];
+  } else if (typeof logo === 'string' && logo.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(logo);
+      if (Array.isArray(parsed) && parsed.length > 0) logo = parsed[0];
+    } catch (e) {}
+  }
   const isSuperAdmin = req.user && req.user.role && req.user.role.toUpperCase() === 'SUPER ADMIN';
 
   // Verify custom branding support
@@ -199,13 +240,15 @@ router.put('/:id', async (req, res) => {
     const scaleRes = await pool.query('SELECT features FROM cms_tenant_info LIMIT 1');
     if (scaleRes.rows.length && scaleRes.rows[0].features) {
       const features = typeof scaleRes.rows[0].features === 'string' ? JSON.parse(scaleRes.rows[0].features) : scaleRes.rows[0].features;
-      const branding = features.custom_branding || '❌';
-      const isBrandingAllowed = branding !== '❌' && branding !== 'none' && branding !== 'Không';
-      if (!isBrandingAllowed && logo) {
-        return res.status(403).json({
-          error: 'Gói dịch vụ hiện tại không hỗ trợ tải lên logo riêng. Vui lòng nâng cấp gói trên CMS.',
-          error_code: 'my_company.error.branding_not_supported'
-        });
+      if (features.custom_branding !== undefined && features.custom_branding !== null) {
+        const branding = String(features.custom_branding).trim().toLowerCase();
+        const isBrandingDisallowed = branding === '❌' || branding === 'none' || branding === 'không' || branding === 'false';
+        if (isBrandingDisallowed && logo) {
+          return res.status(403).json({
+            error: 'Gói dịch vụ hiện tại không hỗ trợ tải lên logo riêng. Vui lòng nâng cấp gói trên CMS.',
+            error_code: 'my_company.error.branding_not_supported'
+          });
+        }
       }
     }
   } catch (err) {
@@ -224,8 +267,9 @@ router.put('/:id', async (req, res) => {
       [company_shortname, company_fullname, logo, tax_code, website, address, country, city, state, province, currency_list, status || 'Active', req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    broadcastSSE('db_change', { action: 'update', table: 'my_company', record: result.rows[0] });
-    res.json(result.rows[0]);
+    const updated = normalizeCompanyRecord(result.rows[0]);
+    broadcastSSE('db_change', { action: 'update', table: 'my_company', record: updated });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

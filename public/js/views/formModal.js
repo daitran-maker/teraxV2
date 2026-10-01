@@ -1346,14 +1346,27 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
 
     let existingFiles = [];
     if (val) {
-      try {
-        if (String(val).startsWith('[')) {
-          existingFiles = JSON.parse(val);
-        } else {
-          existingFiles = String(val).split(',').map(s => s.trim()).filter(Boolean);
+      if (typeof val === 'object') {
+        if (val.type === 'Buffer' && Array.isArray(val.data)) {
+          try {
+            val = new TextDecoder('utf-8').decode(new Uint8Array(val.data));
+          } catch (e) {
+            val = '';
+          }
+        } else if (Array.isArray(val)) {
+          existingFiles = val;
         }
-      } catch (e) {
-        existingFiles = [val];
+      }
+      if (!existingFiles.length && typeof val === 'string') {
+        try {
+          if (val.startsWith('[')) {
+            existingFiles = JSON.parse(val);
+          } else {
+            existingFiles = String(val).split(',').map(s => s.trim()).filter(Boolean);
+          }
+        } catch (e) {
+          existingFiles = [val];
+        }
       }
     }
 
@@ -2047,7 +2060,11 @@ function collectFormData(moduleKey) {
       const hiddenEls = document.querySelectorAll(`input[id^="f-${field.key}-base64-"]`);
       if (hiddenEls.length > 0) {
         const vals = Array.from(hiddenEls).map(el => el.value).filter(Boolean);
-        data[field.key] = vals.length > 0 ? JSON.stringify(vals) : null;
+        if (field.key === 'logo' || field.key === 'avatar') {
+          data[field.key] = vals.length > 0 ? vals[0] : null;
+        } else {
+          data[field.key] = vals.length > 0 ? JSON.stringify(vals) : null;
+        }
       } else {
         const hiddenEl = document.getElementById(`f-${field.key}-base64`);
         data[field.key] = hiddenEl ? (hiddenEl.value || null) : null;
@@ -2235,11 +2252,23 @@ window.clearFileUploadSlot = function (fieldKey, idx) {
 };
 
 window.renderFileUploadSlotHTML = function (fieldKey, idx, val = '', acceptStr = '') {
+  if (val && typeof val === 'object') {
+    if (val.type === 'Buffer' && Array.isArray(val.data)) {
+      try {
+        val = new TextDecoder('utf-8').decode(new Uint8Array(val.data));
+      } catch (e) {
+        val = '';
+      }
+    } else if (Array.isArray(val) && val.length > 0) {
+      val = val[0];
+    }
+  }
+  if (typeof val !== 'string') val = val ? String(val) : '';
   const cleanName = val ? formatFileNameDisplay(val, 28) : '';
   const displayVal = val ? cleanName : 'Choose File or Drag & Drop here';
   const previewStyle = val ? 'display:block;' : 'display:none;';
   let previewContent = '';
-  const isImageFile = val && (val.startsWith('data:image') || val.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (val.startsWith('/uploads/') && val.match(/\.(png|jpe?g|gif|webp|svg)/i)));
+  const isImageFile = val && (val.startsWith('data:image') || val.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (val.startsWith('/uploads/') && (val.match(/\.(png|jpe?g|gif|webp|svg)/i) || val.includes('/uploads/'))) || val.startsWith('uploads/'));
   if (isImageFile) {
     previewContent = `<img src="${val}" alt="Preview" style="max-width:120px; max-height:120px; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" />`;
   } else if (val) {

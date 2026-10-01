@@ -3638,7 +3638,19 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
     const isPartnerName = moduleKey === 'company' && (k === 'company_fullname' || k === 'company_shortname');
 
     const extractImageUrl = (raw) => {
-      if (!raw || typeof raw !== 'string') return null;
+      if (!raw) return null;
+      if (typeof raw === 'object') {
+        if (raw.type === 'Buffer' && Array.isArray(raw.data)) {
+          try {
+            raw = new TextDecoder('utf-8').decode(new Uint8Array(raw.data));
+          } catch (e) {
+            return null;
+          }
+        } else if (Array.isArray(raw) && raw.length > 0) {
+          raw = raw[0];
+        }
+      }
+      if (typeof raw !== 'string') return null;
       let trimmed = raw.trim();
       if (trimmed.startsWith('[')) {
         try {
@@ -3646,7 +3658,15 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
           if (Array.isArray(parsed) && parsed.length > 0) trimmed = String(parsed[0]).trim();
         } catch (e) {}
       }
-      if (trimmed.toLowerCase().includes('data:image') || trimmed.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) || (trimmed.startsWith('/uploads/') && trimmed.match(/\.(png|jpe?g|gif|webp|svg)/i))) {
+      if (
+        trimmed.toLowerCase().includes('data:image') ||
+        trimmed.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) ||
+        (trimmed.startsWith('/uploads/') && trimmed.match(/\.(png|jpe?g|gif|webp|svg)/i)) ||
+        trimmed.startsWith('/uploads/') ||
+        trimmed.startsWith('uploads/') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://')
+      ) {
         return trimmed;
       }
       return null;
@@ -3666,14 +3686,16 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
 
     const directImgUrl = extractImageUrl(val);
     const isLogoCol = k === 'logo' || k === 'avatar';
-    if (directImgUrl || (isLogoCol && val)) {
-      const imgSrc = directImgUrl || (typeof val === 'string' ? val.trim() : '');
+    if (directImgUrl || isLogoCol) {
+      const imgSrc = directImgUrl;
       if (imgSrc) {
         const isMyCompanyLogo = (moduleKey === 'my_company' || moduleKey === 'company') && k === 'logo';
         const style = isMyCompanyLogo
           ? 'width:36px;height:36px;border-radius:6px;object-fit:contain;background:#F8FAFC;border:1px solid #E2E8F0;padding:2px;'
           : 'width:32px;height:32px;border-radius:50%;object-fit:cover;';
         return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle}"><img src="${escapeHTML(imgSrc)}" alt="Logo" style="${style}vertical-align:middle;" onerror="this.style.display='none'" /></td>`;
+      } else if (isLogoCol) {
+        return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle}"></td>`;
       }
     }
 

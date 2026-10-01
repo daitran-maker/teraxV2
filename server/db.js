@@ -2859,6 +2859,46 @@ async function runIncrementalMigrations() {
   } catch (e) {
     console.error('Failed to run migrateUtc0Standardization migration:', e);
   }
+  try {
+    await migrateByteaImageColumns();
+  } catch (e) {
+    console.error('Failed to run migrateByteaImageColumns migration:', e);
+  }
+}
+
+async function migrateByteaImageColumns() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = 'public' AND table_name = 'my_company' AND column_name = 'logo' AND data_type = 'bytea'
+        ) THEN
+          ALTER TABLE public.my_company ALTER COLUMN logo TYPE text USING (CASE WHEN logo IS NOT NULL THEN convert_from(logo, 'UTF8') ELSE NULL END);
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = 'public' AND table_name = 'employee' AND column_name = 'avatar' AND data_type = 'bytea'
+        ) THEN
+          ALTER TABLE public.employee ALTER COLUMN avatar TYPE text USING (CASE WHEN avatar IS NOT NULL THEN convert_from(avatar, 'UTF8') ELSE NULL END);
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = 'public' AND table_name = 'employee' AND column_name = 'picture' AND data_type = 'bytea'
+        ) THEN
+          ALTER TABLE public.employee ALTER COLUMN picture TYPE text USING (CASE WHEN picture IS NOT NULL THEN convert_from(picture, 'UTF8') ELSE NULL END);
+        END IF;
+      END $$;
+    `);
+  } catch (err) {
+    console.error('migrateByteaImageColumns error:', err.message);
+  } finally {
+    client.release();
+  }
 }
 
 async function migrateUtc0Standardization() {

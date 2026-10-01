@@ -12,7 +12,7 @@
     pk: 'my_company_id',
     icon: '🏢',
     columns: [
-      { key: 'logo', label: ' ' },
+      { key: 'logo', label: ' ', type: 'file' },
       { key: 'my_company_id', label: 'ID', hidden: true },
       { key: 'company_shortname', label: 'Company Short Name' },
       { key: 'company_fullname', label: 'Company Full Name' },
@@ -42,13 +42,22 @@
     ],
     detailSubtitle: (r) => {
       let logoUrl = r.logo;
+      if (logoUrl && typeof logoUrl === 'object') {
+        if (logoUrl.type === 'Buffer' && Array.isArray(logoUrl.data)) {
+          try {
+            logoUrl = new TextDecoder('utf-8').decode(new Uint8Array(logoUrl.data));
+          } catch (e) {}
+        } else if (Array.isArray(logoUrl) && logoUrl.length > 0) {
+          logoUrl = logoUrl[0];
+        }
+      }
       if (logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('[')) {
         try {
           const parsed = JSON.parse(logoUrl);
           if (Array.isArray(parsed) && parsed.length > 0) logoUrl = parsed[0];
         } catch(e) {}
       }
-      const logo = logoUrl ? `<img src="${logoUrl}" style="width:40px;height:40px;border-radius:4px;margin-right:12px;object-fit:contain;background:#F8FAFC;border:1px solid #E2E8F0;" />` : '';
+      const logo = (logoUrl && typeof logoUrl === 'string') ? `<img src="${logoUrl}" style="width:40px;height:40px;border-radius:4px;margin-right:12px;object-fit:contain;background:#F8FAFC;border:1px solid #E2E8F0;" />` : '';
       return `${logo} <span style="font-size:18px;font-weight:700;color:var(--text);">${r.company_fullname || ''}</span>`;
     },
     displayName: (r) => {
