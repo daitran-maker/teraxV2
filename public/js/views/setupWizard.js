@@ -6,18 +6,56 @@
 
 window.setupCurrentStep = 1;
 window.setupWizardData = null;
-window.setupParsedEmployees = [];
+window.setupParsedCompanies = [];
 window.setupParsedDepartments = [];
+window.setupParsedEmployees = [];
 window.setupParsedPolicies = [];
+window.setupParsedAccounts = [];
+window.setupStep1ActiveTab = 'form';
 window.setupStep2ActiveTab = 'choose';
 window.setupStep3ActiveTab = 'quick';
 window.setupStep4ActiveTab = 'library';
 window.setupStep4Category = 'all';
 window.setupStep4Search = '';
 window.setupStep4ApprovalLevel = 'Tier 1';
+window.setupStep5ActiveTab = 'quick';
 window.setupCustomPolicies = [
   { policy_name: '', policy_type: 'Operation', sla: 3, approval_level: 'Tier 1', tier1_approval: 'Direct Manager', tier2_approval: '', tier3_approval: '', description: '' }
 ];
+
+// ─── Setup Wizard Draft Cache (in memory & localStorage) ────────
+window.setupDraft = {
+  company: null,
+  departments: [],
+  employees: [],
+  policies: [],
+  accounts: []
+};
+
+function saveSetupDraftToStorage() {
+  try {
+    localStorage.setItem('terax_setup_draft_v2', JSON.stringify(window.setupDraft));
+  } catch(e){}
+}
+
+function loadSetupDraftFromStorage() {
+  try {
+    const raw = localStorage.getItem('terax_setup_draft_v2');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        window.setupDraft = {
+          company: parsed.company || null,
+          departments: Array.isArray(parsed.departments) ? parsed.departments : [],
+          employees: Array.isArray(parsed.employees) ? parsed.employees : [],
+          policies: Array.isArray(parsed.policies) ? parsed.policies : [],
+          accounts: Array.isArray(parsed.accounts) ? parsed.accounts : []
+        };
+      }
+    }
+  } catch(e){}
+}
+loadSetupDraftFromStorage();
 
 // ─── i18n helper ─────────────────────────────────────────────
 function swT(key, fallbackVi, fallbackEn) {
@@ -133,9 +171,15 @@ window.renderSetupContent = async function (forceRefresh) {
     }
   }
   const counts = window.setupTableCounts || {};
-  const comp = window.setupWizardData.company || {};
+  const draft = window.setupDraft || {};
+  const comp = draft.company ? (Array.isArray(draft.company) ? draft.company[0] : draft.company) : (window.setupWizardData.company || {});
   const currentStep = window.setupCurrentStep || 1;
-  const stepDone = [counts.my_company>0, counts.department>0, counts.employee>0, counts.policy_and_program>0, counts.account>0];
+  const hasComp = (counts.my_company > 0) || Boolean(draft.company);
+  const hasDepts = (counts.department > 0) || (draft.departments && draft.departments.length > 0);
+  const hasEmps = (counts.employee > 0) || (draft.employees && draft.employees.length > 0);
+  const hasPolicies = (counts.policy_and_program > 0) || (draft.policies && draft.policies.length > 0);
+  const hasAccounts = (counts.account > 0) || (draft.accounts && draft.accounts.length > 0);
+  const stepDone = [hasComp, hasDepts, hasEmps, hasPolicies, hasAccounts];
   const completedCount = stepDone.filter(Boolean).length;
   const pct = Math.round((completedCount/5)*100);
   const stepLabels = [
@@ -543,10 +587,13 @@ window.autoFetchTaxCode = async function(cleanCode) {
   }
 };
 
-function renderStep1HTML(comp) {
+function renderStep1HTML(compRaw) {
+  const draftComp = window.setupDraft?.company ? (Array.isArray(window.setupDraft.company) ? window.setupDraft.company[0] : window.setupDraft.company) : null;
+  const comp = draftComp || compRaw || {};
   const defaultTz = comp.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
   const defaultCountry = comp.country || 'Vietnam';
   const defaultCurrency = (comp.base_currency || 'VND').toUpperCase();
+  const tab = window.setupStep1ActiveTab || 'form';
 
   let logoSrc = '';
   if (comp.logo) {
@@ -571,7 +618,6 @@ function renderStep1HTML(comp) {
 
   // Async load lookups from CMS database via /system-setup/lookups
   setTimeout(async () => {
-    // Populate timezones
     window.swSearchOptions.timezone = buildTimezoneOptions(defaultTz);
     const matchedTz = window.swSearchOptions.timezone.find(t => t.value === defaultTz);
     const tzLabelEl = document.getElementById('sw_search_label_timezone');
@@ -583,21 +629,18 @@ function renderStep1HTML(comp) {
       fetchLookup('currencies', '/system-setup/lookups/currencies')
     ]);
 
-    // Format countries: 5 popular already prioritized at top from backend
     window.swSearchOptions.country = cts.map(c => ({
       value: c.name,
       label: c.display_name || c.name,
       searchLabel: (c.code ? c.code + ' ' : '') + (c.name || '') + ' ' + (c.display_name || '')
     }));
 
-    // Format currencies: 5 popular already prioritized at top from backend
     window.swSearchOptions.currency = cus.map(c => ({
       value: c.code,
       label: c.code,
       searchLabel: c.code + ' ' + (c.label || '')
     }));
 
-    // Set initial display labels
     const matchedCountry = window.swSearchOptions.country.find(c =>
       c.value.toLowerCase() === defaultCountry.toLowerCase() ||
       c.label.toLowerCase().includes(defaultCountry.toLowerCase())
@@ -613,78 +656,130 @@ function renderStep1HTML(comp) {
     window.filterSwSearchOptions('currency', '');
   }, 0);
 
+  let tabContent = '';
+  if (tab === 'form') {
+    tabContent = '<form id="form-step1" onsubmit="event.preventDefault();saveStep1AndAdvance();">'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
+      + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_fullname', 'Tên đầy đủ công ty / doanh nghiệp'), true)+swInput('step1_fullname', swT('sw.step1_fullname_ph', 'VD: CÔNG TY CỔ PHẦN CÔNG NGHỆ TERAX'), escapeHTML(comp.company_fullname||''))+'</div>'
+      + '<div class="form-group">'+swLabel(swT('sw.step1_shortname', 'Tên viết tắt / Brand Name'), true)+swInput('step1_shortname', swT('sw.step1_shortname_ph', 'VD: TERAX'), escapeHTML(comp.company_shortname||''))+'</div>'
+      + '<div class="form-group">'
+      + swLabel(swT('sw.step1_tax_code', 'Mã số thuế'), false)
+      + '<div style="position:relative;">'
+      + '<input type="text" id="step1_tax_code" class="sw-input" style="padding-right:36px;" placeholder="' + swT('sw.step1_tax_code_ph', 'VD: 0101234567') + '" value="' + escapeHTML(comp.tax_code||'') + '" oninput="window.handleTaxCodeInput(this.value)" onblur="window.handleTaxCodeInput(this.value, true)">'
+      + '<span id="step1_tax_status_icon" class="material-symbols-rounded" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:18px;color:#9CA3AF;pointer-events:none;display:none;"></span>'
+      + '</div>'
+      + '<div id="step1_tax_hint" style="font-size:11.5px;color:#6B7280;margin-top:4px;display:none;"></div>'
+      + '</div>'
+      + '<div class="form-group">'+swLabel(swT('sw.step1_country', 'Quốc gia'), true)
+      + '<div class="sw-search-dropdown">'
+      + '<input type="hidden" id="step1_country" value="'+escapeHTML(defaultCountry)+'">'
+      + '<div class="sw-search-display" id="sw_search_display_country" onclick="window.toggleSwSearchDropdown(\'country\')">'
+      + '<span id="sw_search_label_country">'+escapeHTML(defaultCountry)+'</span>'
+      + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
+      + '</div>'
+      + '<div class="sw-search-menu" id="sw_search_menu_country">'
+      + '<input type="text" class="sw-search-input" id="sw_search_input_country" placeholder="'+swT('sw.step1_search_country', 'Tìm kiếm quốc gia...')+'" oninput="window.filterSwSearchOptions(\'country\', this.value)" onclick="event.stopPropagation()">'
+      + '<div id="sw_search_list_country"></div>'
+      + '</div></div></div>'
+      + '<div class="form-group">'+swLabel(swT('sw.step1_currency', 'Currency'), true)
+      + '<div class="sw-search-dropdown">'
+      + '<input type="hidden" id="step1_currency" value="'+escapeHTML(defaultCurrency)+'">'
+      + '<div class="sw-search-display" id="sw_search_display_currency" onclick="window.toggleSwSearchDropdown(\'currency\')">'
+      + '<span id="sw_search_label_currency">'+escapeHTML(defaultCurrency)+'</span>'
+      + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
+      + '</div>'
+      + '<div class="sw-search-menu" id="sw_search_menu_currency">'
+      + '<input type="text" class="sw-search-input" id="sw_search_input_currency" placeholder="'+swT('sw.step1_search_currency', 'Tìm kiếm loại tiền tệ...')+'" oninput="window.filterSwSearchOptions(\'currency\', this.value)" onclick="event.stopPropagation()">'
+      + '<div id="sw_search_list_currency"></div>'
+      + '</div></div></div>'
+      + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_address', 'Địa chỉ trụ sở chính'), false)+swInput('step1_address', swT('sw.step1_address_ph', 'VD: Tầng 5, Tòa nhà Landmark, Hà Nội'), escapeHTML(comp.address||''))+'</div>'
+      + '<div class="form-group">'+swLabel(swT('sw.step1_website', 'Website'), false)+swInput('step1_website', 'https://terax.ai', escapeHTML(comp.website||''))+'</div>'
+      + '<div class="form-group">' + swLabel(swT('sw.step1_timezone', 'Múi giờ hệ thống'), true)
+      + '<div class="sw-search-dropdown">'
+      + '<input type="hidden" id="step1_timezone" value="' + escapeHTML(defaultTz) + '">'
+      + '<div class="sw-search-display" id="sw_search_display_timezone" onclick="window.toggleSwSearchDropdown(\'timezone\')">'
+      + '<span id="sw_search_label_timezone">' + escapeHTML(defaultTz) + '</span>'
+      + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
+      + '</div>'
+      + '<div class="sw-search-menu" id="sw_search_menu_timezone">'
+      + '<input type="text" class="sw-search-input" id="sw_search_input_timezone" placeholder="' + swT('sw.step1_search_timezone', 'Tìm kiếm múi giờ...') + '" oninput="window.filterSwSearchOptions(\'timezone\', this.value)" onclick="event.stopPropagation()">'
+      + '<div id="sw_search_list_timezone"></div>'
+      + '</div></div></div>'
+      + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_logo', 'Logo thương hiệu công ty'), false)
+      + '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;">'
+      + '<div id="step1_logo_preview" style="width:48px;height:48px;border-radius:8px;background:#FFFFFF;border:1px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">'
+      + (logoSrc ? '<img src="'+escapeHTML(logoSrc)+'" style="width:100%;height:100%;object-fit:contain;">' : '<span class="material-symbols-rounded" style="color:#9CA3AF;font-size:24px;">image</span>')
+      + '</div>'
+      + '<div style="flex:1;">'
+      + '<input type="file" id="step1_logo_file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="window.handleStep1Logo(event)" style="font-size:12px;color:#4B5563;">'
+      + '<div style="font-size:11px;color:#9CA3AF;margin-top:3px;">' + swT('sw.step1_logo_tip', 'Khuyến nghị ảnh định dạng PNG nền trong suốt, dung lượng tối đa 1MB.') + '</div>'
+      + '</div></div></div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6;">'
+      + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(2)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
+      + '<button type="submit" class="sw-btn-primary"><span>' + swT('sw.btn_save_continue', 'Lưu và tiếp tục') + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
+      + '</div></form>';
+  } else {
+    // Excel upload tab
+    const parsed = window.setupParsedCompanies || [];
+    let prev = '';
+    if (parsed.length > 0) {
+      let rows = '';
+      for (let i = 0; i < parsed.length; i++) {
+        const c = parsed[i];
+        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
+          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(c.my_company_id || '–') + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(c.company_shortname || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(c.company_fullname || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(c.tax_code || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(c.country || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(c.city || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#059669;font-weight:600;font-size:11.5px;">' + escapeHTML(c.base_currency || '–') + '</td>'
+          + '</tr>';
+      }
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">domain</span>'
+        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step1_preview_title', 'Danh sách công ty đã đọc') + '</div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
+        + '</div>'
+        + '<button onclick="window.setupParsedCompanies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:260px;overflow-y:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
+        + '<thead><tr style="background:#F8FAFC;">'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Company ID</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_shortname', 'Tên viết tắt') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_fullname', 'Tên đầy đủ') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_tax_code', 'Mã số thuế') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_country', 'Quốc gia') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.city', 'Thành phố') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_currency', 'Tiền tệ') + '</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div></div>';
+    }
+    tabContent = '<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'company\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleCompanyExcelUpload(event)"></label></div></div>'
+      + prev
+      + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6;">'
+      + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(2)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
+      + '<button type="button" class="sw-btn-primary" onclick="saveStep1AndAdvance()"><span>' + swT('sw.btn_save_continue', 'Lưu và tiếp tục') + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
+      + '</div>';
+  }
+
   return '<div class="sw-card">'
     + swStepHeader('apartment', 1, swT('sw.step1_header', 'Thông tin công ty'), swT('sw.step1_desc', 'Tạo cơ sở dữ liệu nền tảng cho doanh nghiệp. Có thể chỉnh sửa sau.'))
-    + '<form id="form-step1" onsubmit="event.preventDefault();saveStep1AndAdvance();">'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
-    + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_fullname', 'Tên đầy đủ công ty / doanh nghiệp'), true)+swInput('step1_fullname', swT('sw.step1_fullname_ph', 'VD: CÔNG TY CỔ PHẦN CÔNG NGHỆ TERAX'), escapeHTML(comp.company_fullname||''))+'</div>'
-    + '<div class="form-group">'+swLabel(swT('sw.step1_shortname', 'Tên viết tắt / Brand Name'), true)+swInput('step1_shortname', swT('sw.step1_shortname_ph', 'VD: TERAX'), escapeHTML(comp.company_shortname||''))+'</div>'
-    + '<div class="form-group">'
-    + swLabel(swT('sw.step1_tax_code', 'Mã số thuế'), false)
-    + '<div style="position:relative;">'
-    + '<input type="text" id="step1_tax_code" class="sw-input" style="padding-right:36px;" placeholder="' + swT('sw.step1_tax_code_ph', 'VD: 0101234567') + '" value="' + escapeHTML(comp.tax_code||'') + '" oninput="window.handleTaxCodeInput(this.value)" onblur="window.handleTaxCodeInput(this.value, true)">'
-    + '<span id="step1_tax_status_icon" class="material-symbols-rounded" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:18px;color:#9CA3AF;pointer-events:none;display:none;"></span>'
-    + '</div>'
-    + '<div id="step1_tax_hint" style="font-size:11.5px;color:#6B7280;margin-top:4px;display:none;"></div>'
-    + '</div>'
-
-    // Country Searchable Select (top 5 popular first, flat list, searchable)
-    + '<div class="form-group">'+swLabel(swT('sw.step1_country', 'Quốc gia'), true)
-    + '<div class="sw-search-dropdown">'
-    + '<input type="hidden" id="step1_country" value="'+escapeHTML(defaultCountry)+'">'
-    + '<div class="sw-search-display" id="sw_search_display_country" onclick="window.toggleSwSearchDropdown(\'country\')">'
-    + '<span id="sw_search_label_country">'+escapeHTML(defaultCountry)+'</span>'
-    + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
-    + '</div>'
-    + '<div class="sw-search-menu" id="sw_search_menu_country">'
-    + '<input type="text" class="sw-search-input" id="sw_search_input_country" placeholder="'+swT('sw.step1_search_country', 'Tìm kiếm quốc gia...')+'" oninput="window.filterSwSearchOptions(\'country\', this.value)" onclick="event.stopPropagation()">'
-    + '<div id="sw_search_list_country"></div>'
-    + '</div></div></div>'
-
-    // Currency Searchable Select (top 5 popular first, flat list, searchable)
-    + '<div class="form-group">'+swLabel(swT('sw.step1_currency', 'Currency'), true)
-    + '<div class="sw-search-dropdown">'
-    + '<input type="hidden" id="step1_currency" value="'+escapeHTML(defaultCurrency)+'">'
-    + '<div class="sw-search-display" id="sw_search_display_currency" onclick="window.toggleSwSearchDropdown(\'currency\')">'
-    + '<span id="sw_search_label_currency">'+escapeHTML(defaultCurrency)+'</span>'
-    + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
-    + '</div>'
-    + '<div class="sw-search-menu" id="sw_search_menu_currency">'
-    + '<input type="text" class="sw-search-input" id="sw_search_input_currency" placeholder="'+swT('sw.step1_search_currency', 'Tìm kiếm loại tiền tệ...')+'" oninput="window.filterSwSearchOptions(\'currency\', this.value)" onclick="event.stopPropagation()">'
-    + '<div id="sw_search_list_currency"></div>'
-    + '</div></div></div>'
-
-    + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_address', 'Địa chỉ trụ sở chính'), false)+swInput('step1_address', swT('sw.step1_address_ph', 'VD: Tầng 5, Tòa nhà Landmark, Hà Nội'), escapeHTML(comp.address||''))+'</div>'
-    + '<div class="form-group">'+swLabel(swT('sw.step1_website', 'Website'), false)+swInput('step1_website', 'https://terax.ai', escapeHTML(comp.website||''))+'</div>'
-    
-    // Timezone Searchable Select
-    + '<div class="form-group">' + swLabel(swT('sw.step1_timezone', 'Múi giờ hệ thống'), true)
-    + '<div class="sw-search-dropdown">'
-    + '<input type="hidden" id="step1_timezone" value="' + escapeHTML(defaultTz) + '">'
-    + '<div class="sw-search-display" id="sw_search_display_timezone" onclick="window.toggleSwSearchDropdown(\'timezone\')">'
-    + '<span id="sw_search_label_timezone">' + escapeHTML(defaultTz) + '</span>'
-    + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
-    + '</div>'
-    + '<div class="sw-search-menu" id="sw_search_menu_timezone">'
-    + '<input type="text" class="sw-search-input" id="sw_search_input_timezone" placeholder="' + swT('sw.step1_search_timezone', 'Tìm kiếm múi giờ...') + '" oninput="window.filterSwSearchOptions(\'timezone\', this.value)" onclick="event.stopPropagation()">'
-    + '<div id="sw_search_list_timezone"></div>'
-    + '</div></div></div>'
-
-    + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_logo', 'Logo thương hiệu công ty'), false)
-    + '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;">'
-    + '<div id="step1_logo_preview" style="width:48px;height:48px;border-radius:8px;background:#FFFFFF;border:1px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">'
-    + (logoSrc ? '<img src="'+escapeHTML(logoSrc)+'" style="width:100%;height:100%;object-fit:contain;">' : '<span class="material-symbols-rounded" style="color:#9CA3AF;font-size:24px;">image</span>')
-    + '</div>'
-    + '<div style="flex:1;">'
-    + '<input type="file" id="step1_logo_file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="window.handleStep1Logo(event)" style="font-size:12px;color:#4B5563;">'
-    + '<div style="font-size:11px;color:#9CA3AF;margin-top:3px;">' + swT('sw.step1_logo_tip', 'Khuyến nghị ảnh định dạng PNG nền trong suốt, dung lượng tối đa 1MB.') + '</div>'
-    + '</div></div></div>'
-    + '</div>'
-    + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6;">'
-    + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(2)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
-    + '<button type="submit" class="sw-btn-primary"><span>' + swT('sw.btn_save_continue', 'Lưu và tiếp tục') + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
-    + '</div></form></div>';
+    + swTabBar([
+        { key: 'form', label: swT('sw.step1_tab_form', 'Điền thông tin') },
+        { key: 'excel', label: swT('sw.step1_tab_excel', 'Nhập từ Excel') }
+      ], tab, 'window.switchStep1Tab')
+    + tabContent
+    + '</div>';
 }
+
+window.switchStep1Tab = function(t){ window.setupStep1ActiveTab = t; renderSetupContent(); };
 
 window.step1LogoBase64 = null;
 window.handleStep1Logo = function(e){
@@ -700,46 +795,105 @@ window.handleStep1Logo = function(e){
   reader.readAsDataURL(file);
 };
 
-window.saveStep1AndAdvance = async function(){
-  const fn=document.getElementById('step1_fullname')?.value?.trim(),sn=document.getElementById('step1_shortname')?.value?.trim();
-  if(!fn||!sn){showToast(swT('sw.step1_required_error', 'Vui lòng điền tên đầy đủ và tên viết tắt'),'warning');return;}
-  const tzVal = document.getElementById('step1_timezone')?.value || 'Asia/Ho_Chi_Minh';
-  try{
-    showToast(swT('sw.step1_saving', 'Đang lưu thông tin công ty...'),'info');
-    const res=await apiPost('/system-setup/company',{
-      company_fullname:fn,
-      company_shortname:sn,
-      tax_code:document.getElementById('step1_tax_code')?.value?.trim(),
-      country:document.getElementById('step1_country')?.value,
-      base_currency:document.getElementById('step1_currency')?.value,
-      timezone: tzVal,
-      address:document.getElementById('step1_address')?.value?.trim(),
-      website:document.getElementById('step1_website')?.value?.trim(),
-      logo: window.step1LogoBase64 || null
-    });
-    if(res.success){
-      if (tzVal) {
-        localStorage.setItem('crc_timezone', tzVal);
-        if (window.setupWizardData && window.setupWizardData.company) {
-          window.setupWizardData.company.timezone = tzVal;
+window.handleCompanyExcelUpload = async function(event){
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    await swEnsureXLSX();
+  } catch(e) {
+    showToast(e.message || swT('sw.excel_load_error', 'Lỗi tải thư viện Excel'), 'error');
+    event.target.value = '';
+    return;
+  }
+  const r = new FileReader();
+  r.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows || !rows.length) {
+        showToast(swT('common.empty_file', 'File không có dòng dữ liệu'), 'warning');
+        return;
+      }
+      const mapped = [];
+      for (const row of rows) {
+        const k = Object.keys(row);
+        const cidK = k.find(x => /my_company_id|^company_id$|^id$/i.test(x));
+        const snK = k.find(x => /company_shortname|shortname|viết tắt/i.test(x));
+        const fnK = k.find(x => /company_fullname|fullname|tên đầy đủ/i.test(x)) || k.find(x => /tên|name/i.test(x));
+        const addrK = k.find(x => /address|địa chỉ/i.test(x));
+        const taxK = k.find(x => /tax_code|tax|mã số thuế/i.test(x));
+        const ctryK = k.find(x => /country|quốc gia/i.test(x));
+        const cityK = k.find(x => /city|thành phố/i.test(x));
+        const curK = k.find(x => /base_currency|currency|tiền tệ/i.test(x));
+
+        const fn = fnK ? String(row[fnK]).trim() : '';
+        const sn = snK ? String(row[snK]).trim() : (fn ? fn.substring(0, 10).toUpperCase() : '');
+        if (fn || sn) {
+          mapped.push({
+            my_company_id: cidK && row[cidK] != null ? String(row[cidK]).trim() : String(mapped.length + 1),
+            company_shortname: sn,
+            company_fullname: fn || sn,
+            address: addrK ? String(row[addrK]).trim() : '',
+            tax_code: taxK ? String(row[taxK]).trim() : '',
+            country: ctryK ? String(row[ctryK]).trim() : 'Vietnam',
+            city: cityK ? String(row[cityK]).trim() : '',
+            base_currency: curK ? String(row[curK]).trim() : 'VND'
+          });
         }
       }
-      const curr = document.getElementById('step1_currency')?.value;
-      if (curr) {
-        localStorage.setItem('crc_base_currency', curr);
-        if (window.setupWizardData && window.setupWizardData.company) {
-          window.setupWizardData.company.base_currency = curr;
-        }
-        if (window.cmsTenantInfo) {
-          window.cmsTenantInfo.base_currency = curr;
-        }
+      if (!mapped.length) {
+        showToast(swT('common.no_valid_rows', 'Không tìm thấy dòng hợp lệ trong file'), 'warning');
+        return;
       }
-      showToast(swT('sw.step1_saved', 'Đã lưu thông tin công ty!'),'success');
-      window.setupCurrentStep=2;
-      await renderSetupContent(true);
+      window.setupParsedCompanies = mapped;
+      window.setupDraft.company = mapped.length === 1 ? mapped[0] : mapped;
+      saveSetupDraftToStorage();
+      showToast(swT('sw.step1_parsed_count', 'Đã nhận diện {{count}} công ty từ file Excel').replace('{{count}}', mapped.length), 'success');
+      renderSetupContent();
+    } catch(err) {
+      showToast(swT('sw.file_read_error', 'Lỗi đọc file: ') + err.message, 'error');
     }
-    else showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-  }catch(err){showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');}
+  };
+  r.readAsArrayBuffer(file);
+};
+
+window.saveStep1AndAdvance = async function(){
+  const tab = window.setupStep1ActiveTab || 'form';
+  if (tab === 'excel' && (window.setupParsedCompanies || []).length > 0) {
+    window.setupDraft.company = window.setupParsedCompanies.length === 1 ? window.setupParsedCompanies[0] : window.setupParsedCompanies;
+    saveSetupDraftToStorage();
+    showToast(swT('sw.step1_draft_saved', 'Đã lưu tạm thông tin công ty vào bộ nhớ!'), 'success');
+    window.setupCurrentStep = 2;
+    await renderSetupContent();
+    return;
+  }
+  const fn = document.getElementById('step1_fullname')?.value?.trim();
+  const sn = document.getElementById('step1_shortname')?.value?.trim();
+  if (!fn || !sn) {
+    showToast(swT('sw.step1_required_error', 'Vui lòng điền tên đầy đủ và tên viết tắt'), 'warning');
+    return;
+  }
+  const tzVal = document.getElementById('step1_timezone')?.value || 'Asia/Ho_Chi_Minh';
+  const currVal = document.getElementById('step1_currency')?.value || 'VND';
+  window.setupDraft.company = {
+    company_fullname: fn,
+    company_shortname: sn,
+    tax_code: document.getElementById('step1_tax_code')?.value?.trim() || null,
+    country: document.getElementById('step1_country')?.value || 'Vietnam',
+    city: document.getElementById('step1_city')?.value?.trim() || null,
+    base_currency: currVal,
+    timezone: tzVal,
+    address: document.getElementById('step1_address')?.value?.trim() || null,
+    website: document.getElementById('step1_website')?.value?.trim() || null,
+    logo: window.step1LogoBase64 || null
+  };
+  saveSetupDraftToStorage();
+  localStorage.setItem('crc_timezone', tzVal);
+  localStorage.setItem('crc_base_currency', currVal);
+  showToast(swT('sw.step1_draft_saved', 'Đã lưu tạm thông tin công ty vào bộ nhớ!'), 'success');
+  window.setupCurrentStep = 2;
+  await renderSetupContent();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -931,13 +1085,15 @@ window.handleDepartmentExcelUpload = async function(event){
       const mapped = [];
       for (const row of rows) {
         const k = Object.keys(row);
+        const didK = k.find(x => /department_id|dept_id|^id$/i.test(x));
         const compk = k.find(x => /company/i.test(x) || /công ty/i.test(x));
-        const ck = k.find(x => /mã|code/i.test(x));
-        const nk = k.find(x => /tên|name/i.test(x) && !/quản lý|manager/i.test(x));
+        const ck = k.find(x => /mã|department_code|dept_code|code/i.test(x));
+        const nk = k.find(x => /department_name|dept_name|tên/i.test(x) && !/quản lý|manager/i.test(x));
         const tk = k.find(x => /loại|type/i.test(x));
         const mk = k.find(x => /quản lý|manager|email/i.test(x) && !/tên/i.test(x)) || k.find(x => /manager/i.test(x));
 
-        const compId = compk ? String(row[compk] != null ? row[compk] : '').trim() : String(window.setupWizardData?.company?.my_company_id || window.setupWizardData?.company?.company_id || '').trim();
+        const did = didK && row[didK] != null ? String(row[didK]).trim() : '';
+        const compId = compk && row[compk] != null ? String(row[compk]).trim() : (window.setupDraft?.company?.my_company_id || '1');
         const code = ck ? String(row[ck] != null ? row[ck] : '').trim() : '';
         const name = nk ? String(row[nk] != null ? row[nk] : '').trim() : '';
         const type = tk ? String(row[tk] != null ? row[tk] : '').trim() : 'Operation';
@@ -945,6 +1101,7 @@ window.handleDepartmentExcelUpload = async function(event){
 
         if (code || name) {
           mapped.push({
+            department_id: did,
             company_id: compId,
             department_code: code || name.substring(0, 6).toUpperCase(),
             department_name: name || code,
@@ -958,6 +1115,8 @@ window.handleDepartmentExcelUpload = async function(event){
         return;
       }
       window.setupParsedDepartments = mapped;
+      window.setupDraft.departments = mapped;
+      saveSetupDraftToStorage();
       showToast(swT('sw.step2_parsed_count', 'Đã nhận diện {{count}} phòng ban').replace('{{count}}', mapped.length), 'success');
       renderSetupContent();
     } catch(err) {
@@ -973,67 +1132,61 @@ window.applyParsedDepartments = async function(){
     window.setSetupStep(3);
     return;
   }
-  try {
-    showToast(swT('sw.step2_creating', 'Đang tạo phòng ban...'), 'info');
-    const res = await apiPost('/system-setup/presets/departments', { departments: depts });
-    if (res.success) {
-      showToast(swT('sw.step2_created', 'Đã tạo {{count}} phòng ban!').replace('{{count}}', res.count), 'success');
-      window.setupParsedDepartments = [];
-      window.setupCurrentStep = 3;
-      await renderSetupContent(true);
-    } else {
-      showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-    }
-  } catch(err) {
-    showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
-  }
+  window.setupDraft.departments = depts;
+  saveSetupDraftToStorage();
+  showToast(swT('sw.step2_draft_saved', 'Đã lưu tạm {{count}} phòng ban vào bộ nhớ!').replace('{{count}}', depts.length), 'success');
+  window.setupCurrentStep = 3;
+  await renderSetupContent();
 };
 
-window.saveStep2AndAdvance=async function(){
-  const tab=window.setupStep2ActiveTab;
+window.saveStep2AndAdvance = async function(){
+  const tab = window.setupStep2ActiveTab;
+  let deptsToSave = [];
+
   if (tab === 'excel' || (tab === 'preview' && (window.setupParsedDepartments || []).length > 0)) {
-    if (window.setupParsedDepartments && window.setupParsedDepartments.length > 0) {
-      await window.applyParsedDepartments();
-      return;
-    }
-    window.setSetupStep(3);
-    return;
-  }
-  if(tab==='quick'){
-    const codes=document.querySelectorAll('.qdept-code'),
-          names=document.querySelectorAll('.qdept-name'),
-          mgrs=document.querySelectorAll('.qdept-manager'),
-          payload=[];
-    codes.forEach((c,i)=>{
-      const code=c.value.trim(), name=names[i]?.value?.trim(), mgr=mgrs[i]?.value?.trim();
-      if(code&&name) payload.push({department_code:code, department_name:name, manager_email:mgr||null, type:'Operation'});
+    deptsToSave = window.setupParsedDepartments || [];
+  } else if (tab === 'quick') {
+    const codes = document.querySelectorAll('.qdept-code');
+    const names = document.querySelectorAll('.qdept-name');
+    const mgrs = document.querySelectorAll('.qdept-manager');
+    const curCompId = window.setupDraft?.company?.my_company_id || '1';
+    codes.forEach((c, i) => {
+      const code = c.value.trim();
+      const name = names[i]?.value?.trim();
+      const mgr = mgrs[i]?.value?.trim();
+      if (code && name) {
+        deptsToSave.push({
+          department_id: '',
+          company_id: curCompId,
+          department_code: code,
+          department_name: name,
+          manager_email: mgr || null,
+          type: 'Operation'
+        });
+      }
     });
-    if(!payload.length){window.setSetupStep(3);return;}
-    try{
-      const res=await apiPost('/system-setup/presets/departments',{departments:payload});
-      if(res.success){
-        showToast(swT('sw.step2_created', 'Đã tạo {{count}} phòng ban!').replace('{{count}}', res.count),'success');
-        window.setupCurrentStep=3;await renderSetupContent(true);
-      } else showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-    }catch(err){showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');}
-    return;
+  } else {
+    // Presets
+    const cbs = document.querySelectorAll('input[name="preset_dept"]:checked');
+    const sels = Array.from(cbs).map(c => c.value);
+    const curCompId = window.setupDraft?.company?.my_company_id || '1';
+    deptsToSave = PRESET_DEPARTMENTS.filter(d => sels.includes(d.code)).map(d => ({
+      department_id: '',
+      company_id: curCompId,
+      department_code: d.code,
+      department_name: swIsVi() ? d.name : (d.nameEn || d.name),
+      manager_email: d.manager || null,
+      type: 'Operation'
+    }));
   }
-  const cbs=document.querySelectorAll('input[name="preset_dept"]:checked'),sels=Array.from(cbs).map(c=>c.value);
-  if(!sels.length){window.setSetupStep(3);return;}
-  const payload=PRESET_DEPARTMENTS.filter(d=>sels.includes(d.code)).map(d=>({
-    department_code:d.code,
-    department_name: swIsVi() ? d.name : (d.nameEn || d.name),
-    manager_email:d.manager||null,
-    type:'Operation'
-  }));
-  try{
-    showToast(swT('sw.step2_creating', 'Đang tạo phòng ban...'),'info');
-    const res=await apiPost('/system-setup/presets/departments',{departments:payload});
-    if(res.success){
-      showToast(swT('sw.step2_created', 'Đã tạo {{count}} phòng ban!').replace('{{count}}', res.count),'success');
-      window.setupCurrentStep=3;await renderSetupContent(true);
-    } else showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-  }catch(err){showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');}
+
+  if (deptsToSave.length > 0) {
+    window.setupDraft.departments = deptsToSave;
+    saveSetupDraftToStorage();
+    showToast(swT('sw.step2_draft_saved', 'Đã lưu tạm {{count}} phòng ban vào bộ nhớ!').replace('{{count}}', deptsToSave.length), 'success');
+  }
+  window.setupCurrentStep = 3;
+  await renderSetupContent();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1187,92 +1340,54 @@ window.downloadEmployeeTemplate = async function(){
     return;
   }
   const isVi = swIsVi();
-  const h = isVi ? [
-    'Họ và tên *',
-    'Tên đăng nhập *',
-    'Email *',
-    'Phòng ban (Mã hoặc Tên)',
-    'Chức vụ',
-    'Ngày bắt đầu (YYYY-MM-DD) *',
-    'Email Quản lý trực tiếp *',
-    'Email Quản lý nhân sự *',
-    'Tên liên hệ khẩn cấp *',
-    'SĐT liên hệ khẩn cấp *'
-  ] : [
-    'Full Name *',
-    'Username *',
-    'Email *',
-    'Department (Code or Name)',
-    'Job Title',
-    'Start Date (YYYY-MM-DD) *',
-    'Direct Manager Email *',
-    'HR Manager Email *',
-    'Emergency Contact Name *',
-    'Emergency Contact Phone *'
+  const headers = [
+    'employee_id',
+    'employee_code',
+    'nick_name',
+    'user_name',
+    'full_name',
+    'gen',
+    'position',
+    'company_id',
+    'department_id',
+    'status',
+    'direct_manager',
+    'role',
+    'location_base',
+    'email',
+    'phone',
+    'address',
+    'start_date'
   ];
-  const today = new Date().toISOString().split('T')[0];
-  const data = isVi ? [
+  const sampleData = [
     {
-      'Họ và tên *': 'Nguyễn Văn Quản Lý',
-      'Tên đăng nhập *': 'nguyen.quanly',
-      'Email *': 'manager@company.com',
-      'Phòng ban (Mã hoặc Tên)': 'KD',
-      'Chức vụ': 'Trưởng phòng',
-      'Ngày bắt đầu (YYYY-MM-DD) *': today,
-      'Email Quản lý trực tiếp *': 'admin@company.com',
-      'Email Quản lý nhân sự *': 'admin@company.com',
-      'Tên liên hệ khẩn cấp *': 'Nguyễn Thị Vợ',
-      'SĐT liên hệ khẩn cấp *': '0901234567'
-    },
-    {
-      'Họ và tên *': 'Trần Thị Nhân Viên',
-      'Tên đăng nhập *': 'tran.nhanvien',
-      'Email *': 'staff@company.com',
-      'Phòng ban (Mã hoặc Tên)': 'KD',
-      'Chức vụ': 'Chuyên viên',
-      'Ngày bắt đầu (YYYY-MM-DD) *': today,
-      'Email Quản lý trực tiếp *': 'manager@company.com',
-      'Email Quản lý nhân sự *': 'admin@company.com',
-      'Tên liên hệ khẩn cấp *': 'Trần Văn Mẹ',
-      'SĐT liên hệ khẩn cấp *': '0912345678'
-    }
-  ] : [
-    {
-      'Full Name *': 'John Smith',
-      'Username *': 'john.smith',
-      'Email *': 'manager@company.com',
-      'Department (Code or Name)': 'KD',
-      'Job Title': 'Sales Manager',
-      'Start Date (YYYY-MM-DD) *': today,
-      'Direct Manager Email *': 'admin@company.com',
-      'HR Manager Email *': 'admin@company.com',
-      'Emergency Contact Name *': 'Mary Smith',
-      'Emergency Contact Phone *': '0901234567'
-    },
-    {
-      'Full Name *': 'Jane Doe',
-      'Username *': 'jane.doe',
-      'Email *': 'staff@company.com',
-      'Department (Code or Name)': 'KD',
-      'Job Title': 'Sales Executive',
-      'Start Date (YYYY-MM-DD) *': today,
-      'Direct Manager Email *': 'manager@company.com',
-      'HR Manager Email *': 'admin@company.com',
-      'Emergency Contact Name *': 'Robert Doe',
-      'Emergency Contact Phone *': '0912345678'
+      employee_id: 1,
+      employee_code: 'NV001',
+      nick_name: '',
+      user_name: 'dung.pham',
+      full_name: 'Phạm Văn Dũng',
+      gen: 'Nam',
+      position: 'Tổng Giám đốc',
+      company_id: 1,
+      department_id: 1,
+      status: 17,
+      direct_manager: 1,
+      role: 'Super Admin',
+      location_base: 'Hà Nội',
+      email: 'dung.pham@company.com',
+      phone: '0982363845',
+      address: 'Trần Phú, Hà Nội',
+      start_date: new Date().toISOString().split('T')[0]
     }
   ];
-  const ws = XLSX.utils.json_to_sheet(data, { header: h });
-  ws['!cols'] = [
-    { wch: 24 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 18 },
-    { wch: 26 }, { wch: 26 }, { wch: 24 }, { wch: 22 }, { wch: 20 }
-  ];
+  const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 5, 16) }));
   const wb = XLSX.utils.book_new();
   const sheetName = isVi ? 'NhanVien' : 'Employees';
-  const fileName = isVi ? 'Mau_Nhan_Vien_Chuan_TeraX.xlsx' : 'Employee_Template_TeraX.xlsx';
+  const fileName = isVi ? 'Mau_Nhan_Vien_TeraX.xlsx' : 'Employee_Template_TeraX.xlsx';
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, fileName);
-  showToast(swT('common.download_success', 'Đã tải xuống file mẫu'),'success');
+  showToast(swT('common.download_success', 'Đã tải xuống file mẫu nhân viên'),'success');
 };
 
 window.handleEmployeeExcelUpload = async function(event){
@@ -1296,33 +1411,54 @@ window.handleEmployeeExcelUpload = async function(event){
         return;
       }
       const mapped = [];
+      const curCompId = window.setupDraft?.company?.my_company_id || '1';
       for (const row of rows) {
         const k = Object.keys(row);
-        const nk = k.find(x => /tên|name|họ/i.test(x) && !/khẩn|emergency|quản lý|manager/i.test(x));
-        const unk = k.find(x => /username|đăng nhập|tai khoan/i.test(x));
-        const ek = k.find(x => /email|thư/i.test(x) && !/quản lý|manager/i.test(x));
-        const dk = k.find(x => /phòng|dept|ban/i.test(x));
-        const pk = k.find(x => /chức|vị trí|title|position/i.test(x));
-        const sdk = k.find(x => /ngày bắt đầu|start_date|start date/i.test(x));
-        const mk = k.find(x => /quản lý trực tiếp|direct_manager|direct manager/i.test(x)) || k.find(x => /quản lý|manager/i.test(x));
-        const hrmk = k.find(x => /quản lý nhân sự|hr_manager|head_manager|hr manager/i.test(x));
-        const enk = k.find(x => /khẩn cấp.*tên|tên.*khẩn cấp|emergency.*name/i.test(x));
-        const epk = k.find(x => /khẩn cấp.*sđt|sđt.*khẩn cấp|phone.*emergency|emergency.*phone|điện thoại/i.test(x));
+        const eidK = k.find(x => /employee_id|^id$/i.test(x));
+        const codeK = k.find(x => /employee_code|emp_code|mã nhân viên|mã nv/i.test(x));
+        const nickK = k.find(x => /nick_name|nickname|biệt danh/i.test(x));
+        const unK = k.find(x => /user_name|username|tên đăng nhập/i.test(x));
+        const fnK = k.find(x => /full_name|họ và tên|họ tên|tên/i.test(x) && !/khẩn|emergency|quản lý|manager/i.test(x));
+        const genK = k.find(x => /^gen$|gender|giới tính/i.test(x));
+        const posK = k.find(x => /position|chức vụ|vị trí|chức danh/i.test(x));
+        const compK = k.find(x => /company_id|công ty/i.test(x));
+        const deptIdK = k.find(x => /department_id|dept_id/i.test(x));
+        const deptNameK = k.find(x => /department_name|phòng ban/i.test(x)) || (row.__EMPTY ? '__EMPTY' : null);
+        const statusK = k.find(x => /^status$|trạng thái/i.test(x));
+        const mgrK = k.find(x => /direct_manager|quản lý trực tiếp/i.test(x)) || k.find(x => /quản lý|manager/i.test(x) && !/hr|head/i.test(x));
+        const roleK = k.find(x => /^role$|vai trò/i.test(x));
+        const locK = k.find(x => /location_base|location|địa điểm/i.test(x));
+        const emailK = k.find(x => /email|thư/i.test(x) && !/quản lý|manager/i.test(x));
+        const phoneK = k.find(x => /phone|điện thoại|sđt/i.test(x) && !/khẩn|emergency/i.test(x));
+        const addrK = k.find(x => /address|địa chỉ/i.test(x) && !/công ty|company/i.test(x));
+        const sdK = k.find(x => /start_date|ngày bắt đầu|ngày vào/i.test(x));
 
-        const fn = nk ? String(row[nk]).trim() : '';
-        const em = ek ? String(row[ek]).trim() : '';
-        if (fn && em) {
+        const fn = fnK ? String(row[fnK]).trim() : '';
+        const un = unK ? String(row[unK]).trim() : '';
+        const em = emailK ? String(row[emailK]).trim() : '';
+        let phone = phoneK && row[phoneK] != null ? String(row[phoneK]).trim() : '';
+        if (phone && phone.length === 9) phone = '0' + phone;
+
+        if (fn || un || em) {
           mapped.push({
-            full_name: fn,
-            username: unk ? String(row[unk]).trim() : em.split('@')[0],
+            employee_id: eidK && row[eidK] != null ? String(row[eidK]).trim() : '',
+            employee_code: codeK && row[codeK] != null ? String(row[codeK]).trim() : '',
+            nick_name: nickK && row[nickK] != null ? String(row[nickK]).trim() : '',
+            username: un || (em ? em.split('@')[0] : (fn ? fn.toLowerCase().replace(/\s+/g, '.') : '')),
+            full_name: fn || un || em,
+            gen: genK && row[genK] != null ? String(row[genK]).trim() : '',
+            position: posK && row[posK] != null ? String(row[posK]).trim() : (swIsVi() ? 'Nhân viên' : 'Employee'),
+            company_id: compK && row[compK] != null ? String(row[compK]).trim() : curCompId,
+            department_id: deptIdK && row[deptIdK] != null ? String(row[deptIdK]).trim() : '',
+            department_name: deptNameK && row[deptNameK] != null ? String(row[deptNameK]).trim() : '',
+            status: statusK && row[statusK] != null && row[statusK] !== '' ? row[statusK] : 17,
+            direct_manager: mgrK && row[mgrK] != null ? String(row[mgrK]).trim() : '',
+            role: roleK && row[roleK] != null ? String(row[roleK]).trim() : 'Staff',
+            location_base: locK && row[locK] != null ? String(row[locK]).trim() : '',
             email: em,
-            department_code: dk ? String(row[dk]).trim() : '',
-            position: pk ? String(row[pk]).trim() : (swIsVi() ? 'Nhân viên' : 'Employee'),
-            start_date: sdk ? String(row[sdk]).trim() : new Date().toISOString().split('T')[0],
-            direct_manager: mk ? String(row[mk]).trim() : '',
-            head_manager: hrmk ? String(row[hrmk]).trim() : '',
-            emergency_contact_name: enk ? String(row[enk]).trim() : '',
-            emergency_contact_phone: epk ? String(row[epk]).trim() : ''
+            phone: phone,
+            address: addrK && row[addrK] != null ? String(row[addrK]).trim() : '',
+            start_date: sdK && row[sdK] != null ? String(row[sdK]).trim() : new Date().toISOString().split('T')[0]
           });
         }
       }
@@ -1331,6 +1467,8 @@ window.handleEmployeeExcelUpload = async function(event){
         return;
       }
       window.setupParsedEmployees = mapped;
+      window.setupDraft.employees = mapped;
+      saveSetupDraftToStorage();
       showToast(swT('sw.step3_parsed_count', 'Đã nhận diện {{count}} nhân viên').replace('{{count}}', mapped.length),'success');
       renderSetupContent();
     } catch(err) {
@@ -1359,12 +1497,15 @@ window.saveStep3AndAdvance = async function(){
       const en = c.querySelector('.qemp-emg-name')?.value?.trim();
       const ep = c.querySelector('.qemp-emg-phone')?.value?.trim();
 
-      if (fn && em) {
+      if (fn || un || em) {
         employeesToSave.push({
-          full_name: fn,
+          employee_id: '',
+          employee_code: '',
+          full_name: fn || un || em,
           username: un,
           email: em,
           department_code: dp,
+          department_name: dp,
           position: pos,
           start_date: sd,
           direct_manager: dm,
@@ -1374,33 +1515,17 @@ window.saveStep3AndAdvance = async function(){
         });
       }
     });
-    if (!employeesToSave.length) {
-      window.setSetupStep(4);
-      return;
-    }
   } else {
     employeesToSave = window.setupParsedEmployees || [];
   }
 
-  if (!employeesToSave.length) {
-    window.setSetupStep(4);
-    return;
+  if (employeesToSave.length > 0) {
+    window.setupDraft.employees = employeesToSave;
+    saveSetupDraftToStorage();
+    showToast(swT('sw.step3_draft_saved', 'Đã lưu tạm {{count}} nhân viên vào bộ nhớ!').replace('{{count}}', employeesToSave.length), 'success');
   }
-
-  try {
-    showToast(swT('sw.step3_importing', 'Đang nhập {{count}} nhân viên...').replace('{{count}}', employeesToSave.length),'info');
-    const res = await apiPost('/system-setup/import-employees', { employees: employeesToSave });
-    if (res.success) {
-      showToast(swT('sw.step3_imported', 'Đã nhập {{count}} nhân viên!').replace('{{count}}', res.count),'success');
-      window.setupParsedEmployees = [];
-      window.setupCurrentStep = 4;
-      await renderSetupContent(true);
-    } else {
-      showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-    }
-  } catch(err) {
-    showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
-  }
+  window.setupCurrentStep = 4;
+  await renderSetupContent();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -2158,35 +2283,21 @@ window.applyParsedPolicies = async function(){
     window.setSetupStep(5);
     return;
   }
-  try {
-    showToast(swT('sw.step4_creating', 'Đang tạo quy trình...'), 'info');
-    const res = await apiPost('/system-setup/presets/policies', { policies: policies });
-    if (res.success) {
-      showToast(swT('sw.step4_created_success', 'Đã tạo {{count}} quy trình!').replace('{{count}}', res.count), 'success');
-      window.setupParsedPolicies = [];
-      window.setupCurrentStep = 5;
-      await renderSetupContent(true);
-    } else {
-      showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-    }
-  } catch(err) {
-    showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
-  }
+  window.setupDraft.policies = policies;
+  saveSetupDraftToStorage();
+  showToast(swT('sw.step4_draft_saved', 'Đã lưu tạm {{count}} quy trình vào bộ nhớ!').replace('{{count}}', policies.length), 'success');
+  window.setupCurrentStep = 5;
+  await renderSetupContent();
 };
 
 window.saveStep4AndAdvance = async function(){
   const tab = window.setupStep4ActiveTab;
+  let policiesToSave = [];
+
   if (tab === 'excel') {
-    if (window.setupParsedPolicies && window.setupParsedPolicies.length > 0) {
-      await window.applyParsedPolicies();
-      return;
-    }
-    window.setSetupStep(5);
-    return;
-  }
-  if(tab === 'create'){
+    policiesToSave = window.setupParsedPolicies || [];
+  } else if (tab === 'create') {
     const rows = document.querySelectorAll('#step4-custom-policies-container .step4-policy-row');
-    const policies = [];
     rows.forEach(r => {
       const name = r.querySelector('.step4-pol-name')?.value?.trim();
       if (!name) return;
@@ -2200,7 +2311,7 @@ window.saveStep4AndAdvance = async function(){
       const lead = r.querySelector('.step4-pol-lead')?.value?.trim() || null;
       const owner = r.querySelector('.step4-pol-owner')?.value?.trim() || null;
       const dept = r.querySelector('.step4-pol-dept')?.value?.trim() || null;
-      policies.push({
+      policiesToSave.push({
         policy_name: name,
         policy_type: type,
         description: desc,
@@ -2215,49 +2326,28 @@ window.saveStep4AndAdvance = async function(){
         department_id: dept
       });
     });
-
-    if(!policies.length){
-      showToast(swT('form.required_field', 'Vui lòng nhập tên quy trình'), 'warning');
-      return;
-    }
-
-    try {
-      showToast(swT('sw.step4_creating', 'Đang tạo quy trình...'), 'info');
-      const res = await apiPost('/system-setup/presets/policies', { policies: policies });
-      if(res.success){
-        const count = res.count || policies.length;
-        showToast(swT('sw.step4_created_success', 'Đã tạo {{count}} quy trình!').replace('{{count}}', count), 'success');
-        window.setupCustomPolicies = [{ policy_name: '', policy_type: 'Operation', sla: 3, approval_level: 'Tier 1', tier1_approval: 'Direct Manager', tier2_approval: '', tier3_approval: '', description: '' }];
-        window.setupCurrentStep = 5;
-        await renderSetupContent(true);
-      } else {
-        showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-      }
-    } catch(err){
-      showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
-    }
-    return;
+  } else {
+    // Library presets
+    const cbs = document.querySelectorAll('input[name="preset_policy"]:checked');
+    const sels = Array.from(cbs).map(c => c.value);
+    policiesToSave = PRESET_POLICIES_FULL.filter(p => sels.includes(p.id)).map(p => ({
+      policy_name: swIsVi() ? (p.nameVi || p.name) : (p.nameEn || p.name),
+      policy_type: p.type,
+      description: swIsVi() ? (p.descVi || p.name) : (p.descEn || p.descVi || p.name),
+      elements: p.elements,
+      sla: p.sla,
+      approval_level: 'Tier 1',
+      tier1_approval: 'Direct Manager'
+    }));
   }
-  const cbs = document.querySelectorAll('input[name="preset_policy"]:checked'), sels = Array.from(cbs).map(c=>c.value);
-  if(!sels.length){window.setSetupStep(5);return;}
-  const payload = PRESET_POLICIES_FULL.filter(p=>sels.includes(p.id)).map(p=>({
-    policy_name: swIsVi() ? (p.nameVi || p.name) : (p.nameEn || p.name),
-    policy_type: p.type,
-    description: swIsVi() ? (p.descVi || p.name) : (p.descEn || p.descVi || p.name),
-    elements: p.elements,
-    sla: p.sla,
-    approval_level: 'Tier 1',
-    tier1_approval: 'Direct Manager'
-  }));
-  try {
-    showToast(swT('sw.step4_creating', 'Đang khởi tạo quy trình...'),'info');
-    const res = await apiPost('/system-setup/presets/policies', { policies: payload });
-    if(res.success){
-      showToast(swT('sw.step4_created_count', 'Đã tạo {{count}} quy trình!').replace('{{count}}', res.count),'success');
-      window.setupCurrentStep = 5;
-      await renderSetupContent(true);
-    } else showToast(res.error || swT('common.save_failed', 'Lưu thất bại'), 'error');
-  } catch(err){showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');}
+
+  if (policiesToSave.length > 0) {
+    window.setupDraft.policies = policiesToSave;
+    saveSetupDraftToStorage();
+    showToast(swT('sw.step4_draft_saved', 'Đã lưu tạm {{count}} quy trình vào bộ nhớ!').replace('{{count}}', policiesToSave.length), 'success');
+  }
+  window.setupCurrentStep = 5;
+  await renderSetupContent();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -2327,9 +2417,16 @@ window.removeStep5AccountRow = function(btn) {
   }
 };
 
+window.switchStep5Tab = function(t){ window.setupStep5ActiveTab = t; renderSetupContent(); };
+
 function renderStep5HTML(comp, counts) {
-  const cur = comp.base_currency || 'VND';
-  const acctInfo = counts.account > 0 ? '<div style="padding:12px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:16px;font-size:12px;color:#374151;"><span class="material-symbols-rounded" style="font-size:14px;color:#059669;vertical-align:middle;">check_circle</span> ' + swT('sw.step5_existing_count', 'Hiện có {{count}} tài khoản đã thiết lập.').replace('{{count}}', counts.account) + '</div>' : '';
+  const tab = window.setupStep5ActiveTab || 'quick';
+  const cur = (window.setupDraft?.company?.base_currency) || comp.base_currency || 'VND';
+  const acctCount = (window.setupDraft?.accounts && window.setupDraft.accounts.length > 0)
+    ? window.setupDraft.accounts.length
+    : (counts.account || 0);
+
+  const acctInfo = acctCount > 0 ? '<div style="padding:12px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:16px;font-size:12px;color:#374151;"><span class="material-symbols-rounded" style="font-size:14px;color:#059669;vertical-align:middle;">check_circle</span> ' + swT('sw.step5_existing_count', 'Hiện có {{count}} tài khoản đã thiết lập.').replace('{{count}}', acctCount) + '</div>' : '';
 
   const initialRowHTML = window.renderStep5AccountRowHTML(0, {
     account_name: '',
@@ -2390,73 +2487,242 @@ function renderStep5HTML(comp, counts) {
 
   const currencyDatalist = '<datalist id="step5-currency-datalist"><option value="VND"><option value="USD"><option value="EUR"><option value="JPY"><option value="SGD"><option value="CNY"></datalist>';
 
+  let tabContent = '';
+  if (tab === 'quick') {
+    tabContent = '<form id="form-step5" onsubmit="event.preventDefault();saveStep5AndAdvance();">'
+      + '<p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step5_multi_desc', 'Bạn có thể nhập một hoặc nhiều tài khoản ngân hàng của doanh nghiệp.') + '</p>'
+      + '<div id="step5-accounts-container">'
+      + initialRowHTML
+      + '</div>'
+      + '<button type="button" onclick="window.addStep5AccountRow()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:1px dashed #D1D5DB;background:#F9FAFB;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:16px;">'
+      + '<span class="material-symbols-rounded" style="font-size:16px;">add</span> '
+      + swT('sw.step5_add_account', 'Thêm tài khoản ngân hàng khác')
+      + '</button>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:16px;border-top:1px solid #F3F4F6;">'
+      + '<button type="button" class="sw-btn-back" onclick="window.setSetupStep(4)"><span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span> ' + swT('sw.btn_back', 'Quay lại') + '</button>'
+      + '<div style="display:flex;gap:10px;align-items:center;">'
+      + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(6)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
+      + '<button type="submit" class="sw-btn-primary"><span>' + swT('sw.btn_save_summary', 'Lưu và xem tổng kết') + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
+      + '</div>'
+      + '</div></form>';
+  } else {
+    // Excel upload tab
+    const parsed = window.setupParsedAccounts || [];
+    let prev = '';
+    if (parsed.length > 0) {
+      let rows = '';
+      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
+        const a = parsed[i];
+        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
+          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(a.account_id || '–') + '</td>'
+          + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(a.account_name || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(a.type || 'Bank Account') + '</td>'
+          + '<td style="padding:7px 10px;color:#059669;font-weight:600;font-size:11.5px;">' + escapeHTML(a.account_status || 'active') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.currency || 'VND') + '</td>'
+          + '<td style="padding:7px 10px;color:#2563EB;font-weight:600;font-size:11.5px;">' + escapeHTML(a.account_number || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#111827;font-size:11.5px;">' + escapeHTML(a.bank_name || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(String(a.exchange_rate || 1)) + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.transaction_managed_by || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.finance_control || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.company_entity || '–') + '</td>'
+          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+          + '<button type="button" onclick="window.deleteSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
+          + '</td>'
+          + '</tr>';
+      }
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">account_balance</span>'
+        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step5_preview_title', 'Danh sách tài khoản đọc từ file Excel') + '</div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
+        + '</div>'
+        + '<button onclick="window.setupParsedAccounts=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
+        + '<thead><tr style="background:#F8FAFC;">'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Account ID</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_name', 'Tên tài khoản') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Loại</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Trạng thái</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Tiền tệ</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_num', 'Số tài khoản') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_bank', 'Ngân hàng') + '</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Tỷ giá</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">QL Giao dịch</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Kiểm soát TC</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Pháp nhân</th>'
+        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:70px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div></div>';
+    }
+    tabContent = '<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'account\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleAccountExcelUpload(event)"></label></div></div>'
+      + prev
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6;">'
+      + '<button type="button" class="sw-btn-back" onclick="window.setSetupStep(4)"><span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span> ' + swT('sw.btn_back', 'Quay lại') + '</button>'
+      + '<div style="display:flex;gap:10px;align-items:center;">'
+      + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(6)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
+      + '<button type="button" class="sw-btn-primary" onclick="saveStep5AndAdvance()"><span>' + (parsed.length > 0 ? swT('sw.step5_imported_btn', 'Lưu {{count}} tài khoản từ Excel').replace('{{count}}', parsed.length) : swT('sw.btn_save_summary', 'Lưu và xem tổng kết')) + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
+      + '</div>'
+      + '</div>';
+  }
+
   return '<div class="sw-card">'
     + swStepHeader('account_balance', 5, swT('sw.step5_header', 'Tài khoản ngân hàng'), swT('sw.step5_desc', 'Thiết lập các tài khoản thanh toán để quản lý dòng tiền thu chi.'))
     + acctInfo
     + acctNameDatalist
     + banksDatalist
     + currencyDatalist
-    + '<form id="form-step5" onsubmit="event.preventDefault();saveStep5AndAdvance();">'
-    + '<p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step5_multi_desc', 'Bạn có thể nhập một hoặc nhiều tài khoản ngân hàng của doanh nghiệp.') + '</p>'
-    + '<div id="step5-accounts-container">'
-    + initialRowHTML
-    + '</div>'
-    + '<button type="button" onclick="window.addStep5AccountRow()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:1px dashed #D1D5DB;background:#F9FAFB;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:16px;">'
-    + '<span class="material-symbols-rounded" style="font-size:16px;">add</span> '
-    + swT('sw.step5_add_account', 'Thêm tài khoản ngân hàng khác')
-    + '</button>'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:16px;border-top:1px solid #F3F4F6;">'
-    + '<button type="button" class="sw-btn-back" onclick="window.setSetupStep(4)"><span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span> ' + swT('sw.btn_back', 'Quay lại') + '</button>'
-    + '<div style="display:flex;gap:10px;align-items:center;">'
-    + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(6)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
-    + '<button type="submit" class="sw-btn-primary"><span>' + swT('sw.btn_save_summary', 'Lưu và xem tổng kết') + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
-    + '</div>'
-    + '</div></form></div>';
+    + swTabBar([
+        { key: 'quick', label: swT('sw.step5_tab_quick', 'Điền thông tin') },
+        { key: 'excel', label: swT('sw.step5_tab_excel', 'Nhập từ Excel') }
+      ], tab, 'window.switchStep5Tab')
+    + tabContent
+    + '</div>';
 }
 
-window.saveStep5AndAdvance = async function() {
-  const rows = document.querySelectorAll('.step5-account-row');
-  const accounts = [];
-  rows.forEach(r => {
-    const an = r.querySelector('.step5-acct-name')?.value?.trim();
-    const bn = r.querySelector('.step5-bank-name')?.value?.trim();
-    const num = r.querySelector('.step5-acct-num')?.value?.trim();
-    const cur = r.querySelector('.step5-currency')?.value?.trim() || 'VND';
-    if (an || bn || num) {
-      accounts.push({
-        account_name: an || (bn ? (bn + (num ? ' - ' + num : '')) : swT('sw.step5_account_item', 'Tài khoản ngân hàng', 'Bank Account')),
-        bank_name: bn,
-        account_number: num,
-        currency: cur
-      });
-    }
-  });
-
+window.handleAccountExcelUpload = async function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
   try {
-    showToast(swT('sw.step5_setting_up', 'Đang thiết lập tài khoản...'), 'info');
-    await apiPost('/system-setup/quick-account', {
-      accounts: accounts,
-      create_cash: true
-    });
-    showToast(swT('sw.step5_saved', 'Đã lưu tài khoản!'), 'success');
-    window.setupCurrentStep = 6;
-    await renderSetupContent(true);
-  } catch(err) {
-    showToast(swT('common.error', 'Lỗi: ') + err.message, 'error');
+    await swEnsureXLSX();
+  } catch(e) {
+    showToast(e.message || swT('sw.excel_load_error', 'Lỗi tải thư viện Excel'), 'error');
+    event.target.value = '';
+    return;
   }
+  const r = new FileReader();
+  r.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows || !rows.length) {
+        showToast(swT('common.empty_file', 'File không có dòng dữ liệu'), 'warning');
+        return;
+      }
+      const mapped = [];
+      for (const row of rows) {
+        const k = Object.keys(row);
+        const idK = k.find(x => /account_id|^id$|mã.*tài.*khoản/i.test(x));
+        const nameK = k.find(x => /account_name|tên.*tài.*khoản/i.test(x));
+        const typeK = k.find(x => /^type$|loại/i.test(x));
+        const statusK = k.find(x => /account_status|status|trạng.*thái/i.test(x));
+        const curK = k.find(x => /currency|tiền.*tệ/i.test(x));
+        const numK = k.find(x => /account_number|số.*tài.*khoản|stk/i.test(x));
+        const bankK = k.find(x => /bank_name|ngân.*hàng|bank/i.test(x));
+        const rateK = k.find(x => /exchange_rate|tỷ.*giá/i.test(x));
+        const transK = k.find(x => /transaction_managed_by|giao.*dịch/i.test(x));
+        const finK = k.find(x => /finance_control|kiểm.*soát/i.test(x));
+        const compK = k.find(x => /company_entity|pháp.*nhân|công.*ty/i.test(x));
+
+        const aid = idK && row[idK] != null ? String(row[idK]).trim() : '';
+        const aname = nameK && row[nameK] != null ? String(row[nameK]).trim() : '';
+        const bname = bankK && row[bankK] != null ? String(row[bankK]).trim() : '';
+        const anum = numK && row[numK] != null ? String(row[numK]).trim() : '';
+        const atype = typeK && row[typeK] != null ? String(row[typeK]).trim() : 'Bank Account';
+        const astatus = statusK && row[statusK] != null ? String(row[statusK]).trim() : 'active';
+        const acur = curK && row[curK] != null ? String(row[curK]).trim() : 'VND';
+        const arate = rateK && row[rateK] != null ? (parseFloat(row[rateK]) || 1) : 1;
+        const atrans = transK && row[transK] != null ? String(row[transK]).trim() : '';
+        const afin = finK && row[finK] != null ? String(row[finK]).trim() : '';
+        const acomp = compK && row[compK] != null ? String(row[compK]).trim() : '';
+
+        if (aname || bname || anum) {
+          mapped.push({
+            account_id: aid,
+            account_name: aname || (bname ? (bname + (anum ? ' - ' + anum : '')) : 'Bank Account'),
+            type: atype || 'Bank Account',
+            account_status: astatus || 'active',
+            currency: acur || 'VND',
+            account_number: anum,
+            bank_name: bname,
+            exchange_rate: arate,
+            transaction_managed_by: atrans,
+            finance_control: afin,
+            company_entity: acomp
+          });
+        }
+      }
+      if (!mapped.length) {
+        showToast(swT('common.no_valid_rows', 'Không tìm thấy dòng hợp lệ trong file'), 'warning');
+        return;
+      }
+      window.setupParsedAccounts = mapped;
+      window.setupDraft.accounts = mapped;
+      saveSetupDraftToStorage();
+      showToast(swT('sw.step5_parsed_count', 'Đã nhận diện {{count}} tài khoản').replace('{{count}}', mapped.length), 'success');
+      renderSetupContent();
+    } catch(err) {
+      showToast(swT('sw.file_read_error', 'Lỗi đọc file: ') + err.message, 'error');
+    }
+  };
+  r.readAsArrayBuffer(file);
+};
+
+window.saveStep5AndAdvance = async function() {
+  const tab = window.setupStep5ActiveTab || 'quick';
+  let accounts = [];
+
+  if (tab === 'excel' && window.setupParsedAccounts && window.setupParsedAccounts.length > 0) {
+    accounts = window.setupParsedAccounts;
+  } else {
+    const rows = document.querySelectorAll('.step5-account-row');
+    rows.forEach(r => {
+      const an = r.querySelector('.step5-acct-name')?.value?.trim();
+      const bn = r.querySelector('.step5-bank-name')?.value?.trim();
+      const num = r.querySelector('.step5-acct-num')?.value?.trim();
+      const cur = r.querySelector('.step5-currency')?.value?.trim() || 'VND';
+      if (an || bn || num) {
+        accounts.push({
+          account_id: '',
+          account_name: an || (bn ? (bn + (num ? ' - ' + num : '')) : swT('sw.step5_account_item', 'Tài khoản ngân hàng', 'Bank Account')),
+          bank_name: bn,
+          account_number: num,
+          currency: cur,
+          type: 'Bank Account',
+          account_status: 'active'
+        });
+      }
+    });
+  }
+
+  if (accounts.length > 0) {
+    window.setupDraft.accounts = accounts;
+    saveSetupDraftToStorage();
+    showToast(swT('sw.step5_draft_saved', 'Đã lưu tạm {{count}} tài khoản vào bộ nhớ!').replace('{{count}}', accounts.length), 'success');
+  }
+  window.setupCurrentStep = 6;
+  await renderSetupContent();
 };
 
 // ─────────────────────────────────────────────────────────────
 //  STEP 6: SUCCESS SCREEN
 // ─────────────────────────────────────────────────────────────
 function renderStep6HTML(counts,comp){
-  const name=escapeHTML(comp.company_fullname||comp.company_shortname||'TeraX');
+  const draft = window.setupDraft || {};
+  const effectiveCounts = {
+    my_company: draft.company ? 1 : (counts.my_company || 0),
+    department: (draft.departments && draft.departments.length > 0) ? draft.departments.length : (counts.department || 0),
+    employee: (draft.employees && draft.employees.length > 0) ? draft.employees.length : (counts.employee || 0),
+    policy_and_program: (draft.policies && draft.policies.length > 0) ? draft.policies.length : (counts.policy_and_program || 0),
+    account: (draft.accounts && draft.accounts.length > 0) ? draft.accounts.length : (counts.account || 0)
+  };
+  const compName = (draft.company && (draft.company.company_fullname || draft.company.company_shortname))
+    || comp.company_fullname
+    || comp.company_shortname
+    || 'TeraX';
+  const name=escapeHTML(compName);
   const summary=[
-    {label:swT('sw.step1_name', 'Thông tin công ty'),val:counts.my_company||0,unit:swT('sw.unit_company', 'công ty'),color:'#EA580C',bg:'#FFF7ED',done:counts.my_company>0},
-    {label:swT('sw.step2_name', 'Phòng ban'),val:counts.department||0,unit:swT('sw.unit_department', 'phòng ban'),color:'#2563EB',bg:'#EFF6FF',done:counts.department>0},
-    {label:swT('sw.step3_name', 'Nhân viên'),val:counts.employee||0,unit:swT('sw.unit_employee', 'nhân viên'),color:'#059669',bg:'#ECFDF5',done:counts.employee>0},
-    {label:swT('sw.step4_name', 'Quy trình'),val:counts.policy_and_program||0,unit:swT('sw.unit_process', 'quy trình'),color:'#7C3AED',bg:'#F5F3FF',done:counts.policy_and_program>0},
-    {label:swT('sw.step5_name', 'Tài khoản tiền'),val:counts.account||0,unit:swT('sw.unit_account', 'tài khoản'),color:'#D97706',bg:'#FFFBEB',done:counts.account>0}
+    {label:swT('sw.step1_name', 'Thông tin công ty'),val:effectiveCounts.my_company||0,unit:swT('sw.unit_company', 'công ty'),color:'#EA580C',bg:'#FFF7ED',done:effectiveCounts.my_company>0},
+    {label:swT('sw.step2_name', 'Phòng ban'),val:effectiveCounts.department||0,unit:swT('sw.unit_department', 'phòng ban'),color:'#2563EB',bg:'#EFF6FF',done:effectiveCounts.department>0},
+    {label:swT('sw.step3_name', 'Nhân viên'),val:effectiveCounts.employee||0,unit:swT('sw.unit_employee', 'nhân viên'),color:'#059669',bg:'#ECFDF5',done:effectiveCounts.employee>0},
+    {label:swT('sw.step4_name', 'Quy trình'),val:effectiveCounts.policy_and_program||0,unit:swT('sw.unit_process', 'quy trình'),color:'#7C3AED',bg:'#F5F3FF',done:effectiveCounts.policy_and_program>0},
+    {label:swT('sw.step5_name', 'Tài khoản tiền'),val:effectiveCounts.account||0,unit:swT('sw.unit_account', 'tài khoản'),color:'#D97706',bg:'#FFFBEB',done:effectiveCounts.account>0}
   ];
   let sumCards='';
   for(const s of summary) {
@@ -2491,8 +2757,6 @@ function renderStep6HTML(counts,comp){
     +'<h2 style="font-size:24px;font-weight:800;color:white;margin-bottom:10px;">' + swT('sw.step6_ready_title', 'TeraX đã sẵn sàng để sử dụng') + '</h2>'
     +'<p style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:20px;">' + swT('sw.step6_ready_message', 'Môi trường làm việc của {{name}} đã được thiết lập. Hãy bắt đầu khám phá TeraX.').replace('{{name}}', '<strong style="color:white;">'+name+'</strong>') + '</p>'
     +'<div style="display:flex;gap:12px;flex-wrap:wrap;"><button onclick="completeSetupWizard()" class="sw-btn-primary" style="background:linear-gradient(135deg,#f97316,#ea580c);"><span class="material-symbols-rounded" style="font-size:18px;">rocket_launch</span> ' + swT('sw.step6_enter_app', 'Vào hệ thống ngay') + '</button>'
-    +'<button style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:white;font-size:13px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:17px;">play_circle</span> ' + swT('sw.step6_quick_guide', 'Xem hướng dẫn nhanh') + '</button>'
-    +'</div></div>'
     +'<div style="width:100px;flex-shrink:0;text-align:center;"><div style="width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto;"><span class="material-symbols-rounded" style="font-size:48px;color:#FCD34D;">verified</span></div><div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;">' + swT('sw.step6_tagline', 'Cùng TeraX vận hành tốt hơn') + '</div></div>'
     +'</div></div>'
     +'<div class="sw-card">'
@@ -2513,17 +2777,49 @@ function renderStep6HTML(counts,comp){
 // ─────────────────────────────────────────────────────────────
 window.completeSetupWizard = async function(redirectTo){
   try {
-    showToast(swT('sw.activating', 'Đang kích hoạt hệ thống...'),'info');
-    const res = await apiPost('/system-setup/complete');
+    showToast(swT('sw.activating', 'Đang lưu thiết lập và kích hoạt hệ thống...'),'info');
+
+    // Check if we have draft data to commit
+    const draft = window.setupDraft || {};
+    const hasDraftData = Boolean(
+      draft.company ||
+      (draft.departments && draft.departments.length > 0) ||
+      (draft.employees && draft.employees.length > 0) ||
+      (draft.policies && draft.policies.length > 0) ||
+      (draft.accounts && draft.accounts.length > 0)
+    );
+
+    let res;
+    if (hasDraftData) {
+      res = await apiPost('/system-setup/commit-draft', {
+        company: draft.company,
+        departments: draft.departments || [],
+        employees: draft.employees || [],
+        policies: draft.policies || [],
+        accounts: draft.accounts || []
+      });
+    } else {
+      res = await apiPost('/system-setup/complete');
+    }
+
     if(res.success){
-      showToast(swT('sw.activated_success', 'Kích hoạt thành công!'),'success');
+      showToast(swT('sw.activated_success', 'Kích hoạt thành công! Dữ liệu đã được lưu vào hệ thống.'),'success');
+      // Clear draft storage
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('terax_setup_draft');
+      }
+      window.setupDraft = { company: null, departments: [], employees: [], policies: [], accounts: [] };
       window.setupCompleted = true;
       document.body.classList.remove('setup-active');
       const ns = document.getElementById('nav-setup');
       if(ns) ns.style.display = 'none';
       window.location.hash = redirectTo || 'home';
-    } else showToast(swT('common.error', 'Lỗi: ') + (res.message || 'Unknown'),'error');
-  } catch(err){showToast(swT('sw.server_error', 'Lỗi máy chủ: ') + err.message,'error');}
+    } else {
+      showToast(swT('common.error', 'Lỗi: ') + (res.message || 'Unknown'),'error');
+    }
+  } catch(err){
+    showToast(swT('sw.server_error', 'Lỗi máy chủ: ') + err.message,'error');
+  }
 };
 
 window.resetSetupStatusDev = async function(){
@@ -2557,76 +2853,142 @@ window.downloadSetupTemplate = async function(moduleKey){
   let fileName = moduleKey + '_template.xlsx';
   let sheetName = moduleKey;
 
-  if (moduleKey === 'department') {
-    const curCompId = window.setupWizardData?.company?.my_company_id || window.setupWizardData?.company?.company_id || 'COMP001';
+  if (moduleKey === 'company') {
     headers = [
-      'company_id',
+      'my_company_id',
+      'company_shortname',
+      'company_fullname',
+      'address',
+      'tax_code',
+      'country',
+      'city',
+      'base_currency'
+    ];
+    sampleData = [
+      {
+        'my_company_id': 1,
+        'company_shortname': 'SaoViet',
+        'company_fullname': 'Công ty Cổ phần Sao Việt',
+        'address': 'Hà Nội, Việt Nam',
+        'tax_code': '0101234567',
+        'country': 'Vietnam',
+        'city': 'Hà Nội',
+        'base_currency': 'VND'
+      }
+    ];
+    fileName = isVi ? 'Mau_Cong_Ty_TeraX.xlsx' : 'Company_Template_TeraX.xlsx';
+    sheetName = isVi ? 'CongTy' : 'Company';
+  } else if (moduleKey === 'department') {
+    headers = [
       'department_code',
       'department_name',
       'type',
-      'manager_email'
+      'manager_email',
+      'company_id',
+      'department_id'
     ];
     sampleData = isVi ? [
       {
-        'company_id': curCompId,
         'department_code': 'BGD',
         'department_name': 'Ban Giám Đốc',
         'type': 'Operation',
-        'manager_email': 'ceo@company.com'
+        'manager_email': 'ceo@company.com',
+        'company_id': 1,
+        'department_id': 1
       },
       {
-        'company_id': curCompId,
         'department_code': 'KD',
         'department_name': 'Phòng Kinh Doanh',
         'type': 'Sale and MKT',
-        'manager_email': 'manager@company.com'
+        'manager_email': 'manager@company.com',
+        'company_id': 1,
+        'department_id': 2
       },
       {
-        'company_id': curCompId,
         'department_code': 'KT',
         'department_name': 'Phòng Kỹ Thuật',
         'type': 'Technical',
-        'manager_email': 'tech@company.com'
+        'manager_email': 'tech@company.com',
+        'company_id': 1,
+        'department_id': 3
       },
       {
-        'company_id': curCompId,
         'department_code': 'TCKT',
         'department_name': 'Phòng Tài Chính Kế Toán',
         'type': 'Finance',
-        'manager_email': 'accountant@company.com'
+        'manager_email': 'accountant@company.com',
+        'company_id': 1,
+        'department_id': 4
       }
     ] : [
       {
-        'company_id': curCompId,
         'department_code': 'BGD',
         'department_name': 'Board of Directors',
         'type': 'Operation',
-        'manager_email': 'ceo@company.com'
+        'manager_email': 'ceo@company.com',
+        'company_id': 1,
+        'department_id': 1
       },
       {
-        'company_id': curCompId,
         'department_code': 'KD',
         'department_name': 'Sales & Marketing',
         'type': 'Sale and MKT',
-        'manager_email': 'manager@company.com'
+        'manager_email': 'manager@company.com',
+        'company_id': 1,
+        'department_id': 2
       },
       {
-        'company_id': curCompId,
         'department_code': 'KT',
         'department_name': 'Engineering & Technical',
         'type': 'Technical',
-        'manager_email': 'tech@company.com'
+        'manager_email': 'tech@company.com',
+        'company_id': 1,
+        'department_id': 3
       },
       {
-        'company_id': curCompId,
         'department_code': 'TCKT',
         'department_name': 'Finance & Accounting',
         'type': 'Finance',
-        'manager_email': 'accountant@company.com'
+        'manager_email': 'accountant@company.com',
+        'company_id': 1,
+        'department_id': 4
       }
     ];
     fileName = isVi ? 'Mau_Phong_Ban_TeraX.xlsx' : 'Department_Template_TeraX.xlsx';
     sheetName = isVi ? 'PhongBan' : 'Departments';
+  } else if (moduleKey === 'employee') {
+    return window.downloadEmployeeTemplate();
+  } else if (moduleKey === 'account') {
+    headers = [
+      'account_id',
+      'account_name',
+      'type',
+      'account_status',
+      'currency',
+      'account_number',
+      'bank_name',
+      'exchange_rate',
+      'transaction_managed_by',
+      'finance_control',
+      'company_entity'
+    ];
+    sampleData = [
+      {
+        'account_id': 1,
+        'account_name': 'Tài khoản chính MBV',
+        'type': 'Bank Account',
+        'account_status': 'active',
+        'currency': 'VND',
+        'account_number': '0011001234567',
+        'bank_name': 'MBV',
+        'exchange_rate': 1,
+        'transaction_managed_by': '',
+        'finance_control': '',
+        'company_entity': 'SaoViet'
+      }
+    ];
+    fileName = isVi ? 'Mau_Tai_Khoan_TeraX.xlsx' : 'Account_Template_TeraX.xlsx';
+    sheetName = isVi ? 'TaiKhoan' : 'Accounts';
   } else if (moduleKey === 'policy') {
     headers = [
       'policy_name',
@@ -2761,11 +3123,20 @@ window.downloadSetupTemplate = async function(moduleKey){
 };
 
 window.importSetupFile = async function(event,moduleKey){
+  if (moduleKey === 'company') {
+    return window.handleCompanyExcelUpload(event);
+  }
   if (moduleKey === 'department') {
     return window.handleDepartmentExcelUpload(event);
   }
+  if (moduleKey === 'employee') {
+    return window.handleEmployeeExcelUpload(event);
+  }
   if (moduleKey === 'policy') {
     return window.handlePolicyExcelUpload(event);
+  }
+  if (moduleKey === 'account') {
+    return window.handleAccountExcelUpload(event);
   }
   const file = event.target.files[0];
   if(!file) return;
@@ -2818,18 +3189,32 @@ window.deleteSetupParsedItem = function(type, index) {
   if (type === 'department') {
     if (window.setupParsedDepartments && window.setupParsedDepartments[index] !== undefined) {
       window.setupParsedDepartments.splice(index, 1);
+      window.setupDraft.departments = window.setupParsedDepartments;
+      saveSetupDraftToStorage();
       showToast(swT('sw.row_deleted', 'Đã xóa dòng thành công'), 'info');
       renderSetupContent();
     }
   } else if (type === 'employee') {
     if (window.setupParsedEmployees && window.setupParsedEmployees[index] !== undefined) {
       window.setupParsedEmployees.splice(index, 1);
+      window.setupDraft.employees = window.setupParsedEmployees;
+      saveSetupDraftToStorage();
       showToast(swT('sw.row_deleted', 'Đã xóa dòng thành công'), 'info');
       renderSetupContent();
     }
   } else if (type === 'policy') {
     if (window.setupParsedPolicies && window.setupParsedPolicies[index] !== undefined) {
       window.setupParsedPolicies.splice(index, 1);
+      window.setupDraft.policies = window.setupParsedPolicies;
+      saveSetupDraftToStorage();
+      showToast(swT('sw.row_deleted', 'Đã xóa dòng thành công'), 'info');
+      renderSetupContent();
+    }
+  } else if (type === 'account') {
+    if (window.setupParsedAccounts && window.setupParsedAccounts[index] !== undefined) {
+      window.setupParsedAccounts.splice(index, 1);
+      window.setupDraft.accounts = window.setupParsedAccounts;
+      saveSetupDraftToStorage();
       showToast(swT('sw.row_deleted', 'Đã xóa dòng thành công'), 'info');
       renderSetupContent();
     }
@@ -2844,6 +3229,8 @@ window.editSetupParsedItem = function(type, index) {
     item = window.setupParsedEmployees?.[index];
   } else if (type === 'policy') {
     item = window.setupParsedPolicies?.[index];
+  } else if (type === 'account') {
+    item = window.setupParsedAccounts?.[index];
   }
   if (!item) return;
 
@@ -2986,6 +3373,21 @@ window.editSetupParsedItem = function(type, index) {
       + '<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">* ' + (isVi ? 'Duy nhất Bậc 1 hỗ trợ Direct Manager. Các bậc khác và người phụ trách chọn trực tiếp từ nhân viên.' : 'Only Tier 1 supports Direct Manager. Other tiers and leads are selected from employees.') + '</div>'
       + '</div>'
       + '</div>';
+  } else if (type === 'account') {
+    title = (isVi ? 'Sửa thông tin tài khoản #' : 'Edit Account #') + (index + 1);
+    fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      + '<div>' + swLabel('Account ID', false) + '<input type="text" id="sw-edit-acct-id" class="sw-input" value="' + escapeHTML(item.account_id || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step5_acct_name', 'Tên tài khoản'), true) + '<input type="text" id="sw-edit-acct-name" class="sw-input" value="' + escapeHTML(item.account_name || '') + '"></div>'
+      + '<div>' + swLabel(swT('common.type', 'Loại'), false) + '<input type="text" id="sw-edit-acct-type" class="sw-input" value="' + escapeHTML(item.type || 'Bank Account') + '"></div>'
+      + '<div>' + swLabel(swT('common.status', 'Trạng thái'), false) + '<input type="text" id="sw-edit-acct-status" class="sw-input" value="' + escapeHTML(item.account_status || 'active') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step5_currency', 'Tiền tệ'), false) + '<input type="text" id="sw-edit-acct-currency" class="sw-input" value="' + escapeHTML(item.currency || 'VND') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step5_acct_num', 'Số tài khoản'), false) + '<input type="text" id="sw-edit-acct-num" class="sw-input" value="' + escapeHTML(item.account_number || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step5_bank', 'Ngân hàng'), false) + '<input type="text" id="sw-edit-acct-bank" class="sw-input" value="' + escapeHTML(item.bank_name || '') + '"></div>'
+      + '<div>' + swLabel('Tỷ giá', false) + '<input type="number" step="any" id="sw-edit-acct-rate" class="sw-input" value="' + escapeHTML(String(item.exchange_rate || 1)) + '"></div>'
+      + '<div>' + swLabel('QL Giao dịch', false) + '<input type="text" id="sw-edit-acct-trans" class="sw-input" value="' + escapeHTML(item.transaction_managed_by || '') + '"></div>'
+      + '<div>' + swLabel('Kiểm soát TC', false) + '<input type="text" id="sw-edit-acct-fin" class="sw-input" value="' + escapeHTML(item.finance_control || '') + '"></div>'
+      + '<div style="grid-column:span 2;">' + swLabel('Pháp nhân công ty', false) + '<input type="text" id="sw-edit-acct-comp" class="sw-input" value="' + escapeHTML(item.company_entity || '') + '"></div>'
+      + '</div>';
   }
 
   const modalHtml = '<div id="sw-parsed-edit-modal-backdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(3px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">'
@@ -3051,6 +3453,8 @@ window.saveSwParsedEditModal = function(type, index) {
         type: deptType,
         manager_email: mgr
       };
+      window.setupDraft.departments = window.setupParsedDepartments;
+      saveSetupDraftToStorage();
       showToast(swT('sw.row_updated', 'Đã cập nhật dòng thành công'), 'success');
       window.closeSwParsedEditModal();
       renderSetupContent();
@@ -3085,6 +3489,8 @@ window.saveSwParsedEditModal = function(type, index) {
         emergency_contact_name: emgName,
         emergency_contact_phone: emgPhone
       };
+      window.setupDraft.employees = window.setupParsedEmployees;
+      saveSetupDraftToStorage();
       showToast(swT('sw.row_updated', 'Đã cập nhật dòng thành công'), 'success');
       window.closeSwParsedEditModal();
       renderSetupContent();
@@ -3146,6 +3552,46 @@ window.saveSwParsedEditModal = function(type, index) {
         sr_owner_matched: !!srOwner,
         department_id: deptId
       };
+      window.setupDraft.policies = window.setupParsedPolicies;
+      saveSetupDraftToStorage();
+      showToast(swT('sw.row_updated', 'Đã cập nhật dòng thành công'), 'success');
+      window.closeSwParsedEditModal();
+      renderSetupContent();
+    }
+  } else if (type === 'account') {
+    const aid = document.getElementById('sw-edit-acct-id')?.value?.trim() || '';
+    const aname = document.getElementById('sw-edit-acct-name')?.value?.trim();
+    if (!aname) {
+      showToast(swT('form.required_field', 'Vui lòng điền tên tài khoản'), 'warning');
+      return;
+    }
+    const atype = document.getElementById('sw-edit-acct-type')?.value?.trim() || 'Bank Account';
+    const astatus = document.getElementById('sw-edit-acct-status')?.value?.trim() || 'active';
+    const acur = document.getElementById('sw-edit-acct-currency')?.value?.trim() || 'VND';
+    const anum = document.getElementById('sw-edit-acct-num')?.value?.trim() || '';
+    const abank = document.getElementById('sw-edit-acct-bank')?.value?.trim() || '';
+    const arate = parseFloat(document.getElementById('sw-edit-acct-rate')?.value) || 1;
+    const atrans = document.getElementById('sw-edit-acct-trans')?.value?.trim() || '';
+    const afin = document.getElementById('sw-edit-acct-fin')?.value?.trim() || '';
+    const acomp = document.getElementById('sw-edit-acct-comp')?.value?.trim() || '';
+
+    if (window.setupParsedAccounts && window.setupParsedAccounts[index]) {
+      window.setupParsedAccounts[index] = {
+        ...window.setupParsedAccounts[index],
+        account_id: aid,
+        account_name: aname,
+        type: atype,
+        account_status: astatus,
+        currency: acur,
+        account_number: anum,
+        bank_name: abank,
+        exchange_rate: arate,
+        transaction_managed_by: atrans,
+        finance_control: afin,
+        company_entity: acomp
+      };
+      window.setupDraft.accounts = window.setupParsedAccounts;
+      saveSetupDraftToStorage();
       showToast(swT('sw.row_updated', 'Đã cập nhật dòng thành công'), 'success');
       window.closeSwParsedEditModal();
       renderSetupContent();

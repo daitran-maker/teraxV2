@@ -709,6 +709,337 @@ router.post('/import-employees', async (req, res) => {
   }
 });
 
+// POST /api/system-setup/commit-draft (Final step: commit all wizard draft data into database atomically)
+router.post('/commit-draft', async (req, res) => {
+  const { company, departments, employees, policies, accounts } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await ensureSetupTable();
+
+    let primaryCompanyId = '1';
+
+    // 1. COMMIT COMPANY
+    if (company) {
+      const companyList = Array.isArray(company) ? company : [company];
+      for (const comp of companyList) {
+        if (!comp) continue;
+        const cId = String(comp.my_company_id || comp.company_id || primaryCompanyId || '1').trim();
+        if (!primaryCompanyId) primaryCompanyId = cId;
+        const cFullName = comp.company_fullname || comp.fullname || comp.name || '';
+        const cShortName = comp.company_shortname || comp.shortname || cFullName;
+        const cTaxCode = comp.tax_code ? String(comp.tax_code).trim() : null;
+        const cCountry = comp.country || 'Vietnam';
+        const cCity = comp.city || null;
+        const cAddress = comp.address || null;
+        const cBaseCurr = comp.base_currency || comp.currency || 'VND';
+        const cTz = comp.timezone || 'Asia/Ho_Chi_Minh';
+        const cWebsite = comp.website || null;
+
+        let logoParam = null;
+        if (comp.logo) {
+          try {
+            if (typeof comp.logo === 'string' && comp.logo.startsWith('data:')) {
+              logoParam = Buffer.from(comp.logo.split(',')[1], 'base64');
+            } else {
+              logoParam = comp.logo;
+            }
+          } catch(e) { logoParam = comp.logo; }
+        }
+
+        await client.query(`
+          INSERT INTO my_company (
+            my_company_id, company_fullname, company_shortname, tax_code, country, city, address, website, base_currency, logo, timezone, status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE((SELECT id FROM status_catalog WHERE table_name='my_company' AND status_key='active' LIMIT 1), 67))
+          ON CONFLICT (my_company_id) DO UPDATE SET
+            company_fullname = COALESCE(EXCLUDED.company_fullname, my_company.company_fullname),
+            company_shortname = COALESCE(EXCLUDED.company_shortname, my_company.company_shortname),
+            tax_code = COALESCE(EXCLUDED.tax_code, my_company.tax_code),
+            country = COALESCE(EXCLUDED.country, my_company.country),
+            city = COALESCE(EXCLUDED.city, my_company.city),
+            address = COALESCE(EXCLUDED.address, my_company.address),
+            website = COALESCE(EXCLUDED.website, my_company.website),
+            base_currency = COALESCE(EXCLUDED.base_currency, my_company.base_currency),
+            logo = COALESCE(EXCLUDED.logo, my_company.logo),
+            timezone = COALESCE(EXCLUDED.timezone, my_company.timezone),
+            status = EXCLUDED.status
+        `, [cId, cFullName, cShortName, cTaxCode, cCountry, cCity, cAddress, cWebsite, cBaseCurr, logoParam, cTz]);
+      }
+    }
+
+    // 2. COMMIT DEPARTMENTS
+    const deptIdMap = new Map();
+    if (Array.isArray(departments) && departments.length > 0) {
+      for (const d of departments) {
+        const dCode = String(d.department_code != null ? d.department_code : '').trim();
+        const dName = String(d.department_name != null ? d.department_name : '').trim();
+        const dType = String(d.type != null ? d.type : 'Operation').trim();
+        const dMgr = String(d.manager_email || d.manager || '').trim() || null;
+        const dComp = String(d.company_id != null ? d.company_id : '').trim() || primaryCompanyId;
+        const rawId = d.department_id != null ? String(d.department_id).trim() : null;
+
+        if (!dCode && !dName) continue;
+
+        let targetId = rawId;
+        if (targetId) {
+          const existRes = await client.query('SELECT department_id FROM department WHERE department_id = $1', [targetId]);
+          if (existRes.rows.length > 0) {
+            await client.query(`
+              UPDATE department
+              SET department_name = $2, department_code = $3, type = $4, manager_email = $5, company_id = $6
+              WHERE department_id = $1
+            `, [targetId, dName, dCode, dType, dMgr, dComp]);
+          } else {
+            await client.query(`
+              INSERT INTO department (department_id, department_name, department_code, type, manager_email, company_id)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [targetId, dName, dCode, dType, dMgr, dComp]);
+          }
+        } else {
+          const existRes = await client.query(
+            'SELECT department_id FROM department WHERE company_id = $1 AND (LOWER(department_code) = LOWER($2) OR LOWER(department_name) = LOWER($3))',
+            [dComp, dCode, dName]
+          );
+          if (existRes.rows.length > 0) {
+            targetId = existRes.rows[0].department_id;
+            await client.query(`
+              UPDATE department
+              SET department_name = $2, department_code = $3, type = $4, manager_email = $5
+              WHERE department_id = $1
+            `, [targetId, dName, dCode, dType, dMgr]);
+          } else {
+            targetId = await generateSequentialId('department', client);
+            await client.query(`
+              INSERT INTO department (department_id, department_name, department_code, type, manager_email, company_id)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [targetId, dName, dCode, dType, dMgr, dComp]);
+          }
+        }
+
+        if (rawId) deptIdMap.set(rawId.toLowerCase(), targetId);
+        if (dCode) deptIdMap.set(dCode.toLowerCase(), targetId);
+        if (dName) deptIdMap.set(dName.toLowerCase(), targetId);
+      }
+    }
+
+    // 3. COMMIT EMPLOYEES
+    const createdEmployees = [];
+    if (Array.isArray(employees) && employees.length > 0) {
+      for (const emp of employees) {
+        const fName = String(emp.full_name || '').trim();
+        const uName = String(emp.username || emp.user_name || '').trim();
+        let email = String(emp.email || '').trim().toLowerCase() || null;
+        if (!fName && !uName && !email) continue;
+
+        const rawEmpId = emp.employee_id != null ? String(emp.employee_id).trim() : null;
+        const empCode = String(emp.employee_code || '').trim() || null;
+        const nickName = String(emp.nick_name || '').trim() || null;
+        const gen = String(emp.gen || '').trim() || null;
+        const pos = String(emp.position || 'Nhân viên').trim();
+        const role = String(emp.role || 'Staff').trim() || 'Staff';
+        const loc = String(emp.location_base || '').trim() || null;
+        let phone = String(emp.phone || '').trim() || null;
+        if (phone && phone.length === 9) phone = '0' + phone;
+        const address = String(emp.address || '').trim() || null;
+        const startDate = String(emp.start_date || '').trim() || new Date().toISOString().split('T')[0];
+        const status = Number(emp.status) === 18 ? 18 : 17;
+        const empComp = String(emp.company_id || primaryCompanyId).trim() || primaryCompanyId;
+
+        // Resolve department_id
+        let resolvedDeptId = null;
+        const rawDept = String(emp.department_id || emp.department_name || emp.department_code || '').trim().toLowerCase();
+        if (rawDept && deptIdMap.has(rawDept)) {
+          resolvedDeptId = deptIdMap.get(rawDept);
+        } else if (emp.department_id) {
+          resolvedDeptId = String(emp.department_id).trim();
+        }
+
+        let targetEmpId = rawEmpId;
+        let existEmp = null;
+        if (targetEmpId) {
+          const check = await client.query('SELECT employee_id FROM employee WHERE employee_id = $1', [targetEmpId]);
+          if (check.rows.length > 0) existEmp = check.rows[0];
+        }
+        if (!existEmp && email) {
+          const check = await client.query('SELECT employee_id FROM employee WHERE LOWER(email) = LOWER($1)', [email]);
+          if (check.rows.length > 0) existEmp = check.rows[0];
+        }
+        if (!existEmp && uName) {
+          const check = await client.query('SELECT employee_id FROM employee WHERE LOWER(username) = LOWER($1)', [uName]);
+          if (check.rows.length > 0) existEmp = check.rows[0];
+        }
+
+        if (existEmp) {
+          targetEmpId = existEmp.employee_id;
+          await client.query(`
+            UPDATE employee SET
+              full_name = COALESCE($2, full_name),
+              username = COALESCE($3, username),
+              email = COALESCE($4, email),
+              employee_code = COALESCE($5, employee_code),
+              nick_name = COALESCE($6, nick_name),
+              gen = COALESCE($7, gen),
+              position = COALESCE($8, position),
+              role = COALESCE($9, role),
+              location_base = COALESCE($10, location_base),
+              phone = COALESCE($11, phone),
+              address = COALESCE($12, address),
+              department_id = COALESCE($13, department_id),
+              company_id = COALESCE($14, company_id),
+              status = $15
+            WHERE employee_id = $1
+          `, [targetEmpId, fName, uName || null, email, empCode, nickName, gen, pos, role, loc, phone, address, resolvedDeptId, empComp, status]);
+        } else {
+          if (!targetEmpId) targetEmpId = await generateSequentialId('employee', client);
+          await client.query(`
+            INSERT INTO employee (
+              employee_id, full_name, username, email, employee_code, nick_name, gen, position,
+              role, location_base, phone, address, department_id, company_id, status, start_date, app_user_enabled
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
+          `, [targetEmpId, fName, uName || (email ? email.split('@')[0] : targetEmpId), email, empCode, nickName, gen, pos, role, loc, phone, address, resolvedDeptId, empComp, status, startDate]);
+        }
+
+        createdEmployees.push({
+          employee_id: targetEmpId,
+          direct_manager_raw: emp.direct_manager != null ? String(emp.direct_manager).trim() : null,
+          head_manager_raw: emp.head_manager != null ? String(emp.head_manager).trim() : null
+        });
+      }
+
+      // Second pass for direct_manager and head_manager
+      for (const ce of createdEmployees) {
+        if (ce.direct_manager_raw) {
+          const mgrKey = ce.direct_manager_raw.toLowerCase();
+          const mgrRes = await client.query(
+            'SELECT employee_id FROM employee WHERE employee_id = $1 OR employee_code = $1 OR LOWER(email) = $1 OR LOWER(username) = $1 OR LOWER(full_name) = $1 LIMIT 1',
+            [mgrKey]
+          );
+          if (mgrRes.rows.length > 0) {
+            await client.query('UPDATE employee SET direct_manager = $1 WHERE employee_id = $2', [mgrRes.rows[0].employee_id, ce.employee_id]);
+          }
+        }
+        if (ce.head_manager_raw) {
+          const hrKey = ce.head_manager_raw.toLowerCase();
+          const hrRes = await client.query(
+            'SELECT employee_id FROM employee WHERE employee_id = $1 OR employee_code = $1 OR LOWER(email) = $1 OR LOWER(username) = $1 OR LOWER(full_name) = $1 LIMIT 1',
+            [hrKey]
+          );
+          if (hrRes.rows.length > 0) {
+            await client.query('UPDATE employee SET head_manager = $1 WHERE employee_id = $2', [hrRes.rows[0].employee_id, ce.employee_id]);
+          }
+        }
+      }
+    }
+
+    // 4. COMMIT POLICIES
+    if (Array.isArray(policies) && policies.length > 0) {
+      const adminRes = await client.query(`
+        SELECT employee_id FROM employee WHERE role = 'Super Admin' OR employee_id = 'EMP-001' ORDER BY employee_id ASC LIMIT 1
+      `);
+      const defaultLead = adminRes.rows[0] ? adminRes.rows[0].employee_id : 'EMP-001';
+
+      for (const p of policies) {
+        const pName = String(p.policy_name || '').trim();
+        if (!pName) continue;
+        const pType = String(p.policy_type || 'Operation').trim();
+        const pDesc = String(p.description || pName).trim();
+        const pSla = p.sla || 3;
+        const tier1 = p.tier1_approval || 'Direct Manager';
+        const tier2 = p.tier2_approval || null;
+        const tier3 = p.tier3_approval || null;
+        const appLevel = String(p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
+        const lead = p.policy_lead || defaultLead;
+        const owner = p.sr_owner || defaultLead;
+        const dept = p.department_id ? (deptIdMap.get(String(p.department_id).toLowerCase()) || p.department_id) : null;
+        const elem = p.elements || 'ASSIGN_TASK';
+
+        const pCheck = await client.query('SELECT policy_id FROM POLICY_AND_PROGRAM WHERE LOWER(policy_name) = LOWER($1)', [pName]);
+        if (pCheck.rows.length === 0) {
+          const pId = await generateSequentialId('policy_and_program', client);
+          await client.query(`
+            INSERT INTO POLICY_AND_PROGRAM (
+              policy_id, policy_name, policy_type, description,
+              tier1_approval, tier2_approval, tier3_approval, approval_level,
+              policy_lead, sr_owner, department_id, elements, company_id, sla
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          `, [pId, pName, pType, pDesc, tier1, tier2, tier3, appLevel, lead, owner, dept, elem, primaryCompanyId, pSla]);
+        }
+      }
+    }
+
+    // 5. COMMIT ACCOUNTS
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      for (const acc of accounts) {
+        const aName = String(acc.account_name || '').trim();
+        const bName = String(acc.bank_name || '').trim();
+        const aNum = String(acc.account_number || '').trim();
+        const aCur = String(acc.currency || 'VND').trim();
+        const aType = String(acc.type || 'Bank').trim();
+        const rawAcctId = acc.account_id != null ? String(acc.account_id).trim() : null;
+        const aStatus = (acc.account_status === 'active' || Number(acc.account_status) === 19) ? 19 : (Number(acc.account_status) || 19);
+        const aRate = acc.exchange_rate != null && !isNaN(Number(acc.exchange_rate)) ? Number(acc.exchange_rate) : 1;
+        const aEntity = String(acc.company_entity || primaryCompanyId).trim() || primaryCompanyId;
+        const txMgr = acc.transaction_managed_by || null;
+        const finCtrl = acc.finance_control || null;
+
+        if (!aName && !bName && !aNum) continue;
+
+        let targetAcctId = rawAcctId;
+        if (targetAcctId) {
+          const aCheck = await client.query('SELECT account_id FROM account WHERE account_id = $1', [targetAcctId]);
+          if (aCheck.rows.length > 0) {
+            await client.query(`
+              UPDATE account SET
+                account_name = COALESCE($2, account_name),
+                type = COALESCE($3, type),
+                currency = COALESCE($4, currency),
+                account_number = COALESCE($5, account_number),
+                bank_name = COALESCE($6, bank_name),
+                account_status = $7,
+                exchange_rate = $8,
+                company_entity = $9,
+                transaction_managed_by = COALESCE($10, transaction_managed_by),
+                finance_control = COALESCE($11, finance_control)
+              WHERE account_id = $1
+            `, [targetAcctId, aName || `${bName} (${aCur})`, aType, aCur, aNum || null, bName || null, aStatus, aRate, aEntity, txMgr, finCtrl]);
+          } else {
+            await client.query(`
+              INSERT INTO account (
+                account_id, account_name, type, currency, account_number, bank_name,
+                account_status, exchange_rate, company_entity, transaction_managed_by, finance_control
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            `, [targetAcctId, aName || `${bName} (${aCur})`, aType, aCur, aNum || null, bName || null, aStatus, aRate, aEntity, txMgr, finCtrl]);
+          }
+        } else {
+          targetAcctId = await generateSequentialId('account', client);
+          await client.query(`
+            INSERT INTO account (
+              account_id, account_name, type, currency, account_number, bank_name,
+              account_status, exchange_rate, company_entity, transaction_managed_by, finance_control
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `, [targetAcctId, aName || `${bName} (${aCur})`, aType, aCur, aNum || null, bName || null, aStatus, aRate, aEntity, txMgr, finCtrl]);
+        }
+      }
+    }
+
+    // 6. FINISH SETUP
+    await client.query(`
+      UPDATE "system_setup"
+      SET "value" = 'true', "updated_at" = CURRENT_TIMESTAMP
+      WHERE "key" = 'setup_completed'
+    `);
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'All draft data committed and setup completed successfully!' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[commit-draft] error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // POST /api/system-setup/complete
 router.post('/complete', async (req, res) => {
   try {
