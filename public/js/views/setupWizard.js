@@ -543,7 +543,26 @@ function renderStep1HTML(comp) {
   const defaultCountry = comp.country || 'Vietnam';
   const defaultCurrency = (comp.base_currency || 'VND').toUpperCase();
 
-  window.step1LogoBase64 = comp.logo || null;
+  let logoSrc = '';
+  if (comp.logo) {
+    if (typeof comp.logo === 'string') {
+      logoSrc = (comp.logo.startsWith('data:') || comp.logo.startsWith('http://') || comp.logo.startsWith('https://') || comp.logo.startsWith('/'))
+        ? comp.logo
+        : 'data:image/png;base64,' + comp.logo;
+    } else if (typeof comp.logo === 'object' && Array.isArray(comp.logo.data)) {
+      try {
+        const bytes = new Uint8Array(comp.logo.data);
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i += 8192) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 8192, len)));
+        }
+        logoSrc = 'data:image/png;base64,' + btoa(binary);
+      } catch (e) {}
+    }
+  }
+
+  window.step1LogoBase64 = logoSrc || null;
 
   // Async load lookups from CMS database via /system-setup/lookups
   setTimeout(async () => {
@@ -649,7 +668,7 @@ function renderStep1HTML(comp) {
     + '<div class="form-group" style="grid-column:span 2;">'+swLabel(swT('sw.step1_logo', 'Logo thương hiệu công ty'), false)
     + '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;">'
     + '<div id="step1_logo_preview" style="width:48px;height:48px;border-radius:8px;background:#FFFFFF;border:1px dashed #D1D5DB;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">'
-    + (comp.logo ? '<img src="'+(comp.logo.startsWith('data:')?comp.logo:'data:image/png;base64,'+comp.logo)+'" style="width:100%;height:100%;object-fit:contain;">' : '<span class="material-symbols-rounded" style="color:#9CA3AF;font-size:24px;">image</span>')
+    + (logoSrc ? '<img src="'+escapeHTML(logoSrc)+'" style="width:100%;height:100%;object-fit:contain;">' : '<span class="material-symbols-rounded" style="color:#9CA3AF;font-size:24px;">image</span>')
     + '</div>'
     + '<div style="flex:1;">'
     + '<input type="file" id="step1_logo_file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="window.handleStep1Logo(event)" style="font-size:12px;color:#4B5563;">'

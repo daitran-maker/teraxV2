@@ -12,7 +12,7 @@
     pk: 'my_company_id',
     icon: '🏢',
     columns: [
-      { key: 'logo', label: ' ' },
+      { key: 'logo', label: ' ', type: 'file' },
       { key: 'my_company_id', label: 'ID', hidden: true },
       { key: 'company_shortname', label: 'Company Short Name' },
       { key: 'company_fullname', label: 'Company Full Name' },
@@ -41,8 +41,26 @@
       { key: 'logo', label: 'Logo', type: 'file', accept: 'image/*', full: true },
     ],
     detailSubtitle: (r) => {
-      const logo = r.logo ? `<img src="${r.logo}" style="width:40px;height:40px;border-radius:4px;margin-right:12px;object-fit:contain;" />` : '';
-      return `${logo} <span style="font-size:18px;font-weight:700;color:var(--text);">${r.company_fullname || ''}</span>`;
+      let logoUrl = r.logo;
+      if (logoUrl && typeof logoUrl === 'object') {
+        if (logoUrl.type === 'Buffer' && Array.isArray(logoUrl.data)) {
+          try {
+            logoUrl = new TextDecoder('utf-8').decode(new Uint8Array(logoUrl.data));
+          } catch (e) {}
+        } else if (Array.isArray(logoUrl) && logoUrl.length > 0) {
+          logoUrl = logoUrl[0];
+        }
+      }
+      if (logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(logoUrl);
+          if (Array.isArray(parsed) && parsed.length > 0) logoUrl = parsed[0];
+        } catch(e) {}
+      }
+      const logo = (logoUrl && typeof logoUrl === 'string') ? `<img src="${logoUrl}" style="width:48px;height:48px;border-radius:6px;margin-right:14px;object-fit:contain;background:#FFFFFF;border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:2px;flex-shrink:0;" />` : '';
+      const title = r.company_shortname || r.company_fullname || 'Company';
+      const sub = (r.company_shortname && r.company_fullname) ? `<div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-top:2px;">${typeof escapeHTML === 'function' ? escapeHTML(r.company_fullname) : r.company_fullname}</div>` : '';
+      return `<div style="display:flex;align-items:center;">${logo}<div><h2 style="font-size:20px;font-weight:700;color:var(--text);margin:0;line-height:1.2;">${typeof escapeHTML === 'function' ? escapeHTML(title) : title}</h2>${sub}</div></div>`;
     },
     displayName: (r) => {
       const short = r.company_shortname || '';

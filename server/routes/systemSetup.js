@@ -170,6 +170,33 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// Helper: format logo buffer or string to safe data URL
+function formatLogo(logo) {
+  if (!logo) return null;
+  if (Buffer.isBuffer(logo)) {
+    const first4 = logo.slice(0, 4);
+    if (first4[0] === 0x89 && first4[1] === 0x50 && first4[2] === 0x4e && first4[3] === 0x47) {
+      return `data:image/png;base64,${logo.toString('base64')}`;
+    }
+    if (first4[0] === 0xff && first4[1] === 0xd8 && first4[2] === 0xff) {
+      return `data:image/jpeg;base64,${logo.toString('base64')}`;
+    }
+    const str = logo.toString('utf8');
+    if (str.startsWith('data:') || str.startsWith('http') || str.startsWith('/') || str.startsWith('[')) {
+      return str;
+    }
+    return `data:image/png;base64,${logo.toString('base64')}`;
+  }
+  if (typeof logo === 'object' && Array.isArray(logo.data)) {
+    return formatLogo(Buffer.from(logo.data));
+  }
+  if (typeof logo === 'string') {
+    if (logo.startsWith('data:') || logo.startsWith('http') || logo.startsWith('/')) return logo;
+    return `data:image/png;base64,${logo}`;
+  }
+  return null;
+}
+
 // GET /api/system-setup/data (Prefill company & admin for Step 1)
 router.get('/data', async (req, res) => {
   try {
@@ -178,6 +205,9 @@ router.get('/data', async (req, res) => {
     const setupCompleted = setupRes.rows[0] ? setupRes.rows[0].value === 'true' : false;
 
     const compRes = await pool.query('SELECT * FROM my_company ORDER BY my_company_id ASC LIMIT 1');
+    const compRaw = compRes.rows[0] || null;
+    const company = compRaw ? { ...compRaw, logo: formatLogo(compRaw.logo) } : null;
+
     const adminRes = await pool.query(`
       SELECT employee_id, username, full_name, email, role, status 
       FROM employee 
@@ -187,7 +217,7 @@ router.get('/data', async (req, res) => {
 
     res.json({
       setupCompleted,
-      company: compRes.rows[0] || null,
+      company,
       admin: adminRes.rows[0] || null
     });
   } catch (err) {
