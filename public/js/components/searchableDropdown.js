@@ -652,6 +652,36 @@ window.handleTargetTableChange = function () {
     searchInput.placeholder = 'Search and select...';
   }
   multiselectContainer.dataset.selected = '[]';
+  if (typeof handleTargetTableTypeChange === 'function') {
+    handleTargetTableTypeChange();
+  }
+};
+
+window.handleTargetTableTypeChange = function (explicitType) {
+  const formModal = document.getElementById('form-modal');
+  let typeVal = explicitType;
+  if (!typeVal) {
+    const typeInput = formModal ? formModal.querySelector('#f-type, [name="type"]') : document.getElementById('f-type');
+    const activeSeg = formModal ? formModal.querySelector('#f-type-control .segmented-option.active') : null;
+    typeVal = (activeSeg ? activeSeg.dataset.value : (typeInput ? typeInput.value : 'Add')) || 'Add';
+  }
+
+  const isAdd = String(typeVal).trim().toLowerCase() === 'add';
+
+  // Toggle all record_ids fields in form-modal or document
+  const searchRoot = formModal || document;
+  const fieldRows = searchRoot.querySelectorAll('#form-field-record_ids, .target-record-multiselect, #container-record_ids');
+  fieldRows.forEach(row => {
+    const target = (row.classList.contains('form-field') || row.id === 'form-field-record_ids') ? row : row.closest('.form-field');
+    if (target) {
+      if (isAdd) {
+        target.style.setProperty('display', 'none', 'important');
+      } else {
+        target.style.removeProperty('display');
+        target.style.display = '';
+      }
+    }
+  });
 };
 
 // Close any open suggestion list when clicking outside

@@ -368,6 +368,8 @@ async function openAddModal(moduleKey, initialData = null) {
     if (typeof handleExpenseValueChange === 'function') handleExpenseValueChange();
   } else if (moduleKey === 'contract') {
     if (typeof handleContractValueChange === 'function') handleContractValueChange();
+  } else if (moduleKey === 'target_table') {
+    if (typeof handleTargetTableTypeChange === 'function') handleTargetTableTypeChange();
   }
   if (typeof updateFormBaseCurrencyLabels === 'function') {
     setTimeout(() => updateFormBaseCurrencyLabels(moduleKey), 50);
@@ -510,6 +512,8 @@ async function openEditModal(moduleKey, pkVal) {
     if (typeof handleExpenseValueChange === 'function') handleExpenseValueChange();
   } else if (moduleKey === 'contract') {
     if (typeof handleContractValueChange === 'function') handleContractValueChange();
+  } else if (moduleKey === 'target_table') {
+    if (typeof handleTargetTableTypeChange === 'function') handleTargetTableTypeChange();
   }
   if (typeof updateFormBaseCurrencyLabels === 'function') {
     setTimeout(() => updateFormBaseCurrencyLabels(moduleKey), 50);
@@ -670,8 +674,9 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
   if (field.hidden) {
     return `<input type="hidden" id="f-${field.key}" name="${field.key}" value="${escapeHTML(val || '')}" />`;
   }
-
-  html += `<div class="form-field${fullClass}">`;
+  const isTargetAdd = moduleKey === 'target_table' && field.key === 'record_ids' && ((record && record.type) ? record.type === 'Add' : true);
+  const hiddenStyle = isTargetAdd ? ' style="display: none;"' : '';
+  html += `<div class="form-field${fullClass}" id="form-field-${field.key}"${hiddenStyle}>`;
   let rawLabel = field.label || field.key;
   let labelKey = field.labelKey || ('col.' + field.key);
   // Dynamic label for counter_party based on payment_type
@@ -1755,7 +1760,15 @@ function validateFormAndNotify(moduleKey, showNotification = false) {
   const missingFields = [];
   const tabErrorsCount = {};
 
-  const requiredFields = mod.fields.filter(f => f.required && f.key && !f.hidden);
+  const requiredFields = mod.fields.filter(f => {
+    if (!f.key || f.hidden) return false;
+    if (moduleKey === 'target_table' && f.key === 'record_ids') {
+      const typeEl = document.getElementById('f-type');
+      const curType = typeEl ? typeEl.value : 'Add';
+      return curType !== 'Add';
+    }
+    return f.required;
+  });
   requiredFields.forEach(field => {
     const key = field.key;
     const isMultiselect = field.type === 'multiselect' || field.type === 'target_record_multiselect' || key === 'sr_owner';
@@ -3082,7 +3095,10 @@ async function submitAdd(moduleKey, extraData = {}) {
   }
   try {
     let postEndpoint = getWriteEndpoint(mod);
-    if (currentView === 'detail' && moduleKey !== currentModule && currentModule) {
+    if (window.__targetTableAddContext && window.__targetTableAddContext.targetTable === moduleKey) {
+      const sep = postEndpoint.includes('?') ? '&' : '?';
+      postEndpoint += `${sep}target_table_id=${encodeURIComponent(window.__targetTableAddContext.targetTableId || '')}&request=${encodeURIComponent(window.__targetTableAddContext.requestId || '')}`;
+    } else if (currentView === 'detail' && moduleKey !== currentModule && currentModule) {
       const sep = postEndpoint.includes('?') ? '&' : '?';
       postEndpoint += `${sep}view=${currentModule}`;
     }
@@ -3118,6 +3134,15 @@ async function submitAdd(moduleKey, extraData = {}) {
       }
     }
     closeModal('form-modal');
+    if (window.__targetTableAddContext && window.__targetTableAddContext.targetTable === moduleKey) {
+      const tgtId = window.__targetTableAddContext.targetTableId || (typeof currentRecord !== 'undefined' && currentRecord && currentRecord.target_table_id);
+      window.__targetTableAddContext = null;
+      if (typeof openDetailInternal === 'function' && tgtId) {
+        setTimeout(() => {
+          openDetailInternal('target_table', tgtId, true);
+        }, 300);
+      }
+    }
     showToast(`${getModuleMeta(moduleKey).title} ${t('toast.record_added', 'record added successfully!')}`, 'success');
     delete selectCache[moduleKey]; // Clear only current module cache
     markReportPanesDirty([moduleKey]);

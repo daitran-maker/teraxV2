@@ -1125,14 +1125,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
       }
     }
 
-    // Calculate sum for financial tables (payment, invoice, and expense summaries omitted per requirement)
-    if (childKey === 'mtr' && data.length > 0) {
-      const baseCurr = (typeof window.getActiveBaseCurrency === 'function' ? window.getActiveBaseCurrency() : 'VND') || 'VND';
-      const total = data.reduce((acc, curr) => acc + (parseFloat(curr.amount_in_base_currency != null ? curr.amount_in_base_currency : curr.amount) || 0), 0);
-      if (sumSpan) {
-        sumSpan.innerHTML = `<span style="font-size:11px; color:#64748B; font-weight:400; white-space:nowrap; flex-shrink:0;">Total: <span style="color:#111827; font-weight:700;">${formatNumber(Math.round(total))} ${baseCurr}</span></span>`;
-      }
-    }
+
 
     // When loading payment/invoice tab for a request-like parent,
     // check if there is already contract data in cache → if yes, hide Add button
@@ -1488,7 +1481,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             : (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentKey) ? parentKey : (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule) ? currentModule : parentKey));
           const isReqParent = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(effectiveParentKey)
             || ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentKey);
-          const allowChildActions = !['logs', 'request_activity_log', 'history', 'finance'].includes(childKey) && (isReqParent
+          const allowChildActions = !['logs', 'request_activity_log', 'history', 'finance', 'target_table'].includes(childKey) && (isReqParent
             ? isChildTableActionAllowed(childKey, 'edit', effectiveParentKey)
             : (parentKey === 'contract' ? ['payment', 'invoice'].includes(childKey) : (parentKey === 'account' ? childKey === 'mtr' : (parentKey === 'my_company' ? true : (parentKey === 'company' ? (childKey === 'contact' && isChildTableActionAllowed(childKey, 'edit', parentKey)) : false)))));
 
@@ -1532,7 +1525,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                                     <span class="material-symbols-rounded" style="font-size:18px; pointer-events:none; color: #64748B;">more_vert</span>
                                   </button>
                                 </td>
-                              ` : (!['logs', 'request_activity_log', 'history', 'request_rating', 'rating', 'feedback', 'comment', 'ticket_comment', 'finance', 'assigned_task'].includes(childKey) && isChildTableActionAllowed(childKey, 'duplicate', parentKey)) ? `
+                              ` : (!['logs', 'request_activity_log', 'history', 'request_rating', 'rating', 'feedback', 'comment', 'ticket_comment', 'finance', 'assigned_task', 'target_table'].includes(childKey) && isChildTableActionAllowed(childKey, 'duplicate', parentKey)) ? `
                                <td style="padding: 6px 14px; text-align: center; white-space: nowrap;" onclick="event.stopPropagation();">
                                  <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation(); duplicateRecord('${childKey}', '${pkVal}')" title="Copy / Duplicate" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid #E5E7EB; border-radius: 6px; background: #FFFFFF; color: #475569; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569'">
                                    <span class="material-symbols-rounded" style="font-size: 16px;">content_copy</span>
@@ -1578,7 +1571,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 }
 
                 let cellContentHTML = '';
-                if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
+                if (childKey === 'target_table' && ['target', 'record_ids'].includes(c.key)) {
+                  cellContentHTML = val !== undefined && val !== null ? String(val) : '';
+                } else if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
                   let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
                   if (c.key === 'payment_type') {
                     if (val === '60' || Number(val) === 60 || String(val).toLowerCase() === 'incoming') translatedVal = (typeof t === 'function' ? t('status.incoming', 'Incoming') : 'Incoming');
@@ -1590,16 +1585,39 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   cellContentHTML = escapeHTML(display);
                 }
 
-                if (colIdx === 0) {
+                if (colIdx === 0 && childKey !== 'target_table') {
                   cellContentHTML = `<span style="font-weight: 600; color: #1E293B;">${cellContentHTML}</span>`;
                 }
 
-                return `<td style="padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;" title="${escapeHTML(displayVal)}">${cellContentHTML}</td>`;
+                const titleAttr = (childKey === 'target_table' && ['target', 'record_ids'].includes(c.key))
+                  ? escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim())
+                  : escapeHTML(displayVal);
+
+                return `<td style="padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;" title="${titleAttr}">${cellContentHTML}</td>`;
               }).join('')}
                            </tr>
                          `;
             }).join('')}
                      </tbody>
+                     ${['mtr', 'contract', 'payment', 'invoice', 'expense'].includes(childKey) && data.length > 0 ? `
+                     <tfoot>
+                       <tr style="border-top: 2px solid #E2E8F0; background: #F8FAFC; font-weight: 700;">
+                         ${allowChildActions ? `<td style="padding: 10px 14px;"></td>` : ''}
+                         ${cols.map((c, colIdx) => {
+                           const k = String(c.key).toLowerCase();
+                           const isAmountCol = ['amount', 'amount_in_base_currency', 'total_value', 'value', 'total_value_in_base_currency', 'balance'].includes(k);
+                           if (isAmountCol) {
+                             const sum = data.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+                             return `<td style="padding: 10px 14px; font-size: 13px; color: #1E293B; font-weight: 700; white-space: nowrap;">${formatNumber(Math.round(sum))}</td>`;
+                           }
+                           if (colIdx === 0) {
+                             return `<td style="padding: 10px 14px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase;">Total</td>`;
+                           }
+                           return `<td style="padding: 10px 14px;"></td>`;
+                         }).join('')}
+                       </tr>
+                     </tfoot>
+                     ` : ''}
                    </table>
                  </div>
                `;
@@ -1664,6 +1682,11 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 }
               }
 
+              if (childKey === 'target_table' && ['target', 'record_ids'].includes(c.key)) {
+                const titleAttr = escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim());
+                return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;" title="${titleAttr}">${val !== undefined && val !== null ? String(val) : ''}</td>`;
+              }
+
               if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
                 let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
                 if (c.key === 'payment_type') {
@@ -1680,6 +1703,24 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                          `;
           }).join('')}
                      </tbody>
+                     ${['mtr', 'contract', 'payment', 'invoice', 'expense'].includes(childKey) && data.length > 0 ? `
+                     <tfoot>
+                       <tr style="border-top: 2px solid var(--border); background: var(--bg-hover); font-weight: 700;">
+                         ${cols.map((c, colIdx) => {
+                           const k = String(c.key).toLowerCase();
+                           const isAmountCol = ['amount', 'amount_in_base_currency', 'total_value', 'value', 'total_value_in_base_currency', 'balance'].includes(k);
+                           if (isAmountCol) {
+                             const sum = data.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+                             return `<td style="padding: 10px 14px; font-size: 12px; color: var(--text-primary); font-weight: 700; white-space: nowrap;">${formatNumber(Math.round(sum))}</td>`;
+                           }
+                           if (colIdx === 0) {
+                             return `<td style="padding: 10px 14px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total</td>`;
+                           }
+                           return `<td style="padding: 10px 14px;"></td>`;
+                         }).join('')}
+                       </tr>
+                     </tfoot>
+                     ` : ''}
                    </table>
                  </div>
                `;

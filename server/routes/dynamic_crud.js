@@ -7,7 +7,7 @@ const { expenseHandler } = require('../modules/expense');
 const { contractHandler } = require('../modules/contract');
 const { assetHandler } = require('../modules/asset');
 const { serviceHandler } = require('../modules/service');
-const { targetTableHandler } = require('../modules/target_table');
+const { targetTableHandler, targetTableService } = require('../modules/target_table');
 
 tableRegistry.register(['request', 'ticket', 'assigned_task', 'task_subtask', 'comment', 'ticket_comment'], requestHandler);
 tableRegistry.register(['payment'], paymentHandler);
@@ -3415,7 +3415,16 @@ router.post('/:tableName', async (req, res) => {
   }
   const user = getUserFromReq(req);
   const viewName = req.query.view || tableName;
-  const isAllowed = await checkPermission('action_rules', `add_${tableName}`, user, viewName);
+  let isAllowed = await checkPermission('action_rules', `add_${tableName}`, user, viewName);
+  let targetTableAuth = null;
+  if (!isAllowed) {
+    const targetRequestId = req.query.request || req.body.request || null;
+    const targetTableId = req.query.target_table_id || req.body.target_table_id || null;
+    targetTableAuth = await targetTableService.canUserAddTargetRecord(user, tableName, targetRequestId, targetTableId);
+    if (targetTableAuth.allowed) {
+      isAllowed = true;
+    }
+  }
   if (!isAllowed) {
     return res.status(403).json({ error: 'Access denied: You do not have permission to add records.' });
   }
@@ -3881,6 +3890,19 @@ router.post('/:tableName', async (req, res) => {
     broadcastSSE('db_change', { action: 'insert', table: tableName, record: responseData });
     triggerNotifications(tableName, null, responseData);
     enrichRecordWithStatusCatalog(tableName, responseData);
+
+    // Link newly added record into target_table if created under an active target_table request
+    try {
+      const newRecordPk = responseData ? (responseData[pk] || responseData.id) : null;
+      if (newRecordPk) {
+        const reqIdForTarget = targetTableAuth?.requestId || req.query.request || req.body.request || null;
+        const targetTableIdForAdd = targetTableAuth?.targetTableId || req.query.target_table_id || req.body.target_table_id || null;
+        await targetTableService.onRecordAdded(tableName, newRecordPk, userEmployeeId, reqIdForTarget, targetTableIdForAdd);
+      }
+    } catch (ttAddErr) {
+      console.error('[target_table onRecordAdded error]', ttAddErr);
+    }
+
     res.json(responseData);
   } catch (err) {
     await client.query('ROLLBACK');
@@ -3913,48 +3935,9 @@ router.put('/:tableName/:id', async (req, res) => {
   const viewName = req.query.view || tableName;
   let isAllowed = isSuperAdmin || await checkPermission('action_rules', `edit_${tableName}`, user, viewName);
   if (!isAllowed) {
-    const targetTablesToCheck = ['employee', 'my_company', 'company', 'asset', 'service', 'contact', 'policy_and_program'];
-    const checkTable = tableName === 'policy' ? 'policy_and_program' : tableName;
-    if (targetTablesToCheck.includes(checkTable)) {
-      try {
-        const activeRequestsRes = await pool.query(
-          `SELECT t.request FROM target_table t
-           JOIN request r ON t.request = r.request_id
-           WHERE t.table_name = $1 AND $2 = ANY(t.record_ids) AND t.type = 'Edit' AND r.process_status = 8`,
-          [tableName, id]
-        );
-        let foundAuthorizedRequest = false;
-        for (const row of activeRequestsRes.rows) {
-          const reqId = row.request;
-          const reqRes = await pool.query(
-            `SELECT requester, sr_creater, policy_lead, sr_owner FROM request WHERE request_id = $1`,
-            [reqId]
-          );
-          if (reqRes.rows.length > 0) {
-            const request = reqRes.rows[0];
-            const requester = (request.requester || '').toLowerCase();
-            const srCreater = (request.sr_creater || '').toLowerCase();
-            const policyLead = (request.policy_lead || '').toLowerCase();
-            const uId = (user.employee_id || '').toLowerCase();
-            const uEmail = (user.email || '').toLowerCase();
-            const srOwnerArr = Array.isArray(request.sr_owner)
-              ? request.sr_owner.map(s => s.toLowerCase())
-              : (request.sr_owner ? [request.sr_owner.toLowerCase()] : []);
-            if (requester === uId || requester === uEmail ||
-                srCreater === uId || srCreater === uEmail ||
-                policyLead === uId || policyLead === uEmail ||
-                srOwnerArr.includes(uId) || srOwnerArr.includes(uEmail)) {
-              foundAuthorizedRequest = true;
-              break;
-            }
-          }
-        }
-        if (foundAuthorizedRequest) {
-          isAllowed = true;
-        }
-      } catch (err) {
-        console.error('[target_table authorization check error]', err);
-      }
+    const editAuth = await targetTableService.canUserEditTargetRecord(user, tableName, id);
+    if (editAuth.allowed) {
+      isAllowed = true;
     }
     if (!isAllowed) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to edit records.' });
@@ -4426,36 +4409,7 @@ router.put('/:tableName/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Record not found' });
 
     // Update target_table configuration log if this record is a target of an active request
-    try {
-      const activeConfigs = await pool.query(
-        `SELECT t.target_table_id, t.log FROM target_table t
-         JOIN request r ON t.request = r.request_id
-         WHERE t.table_name = $1 AND $2 = ANY(t.record_ids) AND t.type = 'Edit' AND r.process_status = 8`,
-        [tableName, id]
-      );
-      for (const row of activeConfigs.rows) {
-        let currentLogs = [];
-        try {
-          currentLogs = typeof row.log === 'string' ? JSON.parse(row.log) : (Array.isArray(row.log) ? row.log : []);
-        } catch (e) {
-          currentLogs = [];
-        }
-        // Avoid duplicates: remove previous log entry for this record if exists
-        currentLogs = currentLogs.filter(l => String(l.record_id) !== String(id));
-        currentLogs.push({
-          record_id: id,
-          action: 'Edit',
-          user: userEmployeeId,
-          timestamp: new Date().toISOString()
-        });
-        await pool.query(
-          `UPDATE target_table SET log = $1 WHERE target_table_id = $2`,
-          [JSON.stringify(currentLogs), row.target_table_id]
-        );
-      }
-    } catch (logErr) {
-      console.error('[target_table edit logging error]', logErr);
-    }
+    await targetTableService.onRecordEdited(tableName, id, userEmployeeId);
 
     if (tableName === 'cms_tenant_info' && data.base_currency) {
       await pool.query('UPDATE public.my_company SET base_currency = $1', [data.base_currency]);
@@ -4761,48 +4715,9 @@ router.delete('/:tableName/:id', async (req, res) => {
         console.error('[request delete owner check error]', e);
       }
     }
-    const targetTablesToCheck = ['employee', 'my_company', 'company', 'asset', 'service', 'contact', 'policy_and_program'];
-    const checkTable = tableName === 'policy' ? 'policy_and_program' : tableName;
-    if (targetTablesToCheck.includes(checkTable)) {
-      try {
-        const activeRequestsRes = await pool.query(
-          `SELECT t.request FROM target_table t
-           JOIN request r ON t.request = r.request_id
-           WHERE t.table_name = $1 AND $2 = ANY(t.record_ids) AND t.type = 'Delete' AND r.process_status = 8`,
-          [tableName, id]
-        );
-        let foundAuthorizedRequest = false;
-        for (const row of activeRequestsRes.rows) {
-          const reqId = row.request;
-          const reqRes = await pool.query(
-            `SELECT requester, sr_creater, policy_lead, sr_owner FROM request WHERE request_id = $1`,
-            [reqId]
-          );
-          if (reqRes.rows.length > 0) {
-            const request = reqRes.rows[0];
-            const requester = (request.requester || '').toLowerCase();
-            const srCreater = (request.sr_creater || '').toLowerCase();
-            const policyLead = (request.policy_lead || '').toLowerCase();
-            const uId = (user.employee_id || '').toLowerCase();
-            const uEmail = (user.email || '').toLowerCase();
-            const srOwnerArr = Array.isArray(request.sr_owner)
-              ? request.sr_owner.map(s => s.toLowerCase())
-              : (request.sr_owner ? [request.sr_owner.toLowerCase()] : []);
-            if (requester === uId || requester === uEmail ||
-                srCreater === uId || srCreater === uEmail ||
-                policyLead === uId || policyLead === uEmail ||
-                srOwnerArr.includes(uId) || srOwnerArr.includes(uEmail)) {
-              foundAuthorizedRequest = true;
-              break;
-            }
-          }
-        }
-        if (foundAuthorizedRequest) {
-          isAllowed = true;
-        }
-      } catch (err) {
-        console.error('[target_table delete authorization check error]', err);
-      }
+    const deleteAuth = await targetTableService.canUserDeleteTargetRecord(user, tableName, id);
+    if (deleteAuth.allowed) {
+      isAllowed = true;
     }
     if (!isAllowed) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to delete records.' });
@@ -5066,36 +4981,7 @@ router.delete('/:tableName/:id', async (req, res) => {
 
     // Update target_table configuration log if this record is deleted under an active request
     if (result.rows.length > 0) {
-      try {
-        const activeConfigs = await pool.query(
-          `SELECT t.target_table_id, t.log FROM target_table t
-           JOIN request r ON t.request = r.request_id
-           WHERE t.table_name = $1 AND $2 = ANY(t.record_ids) AND t.type = 'Delete' AND r.process_status = 8`,
-          [tableName, id]
-        );
-        for (const row of activeConfigs.rows) {
-          let currentLogs = [];
-          try {
-            currentLogs = typeof row.log === 'string' ? JSON.parse(row.log) : (Array.isArray(row.log) ? row.log : []);
-          } catch (e) {
-            currentLogs = [];
-          }
-          // Avoid duplicates
-          currentLogs = currentLogs.filter(l => String(l.record_id) !== String(id));
-          currentLogs.push({
-            record_id: id,
-            action: 'Delete',
-            user: userEmployeeId,
-            timestamp: new Date().toISOString()
-          });
-          await pool.query(
-            `UPDATE target_table SET log = $1 WHERE target_table_id = $2`,
-            [JSON.stringify(currentLogs), row.target_table_id]
-          );
-        }
-      } catch (logErr) {
-        console.error('[target_table delete logging error]', logErr);
-      }
+      await targetTableService.onRecordDeleted(tableName, id, userEmployeeId);
     }
 
     if (['action_rules', 'exception_rules', 'column_permissions'].includes(tableName)) {

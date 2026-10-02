@@ -1893,7 +1893,7 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
     const pStatus = await showCustomPrompt("Re-update Process Status", "Please select new process status:", currentProcessStatus, "", fieldConfig);
     if (!pStatus) return;
     extraData.process_status = pStatus;
-  } else if (actionId === 'payment_paid' || actionId === 'payment_change_mtr') {
+  } else if (actionId === 'payment_paid' || actionId === 'payment_change_mtr' || actionId === 'payment_update_transaction') {
     // Lấy danh sách MTR thuộc account của payment này
     let mtrList = [];
     try {
@@ -2845,6 +2845,7 @@ function buildDetailViewHTML(moduleKey, record) {
       const isExplicitDetailField = mod.detailFields && mod.detailFields.some(f => f.key === row.key);
 
       if ((fieldCfg && fieldCfg.hidden) || (colCfg && colCfg.hidden && !isExplicitDetailField) || !isColumnAllowed(moduleKey, row.key)) return '';
+      if (moduleKey === 'target_table' && row.key === 'record_ids' && String(record.type || '').trim().toLowerCase() === 'add') return '';
 
       let val = record[row.key];
       if (row.key === 'elements' && moduleKey === 'request') {
@@ -3145,6 +3146,8 @@ function buildDetailViewHTML(moduleKey, record) {
           } else {
             valHTML = `<span style="color: #94A3B8; font-style: italic;">—</span>`;
           }
+        } else if ((colCfg && colCfg.html) || (fieldCfg && fieldCfg.html) || (moduleKey === 'target_table' && row.key === 'record_ids')) {
+          valHTML = displayVal ? `${displayVal}${linkIcon}` : `<span style="color: #94A3B8; font-style: italic;">—</span>`;
         } else {
           valHTML = displayVal ? `${escapeHTML(displayVal)}${linkIcon}` : `<span style="color: #94A3B8; font-style: italic;">—</span>`;
         }

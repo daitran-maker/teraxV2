@@ -3302,47 +3302,96 @@ window.resolveVirtualColumn = function (moduleKey, colKey, row) {
       return '';
     }
   }
-  if (moduleKey === 'target_table' && colKey === 'record_ids') {
-    const targetTable = row.table_name;
-    const recordIds = Array.isArray(row.record_ids)
-      ? row.record_ids
-      : (typeof row.record_ids === 'string'
-        ? row.record_ids.split(',').map(s => s.trim().replace(/^\[|\]$/g, '')).filter(Boolean)
-        : []);
+  if (moduleKey === 'target_table') {
+    if (colKey === 'target') {
+      const type = row.type || 'Add';
+      const tbl = row.table_name || '';
+      const badgeBg = type === 'Add' ? '#ea580c' : (type === 'Edit' ? '#2563EB' : '#DC2626');
+      const tableLabels = {
+        employee: { label: 'Employee', icon: 'badge' },
+        my_company: { label: 'My Company', icon: 'domain' },
+        company: { label: 'Customer', icon: 'corporate_fare' },
+        asset: { label: 'Asset', icon: 'devices' },
+        service: { label: 'Service', icon: 'room_service' },
+        contact: { label: 'Contact', icon: 'person' },
+        policy: { label: 'Process', icon: 'rule' }
+      };
+      const info = tableLabels[tbl] || { label: tbl.toUpperCase().replace(/_/g, ' '), icon: 'table_chart' };
+      const translatedLabel = typeof t === 'function' ? t('table.' + tbl, info.label) : info.label;
 
-    if (recordIds.length === 0) return '';
+      return `
+        <div style="display:inline-flex; align-items:center; gap:8px;">
+          <span class="badge" style="background:${badgeBg}; color:#FFF; font-weight:600; padding:2.5px 8px; border-radius:6px; font-size:11px; letter-spacing:0.3px;">${escapeHTML(type)}</span>
+          <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">${info.icon}</span>
+          <span style="font-weight:600; font-size:13px; color:#1E293B;">${escapeHTML(translatedLabel)}</span>
+        </div>
+      `;
+    }
 
-    const getRecordLabel = (tbl, item) => {
-      if (tbl === 'employee') return item.full_name || '';
-      if (tbl === 'my_company') return item.company_shortname || '';
-      if (tbl === 'company') return item.company_shortname || '';
-      if (tbl === 'asset') return item.asset_name || '';
-      if (tbl === 'service') return item.service_name || '';
-      if (tbl === 'contact') return item.full_name || '';
-      if (tbl === 'policy') return item.policy_name || '';
-      return item.id || '';
-    };
+    if (colKey === 'record_ids') {
+      const targetTable = row.table_name;
+      const recordIds = Array.isArray(row.record_ids)
+        ? row.record_ids
+        : (typeof row.record_ids === 'string'
+          ? row.record_ids.split(',').map(s => s.trim().replace(/^\[|\]$/g, '')).filter(Boolean)
+          : []);
 
-    const getPkName = (tbl) => {
-      if (tbl === 'employee') return 'employee_id';
-      if (tbl === 'my_company') return 'my_company_id';
-      if (tbl === 'company') return 'company_id';
-      if (tbl === 'asset') return 'office_asset_id';
-      if (tbl === 'service') return 'service_id';
-      if (tbl === 'contact') return 'contact_id';
-      if (tbl === 'policy') return 'policy_id';
-      return 'id';
-    };
+      if (row.type === 'Add') {
+        if (recordIds.length === 0) {
+          const newRecText = typeof t === 'function' ? t('target_table.scope_new_record', 'New record to be created') : 'New record to be created';
+          return `
+            <span style="display:inline-flex; align-items:center; gap:5px; color:#ea580c; font-size:12px; font-weight:500; background:#FFF7ED; border:1px solid #FFEDD5; padding:3px 10px; border-radius:6px;">
+              <span class="material-symbols-rounded" style="font-size:15px; color:#ea580c;">fiber_new</span> ${escapeHTML(newRecText)}
+            </span>
+          `;
+        }
+        const createdCountText = typeof t === 'function' ? t('target_table.scope_records_created', 'record(s) created') : 'record(s) created';
+        return `
+          <span style="display:inline-flex; align-items:center; gap:5px; color:#10B981; font-size:12px; font-weight:600; background:#ECFDF5; border:1px solid #D1FAE5; padding:3px 10px; border-radius:6px;">
+            <span class="material-symbols-rounded" style="font-size:15px; color:#10B981;">check_circle</span> ${recordIds.length} ${escapeHTML(createdCountText)}
+          </span>
+        `;
+      }
 
-    const pkCol = getPkName(targetTable);
-    const cachedItems = selectCache[targetTable] || [];
+      if (recordIds.length === 0) {
+        const noRecText = typeof t === 'function' ? t('target_table.scope_no_records_selected', 'No records selected') : 'No records selected';
+        return `<span style="color:#94A3B8; font-style:italic; font-size:12px;">${escapeHTML(noRecText)}</span>`;
+      }
 
-    const resolvedLabels = recordIds.map(id => {
-      const found = cachedItems.find(item => String(item[pkCol]) === String(id));
-      return found ? getRecordLabel(targetTable, found) : id;
-    });
+      const getRecordLabel = (tbl, item) => {
+        if (tbl === 'employee') return item.full_name || '';
+        if (tbl === 'my_company') return item.company_shortname || '';
+        if (tbl === 'company') return item.company_shortname || '';
+        if (tbl === 'asset') return item.asset_name || '';
+        if (tbl === 'service') return item.service_name || '';
+        if (tbl === 'contact') return item.full_name || '';
+        if (tbl === 'policy') return item.policy_name || '';
+        return item.id || '';
+      };
 
-    return resolvedLabels.join(', ');
+      const getPkName = (tbl) => {
+        if (tbl === 'employee') return 'employee_id';
+        if (tbl === 'my_company') return 'my_company_id';
+        if (tbl === 'company') return 'company_id';
+        if (tbl === 'asset') return 'office_asset_id';
+        if (tbl === 'service') return 'service_id';
+        if (tbl === 'contact') return 'contact_id';
+        if (tbl === 'policy') return 'policy_id';
+        return 'id';
+      };
+
+      const pkCol = getPkName(targetTable);
+      const cachedItems = (typeof selectCache !== 'undefined' && selectCache[targetTable]) ? selectCache[targetTable] : [];
+
+      const chips = recordIds.slice(0, 3).map(id => {
+        const found = cachedItems.find(item => String(item[pkCol]) === String(id));
+        const lbl = found ? getRecordLabel(targetTable, found) : id;
+        return `<span class="badge" style="background:#F1F5F9; color:#334155; border:1px solid #E2E8F0; padding:2px 8px; border-radius:6px; font-size:11.5px; margin-right:4px;">${escapeHTML(lbl)}</span>`;
+      }).join('');
+
+      const more = recordIds.length > 3 ? `<span style="font-size:11px; color:#64748B; font-weight:600;">+${recordIds.length - 3}</span>` : '';
+      return chips + more;
+    }
   }
   if (moduleKey === 'my_location' && colKey === 'location_label') {
     const code = row.location_code || '';

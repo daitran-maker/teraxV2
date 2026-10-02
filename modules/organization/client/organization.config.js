@@ -225,8 +225,8 @@
       { key: 'avatar', label: 'AVATAR', type: 'file' },
 
       { section: 'employment information' },
-      { key: 'company_id', label: 'MY COMPANY', labelKey: 'col.my_company', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname' },
-      { key: 'department_id', label: 'DEPARTMENT', labelKey: 'col.department' },
+      { key: 'company_id', label: 'MY COMPANY', labelKey: 'col.my_company', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname', full: true },
+      { key: 'department_id', label: 'DEPARTMENT', labelKey: 'col.department', full: true },
       { key: 'position', label: 'POSITION' },
       { key: 'role', label: 'ROLE TYPE' },
       { key: 'status', label: 'ACCOUNT STATUS' },

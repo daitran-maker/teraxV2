@@ -1216,9 +1216,10 @@ window.loadTargetTableActualRecords = async function (configRecord) {
   try {
     const parentRequestVal = configRecord.request;
     let processStatus = 'Draft';
+    let reqRes = null;
     if (parentRequestVal) {
       try {
-        const reqRes = await apiGet(`/table/request/${parentRequestVal}`);
+        reqRes = await apiGet(`/table/request/${parentRequestVal}`);
         if (reqRes && reqRes.process_status) {
           processStatus = reqRes.process_status;
         }
@@ -1227,8 +1228,8 @@ window.loadTargetTableActualRecords = async function (configRecord) {
       }
     }
 
-    const isProcessing = processStatus === 'Processing';
-    const isClosed = ['completed', 'closed'].includes(String(processStatus).toLowerCase());
+    const isProcessing = ['processing', '8', 8].includes(processStatus) || String(processStatus).toLowerCase() === 'processing';
+    const isClosed = ['completed', 'closed', 'cancelled', 'rejected', '9', '10', '11'].includes(String(processStatus).toLowerCase());
 
     const targetTable = configRecord.table_name;
     const actionType = configRecord.type || 'Edit';
@@ -1244,8 +1245,100 @@ window.loadTargetTableActualRecords = async function (configRecord) {
       countBadge.textContent = recordIds.length > 0 ? recordIds.length : '';
     }
 
+    const hashModule = window.location.hash.replace('#', '').split('/')[0];
+    const effectiveView = (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(hashModule))
+      ? hashModule
+      : (typeof currentModule !== 'undefined' && ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule) ? currentModule : 'request');
+
+    const isSuperAdmin = authUser && (String(authUser.role).toUpperCase() === 'SUPER ADMIN' || authUser.role === '1' || authUser.role === 1 || authUser.is_super_admin);
+    let canManageTargetRecords = !!isSuperAdmin;
+
+    if (!canManageTargetRecords && reqRes) {
+      const userEmpId = (authUser?.employee_id || '').toLowerCase();
+      const userEmail = (authUser?.email || '').toLowerCase();
+      const requester = (reqRes.requester || '').toLowerCase();
+      const creator = (reqRes.sr_creater || '').toLowerCase();
+      const policyLead = (reqRes.policy_lead || '').toLowerCase();
+      const srOwnerArr = Array.isArray(reqRes.sr_owner)
+        ? reqRes.sr_owner.map(s => String(s).toLowerCase())
+        : (reqRes.sr_owner ? [String(reqRes.sr_owner).toLowerCase()] : []);
+      if (
+        (userEmpId && (userEmpId === requester || userEmpId === creator || userEmpId === policyLead || srOwnerArr.includes(userEmpId))) ||
+        (userEmail && (userEmail === requester || userEmail === creator || userEmail === policyLead || srOwnerArr.includes(userEmail)))
+      ) {
+        canManageTargetRecords = true;
+      }
+    }
+
+    if (!canManageTargetRecords) {
+      canManageTargetRecords = isChildTableActionAllowed('target_table', 'edit', effectiveView) ||
+                               isChildTableActionAllowed('target_table', 'add', effectiveView) ||
+                               isChildTableActionAllowed('target_table', 'edit', 'request') ||
+                               isChildTableActionAllowed('target_table', 'add', 'request');
+    }
+
+    const isAllowedToAct = canManageTargetRecords && isProcessing;
+    const displayTableName = targetTable.toUpperCase().replace(/_/g, ' ');
+    const badgeColor = actionType === 'Add' ? '#ea580c' : (actionType === 'Edit' ? '#2563EB' : '#DC2626');
+    const recordsPrefix = actionType === 'Add'
+      ? ''
+      : (typeof t === 'function' ? t('target_table.records_prefix', 'Target records: ') : 'Target records: ');
+
+    const headerTitleHTML = actionType === 'Add'
+      ? `<span style="font-weight:700; font-size:13.5px; color:#1E293B;">${escapeHTML(displayTableName)}</span>`
+      : `<span class="badge" style="background:${badgeColor}; color:#FFF; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">${actionType}</span><span style="font-weight:700; font-size:13px; color:#1E293B;">${recordsPrefix}${escapeHTML(displayTableName)}</span>`;
+
+    let headerActionBtn = '';
+    const addBtnText = typeof t === 'function' ? t('target_table.btn_add_record', 'Add Record') : 'Add Record';
+    if (actionType === 'Add' && isAllowedToAct) {
+      headerActionBtn = `
+        <button class="btn btn-sm" onclick="window.openTargetTableAddRecord('${targetTable}', '${configRecord.target_table_id}', '${parentRequestVal || ''}')" style="background:linear-gradient(135deg, #f97316, #ea580c); color:#FFF; border:none; padding:6px 14px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 6px rgba(234,88,12,0.25); transition:all 0.15s ease;" onmouseover="this.style.filter='brightness(1.08)'" onmouseout="this.style.filter='none'">
+          <span class="material-symbols-rounded" style="font-size:16px;">add</span> ${addBtnText}
+        </button>
+      `;
+    }
+
     if (recordIds.length === 0) {
-      const noRecordsMsg = typeof t === 'function' ? t('target_table.no_records', 'Chưa cấu hình bản ghi mục tiêu nào. Bấm Edit bên trên để chọn bản ghi.') : 'Chưa cấu hình bản ghi mục tiêu nào. Bấm Edit bên trên để chọn bản ghi.';
+      if (actionType === 'Add') {
+        const emptyTitle = typeof t === 'function' ? t('target_table.add_empty_title', 'No records created yet') : 'No records created yet';
+        const emptyDesc = isAllowedToAct
+          ? (typeof t === 'function' ? t('target_table.add_empty_desc_active', 'Click "+ Add Record" above to create a new record for this request.') : 'Click "+ Add Record" above to create a new record for this request.')
+          : (isClosed
+            ? (typeof t === 'function' ? t('target_table.add_empty_desc_closed', 'This request is closed.') : 'This request is closed.')
+            : (typeof t === 'function' ? t('target_table.add_empty_desc_locked', 'Locked (Records will be created when the request moves to Processing).') : 'Locked (Records will be created when the request moves to Processing).'));
+
+        const emptyActionBtn = isAllowedToAct
+          ? `
+            <div style="margin-top: 14px;">
+              <button class="btn btn-sm" onclick="window.openTargetTableAddRecord('${targetTable}', '${configRecord.target_table_id}', '${parentRequestVal || ''}')" style="background:linear-gradient(135deg, #f97316, #ea580c); color:#FFF; border:none; padding:7px 18px; font-size:12.5px; font-weight:600; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 10px rgba(234,88,12,0.28); transition:all 0.15s ease;" onmouseover="this.style.filter='brightness(1.08)'" onmouseout="this.style.filter='none'">
+                <span class="material-symbols-rounded" style="font-size:16px;">add</span> ${addBtnText}
+              </button>
+            </div>
+          `
+          : '';
+
+        container.innerHTML = `
+          <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); overflow:hidden;">
+            <div style="padding:14px 18px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                ${headerTitleHTML}
+              </div>
+              <div>${headerActionBtn}</div>
+            </div>
+            <div style="padding:32px 16px; text-align:center; color:#64748B;">
+              <span class="material-symbols-rounded" style="font-size:36px; color:#f97316; display:block; margin-bottom:8px;">post_add</span>
+              <div style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:4px;">${emptyTitle}</div>
+              <div style="font-size:12px; color:#64748B; max-width:420px; margin:0 auto;">
+                ${emptyDesc}
+              </div>
+              ${emptyActionBtn}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const noRecordsMsg = typeof t === 'function' ? t('target_table.no_records', 'No target records configured. Click Edit above to select records.') : 'No target records configured. Click Edit above to select records.';
       container.innerHTML = `
         <div style="padding:16px; border:1px dashed #CBD5E1; border-radius:8px; text-align:center; color:#64748B; font-size:12.5px;">
           ${noRecordsMsg}
@@ -1287,20 +1380,17 @@ window.loadTargetTableActualRecords = async function (configRecord) {
       console.warn(`Failed to load target records for table ${targetTable}:`, err);
     }
 
-    const displayTableName = targetTable.toUpperCase().replace(/_/g, ' ');
-    const badgeColor = actionType === 'Edit' ? '#2563EB' : '#DC2626';
-    const recordsPrefix = typeof t === 'function' ? t('target_table.records_prefix', 'Bản ghi mục tiêu: ') : 'Bản ghi mục tiêu: ';
-    const colDetail = typeof t === 'function' ? t('target_table.col_detail', 'Thông tin chi tiết') : 'Thông tin chi tiết';
-    const colStatus = typeof t === 'function' ? t('target_table.col_status', 'Trạng thái') : 'Trạng thái';
-    const colAction = typeof t === 'function' ? t('target_table.col_action', 'Thao tác') : 'Thao tác';
+    const colDetail = typeof t === 'function' ? t('target_table.col_detail', 'Detailed Information') : 'Detailed Information';
+    const colStatus = typeof t === 'function' ? t('target_table.col_status', 'Status') : 'Status';
+    const colAction = typeof t === 'function' ? t('target_table.col_action', 'Action') : 'Action';
 
     let htmlBlock = `
       <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); overflow:hidden;">
         <div style="padding:14px 18px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="badge" style="background:${badgeColor}; color:#FFF; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">${actionType}</span>
-            <span style="font-weight:700; font-size:13px; color:#1E293B;">${recordsPrefix}${escapeHTML(displayTableName)}</span>
+            ${headerTitleHTML}
           </div>
+          <div>${headerActionBtn}</div>
         </div>
         
         <div style="overflow-x:auto;">
@@ -1321,65 +1411,62 @@ window.loadTargetTableActualRecords = async function (configRecord) {
       const logs = Array.isArray(configRecord.log) ? configRecord.log : [];
       const logEntry = logs.find(l => String(l.record_id) === String(rowId));
 
-      let statusText = typeof t === 'function' ? t('target_table.status_not_edited', 'Chưa chỉnh sửa') : 'Chưa chỉnh sửa';
+      let statusText = typeof t === 'function' ? t('target_table.status_not_edited', 'Not modified') : 'Not modified';
       let statusStyle = 'color: #64748B; font-style: italic;';
-      if (logEntry) {
+      if (actionType === 'Add') {
+        statusText = typeof t === 'function' ? t('target_table.status_created', 'Created') : 'Created';
+        statusStyle = 'color: #ea580c; font-weight: 600;';
+      } else if (logEntry) {
         if (logEntry.action === 'Delete') {
-          statusText = typeof t === 'function' ? t('target_table.status_deleted', 'Đã xóa') : 'Đã xóa';
+          statusText = typeof t === 'function' ? t('target_table.status_deleted', 'Deleted') : 'Deleted';
           statusStyle = 'color: #EF4444; font-weight: 600;';
         } else {
-          statusText = typeof t === 'function' ? t('target_table.status_edited', 'Đã chỉnh sửa') : 'Đã chỉnh sửa';
+          statusText = typeof t === 'function' ? t('target_table.status_edited', 'Modified') : 'Modified';
           statusStyle = 'color: #10B981; font-weight: 600;';
         }
       }
 
       const isDeletedState = logEntry && logEntry.action === 'Delete';
       const rowLabel = isDeletedState
-        ? (typeof t === 'function' ? t('target_table.deleted_fallback', 'Bản ghi ID {id} (Đã xóa)').replace('{id}', rowId) : `Bản ghi ID ${rowId} (Đã xóa)`)
-        : (row ? getRecordLabel(targetTable, row) : (typeof t === 'function' ? t('target_table.general_fallback', 'Bản ghi ID {id}').replace('{id}', rowId) : `Bản ghi ID ${rowId}`));
-
-    const hashModule = window.location.hash.replace('#', '').split('/')[0];
-    const effectiveView = (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(hashModule))
-      ? hashModule
-      : (typeof currentModule !== 'undefined' && ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule) ? currentModule : 'request');
-    const canManageTargetRecords = ['my_process_owner', 'my_task', 'my_team'].includes(effectiveView) && isChildTableActionAllowed('target_table', 'edit', effectiveView);
+        ? (typeof t === 'function' ? t('target_table.deleted_fallback', 'Record ID {id} (Deleted)').replace('{id}', rowId) : `Record ID ${rowId} (Deleted)`)
+        : (row ? getRecordLabel(targetTable, row) : (typeof t === 'function' ? t('target_table.general_fallback', 'Record ID {id}').replace('{id}', rowId) : `Record ID ${rowId}`));
 
     let actionBtn = '';
-    if (canManageTargetRecords && isProcessing) {
+    if (isAllowedToAct) {
       if (isDeletedState) {
-        actionBtn = `<span style="font-size:11px; color:#EF4444; font-style:italic;">${typeof t === 'function' ? t('target_table.status_deleted', 'Đã xóa') : 'Đã xóa'}</span>`;
+        actionBtn = `<span style="font-size:11px; color:#EF4444; font-style:italic;">${typeof t === 'function' ? t('target_table.status_deleted', 'Deleted') : 'Deleted'}</span>`;
       } else {
-        if (actionType === 'Edit') {
+        if (actionType === 'Add' || actionType === 'Edit') {
+          const editBtnText = typeof t === 'function' ? t('btn.edit_record', 'Edit Record') : 'Edit Record';
           actionBtn = `
-                        <button class="btn" onclick="openEditModal('${targetTable}', '${rowId}')" style="background:#2563EB; color:#FFF; border:none; padding:4px 10px; font-size:11.5px; font-weight:600; border-radius:6px; height:28px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-                          <span class="material-symbols-rounded" style="font-size:14px;">edit</span> Edit Record
-                        </button>
-                      `;
+            <button class="btn" onclick="openEditModal('${targetTable}', '${rowId}')" style="background:#2563EB; color:#FFF; border:none; padding:4px 10px; font-size:11.5px; font-weight:600; border-radius:6px; height:28px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">edit</span> ${editBtnText}
+            </button>
+          `;
         } else {
+          const deleteBtnText = typeof t === 'function' ? t('btn.delete_record', 'Delete Record') : 'Delete Record';
           actionBtn = `
-                        <button class="btn" onclick="confirmDelete('${targetTable}', '${rowId}', '${escapeHTML(rowLabel)}')" style="background:#DC2626; color:#FFF; border:none; padding:4px 10px; font-size:11.5px; font-weight:600; border-radius:6px; height:28px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-                          <span class="material-symbols-rounded" style="font-size:14px;">delete</span> Delete Record
-                        </button>
-                      `;
+            <button class="btn" onclick="confirmDelete('${targetTable}', '${rowId}', '${escapeHTML(rowLabel)}')" style="background:#DC2626; color:#FFF; border:none; padding:4px 10px; font-size:11.5px; font-weight:600; border-radius:6px; height:28px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">delete</span> ${deleteBtnText}
+            </button>
+          `;
         }
       }
-    } else if (!canManageTargetRecords) {
-      actionBtn = `<span style="font-size:11px; color:#94A3B8; font-style:italic;">${typeof t === 'function' ? t('target_table.read_only', 'Chỉ xem') : 'Chỉ xem'}</span>`;
     } else {
-      const lockedText = typeof t === 'function' ? t('target_table.locked_draft', 'Khóa (Chờ Processing)') : 'Khóa (Chờ Processing)';
-      actionBtn = `
-                  <span style="font-size:11px; color:#94A3B8; font-style:italic;">${lockedText}</span>
-                `;
+      const lockLabel = isClosed
+        ? (typeof t === 'function' ? t('target_table.read_only', 'Read-only') : 'Read-only')
+        : (typeof t === 'function' ? t('target_table.locked_draft', 'Locked (Processing required)') : 'Locked (Processing required)');
+      actionBtn = `<span style="font-size:11px; color:#94A3B8; font-style:italic;">${lockLabel}</span>`;
     }
 
       return `
-                  <tr style="border-bottom:1px solid #F1F5F9; transition:background 0.1s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='none'">
-                    <td style="padding:10px 18px; font-family:monospace; color:#64748B;">${escapeHTML(rowId)}</td>
-                    <td style="padding:10px 18px; font-weight:600; color:#1E293B;">${escapeHTML(rowLabel)}</td>
-                    <td style="padding:10px 18px; font-size:12px; ${statusStyle}">${escapeHTML(statusText)}</td>
-                    <td style="padding:10px 18px; text-align:right;">${actionBtn}</td>
-                  </tr>
-                `;
+        <tr style="border-bottom:1px solid #F1F5F9; transition:background 0.1s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='none'">
+          <td style="padding:10px 18px; font-family:monospace; color:#64748B;">${escapeHTML(rowId)}</td>
+          <td style="padding:10px 18px; font-weight:600; color:#1E293B;">${escapeHTML(rowLabel)}</td>
+          <td style="padding:10px 18px; font-size:12px; ${statusStyle}">${escapeHTML(statusText)}</td>
+          <td style="padding:10px 18px; text-align:right;">${actionBtn}</td>
+        </tr>
+      `;
     }).join('')}
             </tbody>
           </table>
@@ -1391,6 +1478,21 @@ window.loadTargetTableActualRecords = async function (configRecord) {
   } catch (err) {
     console.error('Error rendering target table actual records:', err);
     container.innerHTML = `<div style="padding:16px; color:#DC2626; font-size:12.5px;">Lỗi tải bản ghi thực tế: ${err.message}</div>`;
+  }
+};
+
+window.openTargetTableAddRecord = function (targetTable, targetTableId, requestId) {
+  window.__targetTableAddContext = {
+    targetTable,
+    targetTableId,
+    requestId
+  };
+  const initialData = {};
+  if (requestId) {
+    initialData.request = requestId;
+  }
+  if (typeof openAddModal === 'function') {
+    openAddModal(targetTable, initialData);
   }
 };
 

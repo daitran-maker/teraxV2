@@ -2136,8 +2136,8 @@ router.post('/execute', async (req, res) => {
         console.warn('Failed to broadcast SSE for created request:', e);
       }
 
-    } else if (action_id === 'payment_paid') {
-      // Paid: nhập transaction_id, tự động lấy transaction_date làm payment_date (ưu tiên)
+    } else if (action_id === 'payment_paid' || action_id === 'payment_change_mtr' || action_id === 'payment_update_transaction') {
+      // Paid / Change MTR / Update Transaction: nhập transaction_id, tự động lấy transaction_date làm payment_date (ưu tiên)
       const { transaction_id, payment_date } = req.body.data || {};
       if (!transaction_id) throw new Error("Vui lòng chọn MTR Transaction");
 
@@ -2191,18 +2191,25 @@ router.post('/execute', async (req, res) => {
         console.error('[payment_paid] Error fetching MTR transaction_date:', mtrErr);
       }
 
+      const logMsg = action_id === 'payment_change_mtr'
+        ? `Changed MTR transaction to ${transaction_id}`
+        : (action_id === 'payment_update_transaction' ? `Updated transaction to ${transaction_id}` : `Marked as paid with MTR ${transaction_id}`);
+      const tzTimeStr = new Date().toISOString();
+      const logEntry = { timestamp: tzTimeStr, user: user.employee_id || 'system', action: logMsg };
+
       await client.query(
-        `UPDATE payment SET payment_status = 32, transaction_id = $2, payment_date = $3 WHERE payment_id = $1`,
-        [record_id, transaction_id, finalPaymentDate]
+        `UPDATE payment SET payment_status = 32, transaction_id = $2, payment_date = $3, log = COALESCE(log, '[]'::jsonb) || $4::jsonb WHERE payment_id = $1`,
+        [record_id, transaction_id, finalPaymentDate, JSON.stringify([logEntry])]
       );
 
-      // Automated invoice generation for Selling contracts
-      try {
-        const payRes = await client.query(
-          `SELECT p.*, c.type AS contract_type 
-           FROM payment p 
-           LEFT JOIN contract c ON p.contract_id = c.contract_id 
-           WHERE p.payment_id = $1`,
+      // Automated invoice generation for Selling contracts (only on initial mark as paid)
+      if (action_id === 'payment_paid') {
+        try {
+          const payRes = await client.query(
+            `SELECT p.*, c.type AS contract_type 
+             FROM payment p 
+             LEFT JOIN contract c ON p.contract_id = c.contract_id 
+             WHERE p.payment_id = $1`,
           [record_id]
         );
         if (payRes.rows.length > 0) {
@@ -2268,6 +2275,7 @@ router.post('/execute', async (req, res) => {
         }
       } catch (autoInvErr) {
         console.error('[payment_paid] Error generating automatic invoice for selling contract payment:', autoInvErr);
+      }
       }
     } else if (action_id === 'payment_ready') {
       await client.query(`UPDATE payment SET payment_status = 31 WHERE payment_id = $1`, [record_id]);

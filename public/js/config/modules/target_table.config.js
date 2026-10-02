@@ -8,18 +8,17 @@
   target_table: {
     label: 'Target table',
     labelKey: 'module.target_table.title',
-    subtitle: 'Manage target records to Edit/Delete',
+    subtitle: 'Manage target records to Add/Edit/Delete',
     endpoint: '/table/target_table',
     pk: 'target_table_id',
     icon: '🎯',
     columns: [
       { key: 'target_table_id', label: 'ID', hidden: true },
-      { key: 'type', label: 'Type' },
-      { key: 'table_name', label: 'Table' },
-      { key: 'record_ids', label: 'Record IDs' }
+      { key: 'target', label: 'Target', labelKey: 'col.target', virtual: true, html: true },
+      { key: 'record_ids', label: 'Scope / Records', labelKey: 'col.scope_records', html: true }
     ],
     fields: [
-      { key: 'type', label: 'TYPE', type: 'segmented', options: ['Edit', 'Delete'], defaultValue: 'Edit', required: true },
+      { key: 'type', label: 'TYPE', type: 'segmented', options: ['Add', 'Edit', 'Delete'], defaultValue: 'Add', required: true, onchange: 'handleTargetTableTypeChange(this.dataset ? this.dataset.value : this.getAttribute("data-value"))' },
       {
         key: 'table_name',
         label: 'TABLE',
@@ -36,7 +35,7 @@
         required: true,
         onchange: 'handleTargetTableChange()'
       },
-      { key: 'record_ids', label: 'RECORD IDS', type: 'target_record_multiselect', full: true, required: true },
+      { key: 'record_ids', label: 'RECORD IDS', type: 'target_record_multiselect', full: true, required: false },
       { key: 'request', label: 'REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', hidden: true }
     ],
     detailFields: [
@@ -44,7 +43,14 @@
       { key: 'table_name', label: 'Table' },
       { key: 'record_ids', label: 'Record IDs' }
     ],
-    displayName: (r) => `${r.type} ${r.table_name}: ${Array.isArray(r.record_ids) ? r.record_ids.join(', ') : r.record_ids || ''}`
+    displayName: (r) => {
+      const tblLabels = { employee: 'Employee', my_company: 'My Company', company: 'Customer', asset: 'Asset', service: 'Service', contact: 'Contact', policy: 'Process' };
+      const tbl = (r && r.table_name) ? (tblLabels[r.table_name] || r.table_name.toUpperCase().replace(/_/g, ' ')) : '';
+      if (!r || !r.type) return tbl;
+      if (r.type === 'Add') return `${r.type} ${tbl}`;
+      const recs = Array.isArray(r.record_ids) && r.record_ids.length > 0 ? r.record_ids.join(', ') : (typeof r.record_ids === 'string' && r.record_ids ? r.record_ids : '');
+      return `${r.type} ${tbl}${recs ? ': ' + recs : ''}`;
+    }
   }
   });
 })();
