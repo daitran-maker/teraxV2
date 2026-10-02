@@ -1509,100 +1509,105 @@ async function initDb() {
 
 
   -- Register / update the audit_log_trigger function and apply to all tables
-  CREATE OR REPLACE FUNCTION audit_log_trigger()
-  RETURNS TRIGGER AS $$
-  DECLARE
-      v_pk_col TEXT;
-      v_record_id TEXT;
-      v_action TEXT;
-      user_val TEXT;
-      changed_fields JSONB;
+  DO $outer$
   BEGIN
-      -- Query the primary key column name dynamically from postgres catalogs
-      SELECT a.attname INTO v_pk_col
-      FROM pg_index i
-      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-      WHERE i.indrelid = TG_RELID AND i.indisprimary
-      LIMIT 1;
+    CREATE OR REPLACE FUNCTION audit_log_trigger()
+    RETURNS TRIGGER AS $func$
+    DECLARE
+        v_pk_col TEXT;
+        v_record_id TEXT;
+        v_action TEXT;
+        user_val TEXT;
+        changed_fields JSONB;
+    BEGIN
+        -- Query the primary key column name dynamically from postgres catalogs
+        SELECT a.attname INTO v_pk_col
+        FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = TG_RELID AND i.indisprimary
+        LIMIT 1;
 
-      IF v_pk_col IS NULL THEN
-          v_pk_col := 'id'; -- Fallback
-      END IF;
+        IF v_pk_col IS NULL THEN
+            v_pk_col := 'id'; -- Fallback
+        END IF;
 
-      -- Resolve the record_id based on operation
-      IF (TG_OP = 'DELETE') THEN
-          v_record_id := COALESCE(to_jsonb(OLD) ->> v_pk_col, 'unknown');
-      ELSE
-          v_record_id := COALESCE(to_jsonb(NEW) ->> v_pk_col, 'unknown');
-      END IF;
+        -- Resolve the record_id based on operation
+        IF (TG_OP = 'DELETE') THEN
+            v_record_id := COALESCE(to_jsonb(OLD) ->> v_pk_col, 'unknown');
+        ELSE
+            v_record_id := COALESCE(to_jsonb(NEW) ->> v_pk_col, 'unknown');
+        END IF;
 
-      -- Resolve the user executing the change
-      BEGIN
-          user_val := current_setting('app.current_user', true);
-      EXCEPTION WHEN OTHERS THEN
-          user_val := NULL;
-      END;
+        -- Resolve the user executing the change
+        BEGIN
+            user_val := current_setting('app.current_user', true);
+        EXCEPTION WHEN OTHERS THEN
+            user_val := NULL;
+        END;
 
-      IF user_val IS NULL OR user_val = '' THEN
-          IF (TG_OP = 'DELETE') THEN
-              user_val := COALESCE(
-                  to_jsonb(OLD) ->> 'updated_by',
-                  to_jsonb(OLD) ->> 'created_by',
-                  to_jsonb(OLD) ->> 'comment_by',
-                  'system'
-              );
-          ELSE
-              user_val := COALESCE(
-                  to_jsonb(NEW) ->> 'updated_by',
-                  to_jsonb(NEW) ->> 'created_by',
-                  to_jsonb(NEW) ->> 'comment_by',
-                  'system'
-              );
-          END IF;
-      END IF;
+        IF user_val IS NULL OR user_val = '' THEN
+            IF (TG_OP = 'DELETE') THEN
+                user_val := COALESCE(
+                    to_jsonb(OLD) ->> 'updated_by',
+                    to_jsonb(OLD) ->> 'created_by',
+                    to_jsonb(OLD) ->> 'comment_by',
+                    'system'
+                );
+            ELSE
+                user_val := COALESCE(
+                    to_jsonb(NEW) ->> 'updated_by',
+                    to_jsonb(NEW) ->> 'created_by',
+                    to_jsonb(NEW) ->> 'comment_by',
+                    'system'
+                );
+            END IF;
+        END IF;
 
-      IF (TG_OP = 'INSERT') THEN
-          v_action := 'created record';
-          
-          SELECT jsonb_object_agg(key, jsonb_build_object('old', null, 'new', value)) INTO changed_fields
-          FROM jsonb_each(to_jsonb(NEW))
-          WHERE key NOT IN ('log', 'logs', 'notification_logs', 'updated_date', 'updated_by', 'created_date', 'created_by') AND value IS NOT NULL;
+        IF (TG_OP = 'INSERT') THEN
+            v_action := 'created record';
+            
+            SELECT jsonb_object_agg(key, jsonb_build_object('old', null, 'new', value)) INTO changed_fields
+            FROM jsonb_each(to_jsonb(NEW))
+            WHERE key NOT IN ('log', 'logs', 'notification_logs', 'updated_date', 'updated_by', 'created_date', 'created_by') AND value IS NOT NULL;
 
-          IF changed_fields IS NOT NULL AND changed_fields != '{}'::jsonb THEN
-              INSERT INTO audit_logs (table_name, record_id, action, changes, changed_by)
-              VALUES (TG_TABLE_NAME, v_record_id, v_action, changed_fields, user_val);
-          END IF;
+            IF changed_fields IS NOT NULL AND changed_fields != '{}'::jsonb THEN
+                INSERT INTO audit_logs (table_name, record_id, action, changes, changed_by)
+                VALUES (TG_TABLE_NAME, v_record_id, v_action, changed_fields, user_val);
+            END IF;
 
-      ELSIF (TG_OP = 'UPDATE') THEN
-          v_action := 'updated record';
+        ELSIF (TG_OP = 'UPDATE') THEN
+            v_action := 'updated record';
 
-          SELECT jsonb_object_agg(key, jsonb_build_object('old', old_val, 'new', new_val)) INTO changed_fields
-          FROM (
-              SELECT o.key, o.value as old_val, n.value as new_val
-              FROM jsonb_each(to_jsonb(OLD)) o
-              JOIN jsonb_each(to_jsonb(NEW)) n ON o.key = n.key
-              WHERE o.value IS DISTINCT FROM n.value
-                AND o.key NOT IN ('log', 'logs', 'notification_logs', 'updated_date', 'updated_by', 'created_date', 'created_by')
-          ) t;
+            SELECT jsonb_object_agg(key, jsonb_build_object('old', old_val, 'new', new_val)) INTO changed_fields
+            FROM (
+                SELECT o.key, o.value as old_val, n.value as new_val
+                FROM jsonb_each(to_jsonb(OLD)) o
+                JOIN jsonb_each(to_jsonb(NEW)) n ON o.key = n.key
+                WHERE o.value IS DISTINCT FROM n.value
+                  AND o.key NOT IN ('log', 'logs', 'notification_logs', 'updated_date', 'updated_by', 'created_date', 'created_by')
+            ) t;
 
-          IF changed_fields IS NOT NULL AND changed_fields != '{}'::jsonb THEN
-              INSERT INTO audit_logs (table_name, record_id, action, changes, changed_by)
-              VALUES (TG_TABLE_NAME, v_record_id, v_action, changed_fields, user_val);
-          END IF;
+            IF changed_fields IS NOT NULL AND changed_fields != '{}'::jsonb THEN
+                INSERT INTO audit_logs (table_name, record_id, action, changes, changed_by)
+                VALUES (TG_TABLE_NAME, v_record_id, v_action, changed_fields, user_val);
+            END IF;
 
-      ELSIF (TG_OP = 'DELETE') THEN
-          v_action := 'deleted record';
-          
-          -- Storing the entire old record state as the changes payload during delete
-          INSERT INTO audit_logs (table_name, record_id, action, changes, changed_by)
-          VALUES (TG_TABLE_NAME, v_record_id, v_action, to_jsonb(OLD), user_val);
-          
-          RETURN OLD;
-      END IF;
+        ELSIF (TG_OP = 'DELETE') THEN
+            v_action := 'deleted record';
+            
+            -- Storing the entire old record state as the changes payload during delete
+            INSERT INTO audit_logs (table_name, record_id, action, changes, changed_by)
+            VALUES (TG_TABLE_NAME, v_record_id, v_action, to_jsonb(OLD), user_val);
+            
+            RETURN OLD;
+        END IF;
 
-      RETURN NEW;
-  END;
-  $$ LANGUAGE plpgsql;
+        RETURN NEW;
+    END;
+    $func$ LANGUAGE plpgsql;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping audit_log_trigger creation: %', SQLERRM;
+  END $outer$;
 
   -- Ensure all tables have log columns, drop deprecated columns, and register the trigger
   DO $$
@@ -1654,142 +1659,147 @@ async function initDb() {
   END $$;
 
   -- Create soft delete cascade trigger function
-  CREATE OR REPLACE FUNCTION cascade_soft_delete_trigger()
-  RETURNS TRIGGER AS $$
-  DECLARE
-      r RECORD;
-      child_table_name text;
-      child_col_name text;
-      parent_col_name text;
-      val_to_match text;
-      has_deleted_at_col boolean;
+  DO $outer$
   BEGIN
-      IF (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) THEN
-          -- Cascade using database foreign key constraints
-          FOR r IN (
-              SELECT DISTINCT
-                  kcu.table_name AS child_table,
-                  kcu.column_name AS child_column,
-                  ccu.column_name AS parent_column
-              FROM information_schema.table_constraints AS tc
-              JOIN information_schema.key_column_usage AS kcu
-                  ON tc.constraint_name = kcu.constraint_name
-                  AND tc.table_schema = kcu.table_schema
-              JOIN information_schema.referential_constraints AS rc
-                  ON tc.constraint_name = rc.constraint_name
-              JOIN information_schema.constraint_column_usage AS ccu
-                  ON rc.unique_constraint_name = ccu.constraint_name
-                  AND rc.unique_constraint_schema = ccu.table_schema
-              WHERE tc.constraint_type = 'FOREIGN KEY'
-                AND ccu.table_name = TG_TABLE_NAME
-          ) LOOP
-              child_table_name := r.child_table;
-              child_col_name := r.child_column;
-              parent_col_name := r.parent_column;
-              
-              EXECUTE format('SELECT ($1).%I::text', parent_col_name) USING NEW INTO val_to_match;
-              
-              IF val_to_match IS NOT NULL THEN
-                  SELECT EXISTS (
-                      SELECT 1 FROM information_schema.columns 
-                      WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
-                  ) INTO has_deleted_at_col;
-                  
-                  IF has_deleted_at_col THEN
-                      EXECUTE format(
-                          'UPDATE %I SET deleted_at = $1 WHERE %I = $2 AND deleted_at IS NULL',
-                          child_table_name, child_col_name
-                      ) USING NEW.deleted_at, val_to_match;
-                  END IF;
-              END IF;
-          END LOOP;
-          
-          -- Cascade using logical request relationships
-          IF TG_TABLE_NAME = 'request' THEN
-              val_to_match := NEW.request_id;
-              IF val_to_match IS NOT NULL THEN
-                  FOR child_table_name IN 
-                      SELECT unnest(ARRAY['payment', 'invoice', 'mtr', 'service', 'asset', 'comment', 'contract'])
-                  LOOP
-                      SELECT EXISTS (
-                          SELECT 1 FROM information_schema.columns 
-                          WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
-                      ) INTO has_deleted_at_col;
-                      
-                      IF has_deleted_at_col THEN
-                          EXECUTE format(
-                              'UPDATE %I SET deleted_at = $1 WHERE request = $2 AND deleted_at IS NULL',
-                              child_table_name
-                          ) USING NEW.deleted_at, val_to_match;
-                      END IF;
-                  END LOOP;
-              END IF;
-          END IF;
-      ELSIF (OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL) THEN
-          -- Cascade restore using database foreign key constraints
-          FOR r IN (
-              SELECT DISTINCT
-                  kcu.table_name AS child_table,
-                  kcu.column_name AS child_column,
-                  ccu.column_name AS parent_column
-              FROM information_schema.table_constraints AS tc
-              JOIN information_schema.key_column_usage AS kcu
-                  ON tc.constraint_name = kcu.constraint_name
-                  AND tc.table_schema = kcu.table_schema
-              JOIN information_schema.referential_constraints AS rc
-                  ON tc.constraint_name = rc.constraint_name
-              JOIN information_schema.constraint_column_usage AS ccu
-                  ON rc.unique_constraint_name = ccu.constraint_name
-                  AND rc.unique_constraint_schema = ccu.table_schema
-              WHERE tc.constraint_type = 'FOREIGN KEY'
-                AND ccu.table_name = TG_TABLE_NAME
-          ) LOOP
-              child_table_name := r.child_table;
-              child_col_name := r.child_column;
-              parent_col_name := r.parent_column;
-              
-              EXECUTE format('SELECT ($1).%I::text', parent_col_name) USING NEW INTO val_to_match;
-              
-              IF val_to_match IS NOT NULL THEN
-                  SELECT EXISTS (
-                      SELECT 1 FROM information_schema.columns 
-                      WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
-                  ) INTO has_deleted_at_col;
-                  
-                  IF has_deleted_at_col THEN
-                      EXECUTE format(
-                          'UPDATE %I SET deleted_at = NULL WHERE %I = $1 AND deleted_at IS NOT NULL',
-                          child_table_name, child_col_name
-                      ) USING val_to_match;
-                  END IF;
-              END IF;
-          END LOOP;
-          
-          -- Cascade restore using logical request relationships
-          IF TG_TABLE_NAME = 'request' THEN
-              val_to_match := NEW.request_id;
-              IF val_to_match IS NOT NULL THEN
-                  FOR child_table_name IN 
-                      SELECT unnest(ARRAY['payment', 'invoice', 'mtr', 'service', 'asset', 'comment', 'contract'])
-                  LOOP
-                      SELECT EXISTS (
-                          SELECT 1 FROM information_schema.columns 
-                          WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
-                      ) INTO has_deleted_at_col;
-                      
-                      IF has_deleted_at_col THEN
-                          EXECUTE format(
-                              'UPDATE %I SET deleted_at = NULL WHERE request = $1 AND deleted_at IS NOT NULL',
-                              child_table_name
-                          ) USING val_to_match;
-                      END IF;
-                  END LOOP;
-              END IF;
-          END IF;
-      END IF;
-      RETURN NEW;
-  END;
-  $$ LANGUAGE plpgsql;
+    CREATE OR REPLACE FUNCTION cascade_soft_delete_trigger()
+    RETURNS TRIGGER AS $func$
+    DECLARE
+        r RECORD;
+        child_table_name text;
+        child_col_name text;
+        parent_col_name text;
+        val_to_match text;
+        has_deleted_at_col boolean;
+    BEGIN
+        IF (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) THEN
+            -- Cascade using database foreign key constraints
+            FOR r IN (
+                SELECT DISTINCT
+                    kcu.table_name AS child_table,
+                    kcu.column_name AS child_column,
+                    ccu.column_name AS parent_column
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.referential_constraints AS rc
+                    ON tc.constraint_name = rc.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                    ON rc.unique_constraint_name = ccu.constraint_name
+                    AND rc.unique_constraint_schema = ccu.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND ccu.table_name = TG_TABLE_NAME
+            ) LOOP
+                child_table_name := r.child_table;
+                child_col_name := r.child_column;
+                parent_col_name := r.parent_column;
+                
+                EXECUTE format('SELECT ($1).%I::text', parent_col_name) USING NEW INTO val_to_match;
+                
+                IF val_to_match IS NOT NULL THEN
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
+                    ) INTO has_deleted_at_col;
+                    
+                    IF has_deleted_at_col THEN
+                        EXECUTE format(
+                            'UPDATE %I SET deleted_at = $1 WHERE %I = $2 AND deleted_at IS NULL',
+                            child_table_name, child_col_name
+                        ) USING NEW.deleted_at, val_to_match;
+                    END IF;
+                END IF;
+            END LOOP;
+            
+            -- Cascade using logical request relationships
+            IF TG_TABLE_NAME = 'request' THEN
+                val_to_match := NEW.request_id;
+                IF val_to_match IS NOT NULL THEN
+                    FOR child_table_name IN 
+                        SELECT unnest(ARRAY['payment', 'invoice', 'mtr', 'service', 'asset', 'comment', 'contract'])
+                    LOOP
+                        SELECT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
+                        ) INTO has_deleted_at_col;
+                        
+                        IF has_deleted_at_col THEN
+                            EXECUTE format(
+                                'UPDATE %I SET deleted_at = $1 WHERE request = $2 AND deleted_at IS NULL',
+                                child_table_name
+                            ) USING NEW.deleted_at, val_to_match;
+                        END IF;
+                    END LOOP;
+                END IF;
+            END IF;
+        ELSIF (OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL) THEN
+            -- Cascade restore using database foreign key constraints
+            FOR r IN (
+                SELECT DISTINCT
+                    kcu.table_name AS child_table,
+                    kcu.column_name AS child_column,
+                    ccu.column_name AS parent_column
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.referential_constraints AS rc
+                    ON tc.constraint_name = rc.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                    ON rc.unique_constraint_name = ccu.constraint_name
+                    AND rc.unique_constraint_schema = ccu.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND ccu.table_name = TG_TABLE_NAME
+            ) LOOP
+                child_table_name := r.child_table;
+                child_col_name := r.child_column;
+                parent_col_name := r.parent_column;
+                
+                EXECUTE format('SELECT ($1).%I::text', parent_col_name) USING NEW INTO val_to_match;
+                
+                IF val_to_match IS NOT NULL THEN
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
+                    ) INTO has_deleted_at_col;
+                    
+                    IF has_deleted_at_col THEN
+                        EXECUTE format(
+                            'UPDATE %I SET deleted_at = NULL WHERE %I = $1 AND deleted_at IS NOT NULL',
+                            child_table_name, child_col_name
+                        ) USING val_to_match;
+                    END IF;
+                END IF;
+            END LOOP;
+            
+            -- Cascade restore using logical request relationships
+            IF TG_TABLE_NAME = 'request' THEN
+                val_to_match := NEW.request_id;
+                IF val_to_match IS NOT NULL THEN
+                    FOR child_table_name IN 
+                        SELECT unnest(ARRAY['payment', 'invoice', 'mtr', 'service', 'asset', 'comment', 'contract'])
+                    LOOP
+                        SELECT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_schema = current_schema() AND table_name = child_table_name AND column_name = 'deleted_at'
+                        ) INTO has_deleted_at_col;
+                        
+                        IF has_deleted_at_col THEN
+                            EXECUTE format(
+                                'UPDATE %I SET deleted_at = NULL WHERE request = $1 AND deleted_at IS NOT NULL',
+                                child_table_name
+                            ) USING val_to_match;
+                        END IF;
+                    END LOOP;
+                END IF;
+            END IF;
+        END IF;
+        RETURN NEW;
+    END;
+    $func$ LANGUAGE plpgsql;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping cascade_soft_delete_trigger creation: %', SQLERRM;
+  END $outer$;
 
   -- Apply soft-delete cascade trigger to all tables that have the deleted_at column
   DO $$
@@ -1950,49 +1960,57 @@ async function initDb() {
   WHERE value_before_vat_in_base_currency IS NULL;
 
   -- Create or replace function to sync request from contract
-  CREATE OR REPLACE FUNCTION public.sync_request_and_source_from_contract()
-  RETURNS TRIGGER AS $sync_req$
+  DO $outer$
   BEGIN
-      IF NEW.contract_id IS NOT NULL THEN
-          SELECT request INTO NEW.request FROM public.contract WHERE contract_id = NEW.contract_id;
-          NEW.source := 'Contract';
-      ELSE
-          IF NEW.source IS NULL THEN
-              NEW.source := 'Request';
-          END IF;
-      END IF;
-      RETURN NEW;
-  END;
-  $sync_req$ LANGUAGE plpgsql;
+    CREATE OR REPLACE FUNCTION public.sync_request_and_source_from_contract()
+    RETURNS TRIGGER AS $sync_req$
+    BEGIN
+        IF NEW.contract_id IS NOT NULL THEN
+            SELECT request INTO NEW.request FROM public.contract WHERE contract_id = NEW.contract_id;
+            NEW.source := 'Contract';
+        ELSE
+            IF NEW.source IS NULL THEN
+                NEW.source := 'Request';
+            END IF;
+        END IF;
+        RETURN NEW;
+    END;
+    $sync_req$ LANGUAGE plpgsql;
 
-  -- Create triggers on payment and invoice to sync request BEFORE INSERT OR UPDATE
-  DROP TRIGGER IF EXISTS trg_sync_payment_request ON public.payment;
-  CREATE TRIGGER trg_sync_payment_request
-  BEFORE INSERT OR UPDATE ON public.payment
-  FOR EACH ROW EXECUTE FUNCTION public.sync_request_and_source_from_contract();
+    DROP TRIGGER IF EXISTS trg_sync_payment_request ON public.payment;
+    CREATE TRIGGER trg_sync_payment_request
+    BEFORE INSERT OR UPDATE ON public.payment
+    FOR EACH ROW EXECUTE FUNCTION public.sync_request_and_source_from_contract();
 
-  DROP TRIGGER IF EXISTS trg_sync_invoice_request ON public.invoice;
-  CREATE TRIGGER trg_sync_invoice_request
-  BEFORE INSERT OR UPDATE ON public.invoice
-  FOR EACH ROW EXECUTE FUNCTION public.sync_request_and_source_from_contract();
+    DROP TRIGGER IF EXISTS trg_sync_invoice_request ON public.invoice;
+    CREATE TRIGGER trg_sync_invoice_request
+    BEFORE INSERT OR UPDATE ON public.invoice
+    FOR EACH ROW EXECUTE FUNCTION public.sync_request_and_source_from_contract();
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping sync_request_and_source_from_contract: %', SQLERRM;
+  END $outer$;
 
   -- Create or replace function to propagate request changes from contract
-  CREATE OR REPLACE FUNCTION public.propagate_contract_request_change()
-  RETURNS TRIGGER AS $prop_req$
+  DO $outer$
   BEGIN
-      IF OLD.request IS DISTINCT FROM NEW.request THEN
-          UPDATE public.payment SET request = NEW.request WHERE contract_id = NEW.contract_id;
-          UPDATE public.invoice SET request = NEW.request WHERE contract_id = NEW.contract_id;
-      END IF;
-      RETURN NEW;
-  END;
-  $prop_req$ LANGUAGE plpgsql;
+    CREATE OR REPLACE FUNCTION public.propagate_contract_request_change()
+    RETURNS TRIGGER AS $prop_req$
+    BEGIN
+        IF OLD.request IS DISTINCT FROM NEW.request THEN
+            UPDATE public.payment SET request = NEW.request WHERE contract_id = NEW.contract_id;
+            UPDATE public.invoice SET request = NEW.request WHERE contract_id = NEW.contract_id;
+        END IF;
+        RETURN NEW;
+    END;
+    $prop_req$ LANGUAGE plpgsql;
 
-  -- Create trigger on contract to propagate request changes AFTER UPDATE
-  DROP TRIGGER IF EXISTS trg_propagate_contract_request ON public.contract;
-  CREATE TRIGGER trg_propagate_contract_request
-  AFTER UPDATE OF request ON public.contract
-  FOR EACH ROW EXECUTE FUNCTION public.propagate_contract_request_change();
+    DROP TRIGGER IF EXISTS trg_propagate_contract_request ON public.contract;
+    CREATE TRIGGER trg_propagate_contract_request
+    AFTER UPDATE OF request ON public.contract
+    FOR EACH ROW EXECUTE FUNCTION public.propagate_contract_request_change();
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping propagate_contract_request_change: %', SQLERRM;
+  END $outer$;
 
     -- Notification table schema
     CREATE TABLE IF NOT EXISTS "notification" (
