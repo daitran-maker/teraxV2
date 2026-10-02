@@ -911,6 +911,7 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
     const segId = `f-${field.key}`;
     const currentVal = String(val !== undefined && val !== null && val !== '' ? val : (field.defaultValue !== undefined ? (typeof field.defaultValue === 'function' ? field.defaultValue() : field.defaultValue) : ''));
     const isDisabled = !!isProtected;
+    const disabledStyle = isDisabled ? 'pointer-events: none; opacity: 0.6; cursor: not-allowed;' : '';
     const segOptions = field.options || [];
     const pillsHTML = segOptions.map(o => {
       const optionVal = typeof o === 'object' ? o.value : o;
