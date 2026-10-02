@@ -1847,11 +1847,43 @@ router.post('/execute', async (req, res) => {
       }
 
       if (activeElements.includes('ASSIGN_TASK')) {
-        const { assign_to, deadline, description, task_info_link, task_info_guide_file, task_info_notes, tasks } = req.body.data || {};
+        const { assign_to, deadline, description, task_info_link, task_info_guide_file, task_info_notes, tasks, has_existing_tasks } = req.body.data || {};
         
+        // Check if tasks already exist for this request
+        const existingTasksRes = await client.query(
+          'SELECT task_id, employee_id, deadline FROM "assigned_task" WHERE "request_id" = $1 AND "deleted_at" IS NULL',
+          [record_id]
+        );
+
         let tasksList = [];
         if (Array.isArray(tasks) && tasks.length > 0) {
           tasksList = tasks;
+        } else if (assign_to && description) {
+          let assignToArr = [];
+          if (Array.isArray(assign_to)) {
+            assignToArr = assign_to.map(s => String(s).trim().replace(/^\[|\]$/g, '')).filter(Boolean);
+          } else if (typeof assign_to === 'string') {
+            assignToArr = assign_to.split(',').map(s => String(s).trim().replace(/^\[|\]$/g, '')).filter(Boolean);
+          }
+          if (assignToArr.length > 0) {
+            tasksList = assignToArr.map(empId => ({
+              employee_id: empId,
+              description,
+              deadline,
+              task_info_link,
+              task_info_guide_file,
+              task_info_notes
+            }));
+          }
+        } else if (existingTasksRes.rows.length > 0) {
+          // Tasks were already created (e.g. at request creation wizard) - notify assignees
+          for (const tRow of existingTasksRes.rows) {
+            const title = '[Task Started / Nhiệm vụ bắt đầu]';
+            const body = 'Request/Yêu cầu: ' + (record_id || '') + '. Deadline: ' + (tRow.deadline || 'N/A') + '.';
+            const link = `#assigned_task/${tRow.task_id}`;
+            await createNotification([tRow.employee_id], title, body, link).catch(() => {});
+          }
+          tasksList = [];
         } else {
           if (!assign_to) {
             throw new Error("task.err.select_assignee");

@@ -3105,7 +3105,8 @@ async function submitAdd(moduleKey, extraData = {}) {
     const newRecord = await apiPost(postEndpoint, data);
 
     // Auto-create assigned tasks if any were configured in the wizard
-    if (moduleKey === 'request' && newRecord) {
+    const isRequestModule = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
+    if (isRequestModule && newRecord) {
       const requestId = newRecord.request_id || newRecord.id || data.request_id || data.sr_id;
       const assigneeCards = document.querySelectorAll('#atm-assignees-container .assignee-card');
       if (assigneeCards.length > 0 && requestId) {

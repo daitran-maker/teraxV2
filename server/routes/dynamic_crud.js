@@ -1996,28 +1996,35 @@ router.get('/:tableName', async (req, res) => {
 
     // === ROW-LEVEL SECURITY: Restrict request and child tables visibility by user identity ===
     const tablesWithRequestCol = ['mtr', 'payment', 'comment', 'service', 'contract', 'asset', 'invoice', 'expense'];
+    const userForFilter = getUserFromReq(req);
+    const isGlobalAdmin = userForFilter && userForFilter.role && (
+      userForFilter.role.toUpperCase() === 'SUPER ADMIN' ||
+      userForFilter.role.toUpperCase() === 'HR' ||
+      userForFilter.role.toUpperCase() === 'ADMINISTRATOR' ||
+      userForFilter.role.toUpperCase() === 'ADMIN'
+    );
+
     if (tableName === 'account') {
-      const userForFilter = getUserFromReq(req);
-      if (userForFilter.employee_id) {
+      if (!isGlobalAdmin) {
         const userEmpId = (userForFilter.employee_id || '').toLowerCase();
-        addBaseClause((idx) => ({
-          sql: `(
-            string_to_array(REPLACE(LOWER(COALESCE("account"."finance_control", '')), ' ', ''), ',') @> ARRAY[$${idx}] OR
-            string_to_array(REPLACE(LOWER(COALESCE("account"."transaction_managed_by", '')), ' ', ''), ',') @> ARRAY[$${idx}]
-          )`,
-          values: [userEmpId]
-        }));
-      } else {
-        addBaseClause(() => ({ sql: '1 = 0', values: [] }));
+        const userEmail = (userForFilter.email || '').toLowerCase();
+        const matchVals = [userEmpId, userEmail].filter(Boolean);
+        if (matchVals.length > 0) {
+          addBaseClause((idx) => {
+            const inPlaceholders = matchVals.map((_, i) => `$${idx + i}`).join(', ');
+            return {
+              sql: `(
+                string_to_array(REPLACE(LOWER(COALESCE("account"."finance_control", '')), ' ', ''), ',') && ARRAY[${inPlaceholders}] OR
+                string_to_array(REPLACE(LOWER(COALESCE("account"."transaction_managed_by", '')), ' ', ''), ',') && ARRAY[${inPlaceholders}]
+              )`,
+              values: matchVals
+            };
+          });
+        } else {
+          addBaseClause(() => ({ sql: '1 = 0', values: [] }));
+        }
       }
     } else if (tableName === 'request' || tablesWithRequestCol.includes(tableName)) {
-      const userForFilter = getUserFromReq(req);
-      const isGlobalAdmin = userForFilter.role && (
-        userForFilter.role.toUpperCase() === 'SUPER ADMIN' ||
-        userForFilter.role.toUpperCase() === 'HR' ||
-        userForFilter.role.toUpperCase() === 'ADMINISTRATOR' ||
-        userForFilter.role.toUpperCase() === 'ADMIN'
-      );
       if (!isGlobalAdmin && userForFilter.employee_id) {
         const userEmpId = (userForFilter.employee_id || '').toLowerCase();
         if (tableName === 'request') {
@@ -3265,14 +3272,21 @@ router.get('/:tableName/:id', async (req, res) => {
     const tablesWithRequestCol = ['mtr', 'payment', 'comment', 'service', 'contract', 'asset', 'invoice'];
     if (tableName === 'account') {
       const userForCheck = getUserFromReq(req);
-      const userEmployeeId = (userForCheck.employee_id || '').toLowerCase();
-      if (!userEmployeeId) {
-        return res.status(403).json({ error: 'Access denied: You do not have permission to view this account.' });
-      }
-      const fc = (record.finance_control || '').toLowerCase().split(',').map(s => s.trim());
-      const tmb = (record.transaction_managed_by || '').toLowerCase().split(',').map(s => s.trim());
-      if (!fc.includes(userEmployeeId) && !tmb.includes(userEmployeeId)) {
-        return res.status(403).json({ error: 'Access denied: You do not have permission to view this account.' });
+      const roleName = String(userForCheck.role || '').toUpperCase();
+      const isGlobalAdmin = ['SUPER ADMIN', 'HR', 'ADMINISTRATOR', 'ADMIN'].includes(roleName);
+      if (!isGlobalAdmin) {
+        const userEmployeeId = (userForCheck.employee_id || '').toLowerCase();
+        const userEmail = (userForCheck.email || '').toLowerCase();
+        if (!userEmployeeId && !userEmail) {
+          return res.status(403).json({ error: 'Access denied: You do not have permission to view this account.' });
+        }
+        const fc = (record.finance_control || '').toLowerCase().split(',').map(s => s.trim());
+        const tmb = (record.transaction_managed_by || '').toLowerCase().split(',').map(s => s.trim());
+        const hasAccess = (userEmployeeId && (fc.includes(userEmployeeId) || tmb.includes(userEmployeeId))) ||
+                          (userEmail && (fc.includes(userEmail) || tmb.includes(userEmail)));
+        if (!hasAccess) {
+          return res.status(403).json({ error: 'Access denied: You do not have permission to view this account.' });
+        }
       }
     } else if (tableName === 'request' || tablesWithRequestCol.includes(tableName)) {
       const userForCheck = getUserFromReq(req);

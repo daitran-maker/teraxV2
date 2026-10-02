@@ -1935,9 +1935,29 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
     }
 
     if (activeElements.includes('ASSIGN_TASK')) {
-      const result = await showAssignTaskModal(currentRecord);
-      if (!result) return; // User cancelled
-      extraData = { ...result };
+      let hasExistingTasks = false;
+      try {
+        const existingTasksRes = await apiGet(`/table/assigned_task?request_id=${encodeURIComponent(pkVal)}&limit=10`);
+        const existingList = (existingTasksRes && existingTasksRes.data && Array.isArray(existingTasksRes.data)) ? existingTasksRes.data : (Array.isArray(existingTasksRes) ? existingTasksRes : []);
+        if (existingList.length > 0) {
+          hasExistingTasks = true;
+        }
+      } catch (err) {
+        console.warn('Could not check existing tasks:', err);
+      }
+
+      if (hasExistingTasks) {
+        const confirmed = await showCustomConfirm(
+          typeof t === 'function' ? t('modal.confirm_execution', 'Confirm Execution') : 'Confirm Execution',
+          typeof t === 'function' ? t('assign_task.start_with_existing', 'Nhiệm vụ đã được thiết lập. Bạn có chắc chắn muốn bắt đầu yêu cầu này?') : 'Tasks have already been assigned. Are you sure you want to start this request?'
+        );
+        if (!confirmed) return;
+        extraData = { has_existing_tasks: true };
+      } else {
+        const result = await showAssignTaskModal(currentRecord);
+        if (!result) return; // User cancelled
+        extraData = { ...result };
+      }
     } else {
       const confirmed = await showCustomConfirm("Confirm Execution", "Are you sure you want to execute this action?");
       if (!confirmed) return;
@@ -2652,7 +2672,7 @@ function buildDetailViewHTML(moduleKey, record) {
 
         childrenToPush = childrenToPush.filter(childKey => {
           if (childKey === 'logs') return true;
-          if (childKey !== 'target_table' && !canShowDetailChildren) return false;
+          if (!['target_table', 'assigned_task'].includes(childKey) && !canShowDetailChildren) return false;
 
           const isRequest = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
           if (isRequest) {
