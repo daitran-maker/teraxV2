@@ -716,6 +716,7 @@ router.post('/commit-draft', async (req, res) => {
   try {
     await client.query('BEGIN');
     await ensureSetupTable();
+    await client.query("ALTER TABLE my_company ADD COLUMN IF NOT EXISTS timezone VARCHAR(100) DEFAULT 'Asia/Ho_Chi_Minh'");
 
     let primaryCompanyId = '1';
 

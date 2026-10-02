@@ -261,6 +261,9 @@ async function initDb() {
     IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'my_company' AND column_name = 'status') THEN
       EXECUTE 'ALTER TABLE "my_company" ADD COLUMN status VARCHAR(20)';
     END IF;
+    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'my_company' AND column_name = 'timezone') THEN
+      EXECUTE 'ALTER TABLE "my_company" ADD COLUMN timezone VARCHAR(100) DEFAULT ''Asia/Ho_Chi_Minh''';
+    END IF;
 
     -- Add notification_logs JSONB to request and parent child tables
     IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'request' AND column_name = 'notification_logs') THEN

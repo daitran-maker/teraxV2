@@ -1129,7 +1129,8 @@ CREATE TABLE public.my_company (
     state text,
     province text,
     deleted_at timestamp without time zone,
-    status integer DEFAULT 67
+    status integer DEFAULT 67,
+    timezone character varying(100) DEFAULT 'Asia/Ho_Chi_Minh'::character varying
 );
 
 
