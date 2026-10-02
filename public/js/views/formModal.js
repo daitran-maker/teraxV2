@@ -917,8 +917,8 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
       const rawOptLabel = typeof o === 'object' ? o.label : o;
       const optionLabel = typeof t_val === 'function' ? t_val(rawOptLabel) : rawOptLabel;
       const isActive = String(currentVal).toLowerCase() === String(optionVal).toLowerCase() ? 'active' : '';
-      const disabledStyle = isDisabled ? 'pointer-events:none; opacity:0.6;' : '';
-      return `<div class="segmented-option ${isActive}" data-value="${escapeHTML(String(optionVal))}" style="${disabledStyle}" onclick="if(!this.closest('.segmented-control').dataset.disabled){this.closest('.segmented-control').querySelectorAll('.segmented-option').forEach(el=>el.classList.remove('active'));this.classList.add('active');const input=this.closest('.segmented-control').querySelector('input[type=hidden]');input.value=this.dataset.value;input.dispatchEvent(new Event('change',{bubbles:true}));${field.onchange || ''}}">${escapeHTML(String(optionLabel))}</div>`;
+      const safeOnChange = field.onchange ? String(field.onchange).replace(/"/g, '&quot;') : '';
+      return `<div class="segmented-option ${isActive}" data-value="${escapeHTML(String(optionVal))}" style="${disabledStyle}" onclick="if(!this.closest('.segmented-control').dataset.disabled){this.closest('.segmented-control').querySelectorAll('.segmented-option').forEach(el=>el.classList.remove('active'));this.classList.add('active');const input=this.closest('.segmented-control').querySelector('input[type=hidden]');input.value=this.dataset.value||this.getAttribute('data-value')||'';input.dispatchEvent(new Event('change',{bubbles:true}));${safeOnChange}}">${escapeHTML(String(optionLabel))}</div>`;
     }).join('');
     html += `
       <div class="segmented-control" id="${segId}-control" ${isDisabled ? 'data-disabled="true"' : ''}>

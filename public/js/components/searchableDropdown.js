@@ -679,6 +679,9 @@ window.handleTargetTableTypeChange = function (explicitType) {
       } else {
         target.style.removeProperty('display');
         target.style.display = '';
+        if (typeof window.initializeSearchableMultiselects === 'function') {
+          setTimeout(() => window.initializeSearchableMultiselects(searchRoot), 10);
+        }
       }
     }
   });

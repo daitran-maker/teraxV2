@@ -2656,20 +2656,23 @@ function buildDetailViewHTML(moduleKey, record) {
 
           const isRequest = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
           if (isRequest) {
-            if (childKey === 'payment') return activeElements.includes('PAYMENT') || activeElements.includes('CONTRACT');
+            if (childKey === 'payment') return activeElements.includes('PAYMENT');
             if (childKey === 'expense') return activeElements.includes('EXPENSE');
             if (childKey === 'service') return activeElements.includes('SERVICE');
             if (childKey === 'asset') return activeElements.includes('ASSET');
             if (childKey === 'contract') return activeElements.includes('CONTRACT');
-            if (childKey === 'invoice') return activeElements.includes('INVOICE') || activeElements.includes('CONTRACT');
-            if (childKey === 'target_table') return activeElements.includes('TARGET TABLE');
+            if (childKey === 'invoice') return activeElements.includes('INVOICE');
+            if (childKey === 'target_table') return activeElements.includes('TARGET TABLE') || activeElements.includes('TARGET_TABLE');
+            if (childKey === 'assigned_task') return activeElements.includes('ASSIGN_TASK') || activeElements.includes('ASSIGN TASK');
+            if (childKey === 'request_rating') return true;
+            return false;
           }
           return true;
         });
         allChildren.push(...childrenToPush);
         // Add Finance summary tab if request has financial elements or element FINANCE is active
         const isRequestParent = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
-        const hasFinancialData = childrenToPush.includes('payment') || childrenToPush.includes('contract') || childrenToPush.includes('expense') || childrenToPush.includes('invoice') || childrenToPush.includes('asset') || activeElements.includes('FINANCE');
+        const hasFinancialData = childrenToPush.includes('payment') || childrenToPush.includes('expense') || childrenToPush.includes('invoice') || activeElements.includes('FINANCE');
         if (isRequestParent && hasFinancialData && isStatusAllowed) {
           allChildren.push('finance');
         }

@@ -68,35 +68,107 @@ router.post('/column-permissions', async (req, res) => {
 });
 
 router.put('/column-permissions/:id', async (req, res) => {
-  const { table_name, column_name, levels = [], positions = [], roles = [], exceptions = [] } = req.body;
+  const { table_name, column_name, levels, positions, roles, exceptions } = req.body;
   const pid = req.params.id;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const cp = await client.query(
-      'UPDATE column_permissions SET table_name=$1, column_name=$2 WHERE id=$3 AND deleted_at IS NULL RETURNING *',
-      [table_name, column_name, pid]
+      `UPDATE column_permissions 
+       SET table_name = COALESCE($1, table_name), 
+           column_name = COALESCE($2, column_name) 
+       WHERE id = $3 AND deleted_at IS NULL RETURNING *`,
+      [table_name || null, column_name || null, pid]
     );
     if (cp.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
-    await client.query('DELETE FROM permission_levels WHERE permission_id=$1', [pid]);
-    await client.query('DELETE FROM permission_positions WHERE permission_id=$1', [pid]);
-    await client.query('DELETE FROM permission_roles WHERE permission_id=$1', [pid]);
-    await client.query('DELETE FROM permission_exceptions WHERE permission_id=$1', [pid]);
-    for (const level of levels) {
-      await client.query('INSERT INTO permission_levels (permission_id, level) VALUES ($1,$2)', [pid, level]);
+
+    if (levels !== undefined) {
+      await client.query('DELETE FROM permission_levels WHERE permission_id=$1', [pid]);
+      for (const item of (Array.isArray(levels) ? levels : [])) {
+        const val = typeof item === 'object' && item !== null ? (item.level || item.value) : item;
+        if (val) await client.query('INSERT INTO permission_levels (permission_id, level) VALUES ($1,$2)', [pid, String(val).trim()]);
+      }
     }
-    for (const pos of positions) {
-      await client.query('INSERT INTO permission_positions (permission_id, position) VALUES ($1,$2)', [pid, pos]);
+    if (positions !== undefined) {
+      await client.query('DELETE FROM permission_positions WHERE permission_id=$1', [pid]);
+      for (const item of (Array.isArray(positions) ? positions : [])) {
+        const val = typeof item === 'object' && item !== null ? (item.position || item.value) : item;
+        if (val) await client.query('INSERT INTO permission_positions (permission_id, position) VALUES ($1,$2)', [pid, String(val).trim()]);
+      }
     }
-    for (const role of roles) {
-      await client.query('INSERT INTO permission_roles (permission_id, role) VALUES ($1,$2)', [pid, role]);
+    if (roles !== undefined) {
+      await client.query('DELETE FROM permission_roles WHERE permission_id=$1', [pid]);
+      for (const item of (Array.isArray(roles) ? roles : [])) {
+        const val = typeof item === 'object' && item !== null ? (item.role || item.value) : item;
+        if (val) await client.query('INSERT INTO permission_roles (permission_id, role) VALUES ($1,$2)', [pid, String(val).trim()]);
+      }
     }
-    for (const ex of exceptions) {
-      await client.query('INSERT INTO permission_exceptions (permission_id, email) VALUES ($1,$2)', [pid, ex]);
+    if (exceptions !== undefined) {
+      await client.query('DELETE FROM permission_exceptions WHERE permission_id=$1', [pid]);
+      for (const item of (Array.isArray(exceptions) ? exceptions : [])) {
+        const val = typeof item === 'object' && item !== null ? (item.email || item.employee_id || item.value) : item;
+        if (val) await client.query('INSERT INTO permission_exceptions (permission_id, email) VALUES ($1,$2)', [pid, String(val).trim()]);
+      }
     }
     await client.query('COMMIT');
     clearPermissionCache();
     res.json(cp.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/column-permissions/bulk', async (req, res) => {
+  const { ids = [], apply_to_all = false, levels, positions, roles, exceptions } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let targetIds = ids;
+    if (apply_to_all || (Array.isArray(ids) && ids.includes('all'))) {
+      const allRes = await client.query('SELECT id FROM column_permissions WHERE deleted_at IS NULL');
+      targetIds = allRes.rows.map(r => r.id);
+    }
+    if (!targetIds || targetIds.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'No records specified' });
+    }
+
+    for (const pid of targetIds) {
+      if (levels !== undefined) {
+        await client.query('DELETE FROM permission_levels WHERE permission_id=$1', [pid]);
+        for (const item of (Array.isArray(levels) ? levels : [])) {
+          const val = typeof item === 'object' && item !== null ? (item.level || item.value) : item;
+          if (val) await client.query('INSERT INTO permission_levels (permission_id, level) VALUES ($1,$2)', [pid, String(val).trim()]);
+        }
+      }
+      if (positions !== undefined) {
+        await client.query('DELETE FROM permission_positions WHERE permission_id=$1', [pid]);
+        for (const item of (Array.isArray(positions) ? positions : [])) {
+          const val = typeof item === 'object' && item !== null ? (item.position || item.value) : item;
+          if (val) await client.query('INSERT INTO permission_positions (permission_id, position) VALUES ($1,$2)', [pid, String(val).trim()]);
+        }
+      }
+      if (roles !== undefined) {
+        await client.query('DELETE FROM permission_roles WHERE permission_id=$1', [pid]);
+        for (const item of (Array.isArray(roles) ? roles : [])) {
+          const val = typeof item === 'object' && item !== null ? (item.role || item.value) : item;
+          if (val) await client.query('INSERT INTO permission_roles (permission_id, role) VALUES ($1,$2)', [pid, String(val).trim()]);
+        }
+      }
+      if (exceptions !== undefined) {
+        await client.query('DELETE FROM permission_exceptions WHERE permission_id=$1', [pid]);
+        for (const item of (Array.isArray(exceptions) ? exceptions : [])) {
+          const val = typeof item === 'object' && item !== null ? (item.email || item.employee_id || item.value) : item;
+          if (val) await client.query('INSERT INTO permission_exceptions (permission_id, email) VALUES ($1,$2)', [pid, String(val).trim()]);
+        }
+      }
+    }
+    await client.query('COMMIT');
+    clearPermissionCache();
+    res.json({ message: `Updated ${targetIds.length} column permissions successfully`, count: targetIds.length });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });

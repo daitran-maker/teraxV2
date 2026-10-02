@@ -170,6 +170,17 @@ async function buildBulkEditFormHTML(moduleKey) {
 
   let html = '<div class="form-grid" style="display: grid; gap: 16px;">';
 
+  if (moduleKey === 'permissions') {
+    html += `
+      <div style="background: rgba(234,88,12,0.1); border: 1px solid rgba(234,88,12,0.3); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+        <input type="checkbox" id="bulk-apply-to-all" style="width: 18px; height: 18px; cursor: pointer; accent-color: #ea580c;" />
+        <label for="bulk-apply-to-all" style="cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-main); margin: 0;">
+          🌐 Áp dụng cho TOÀN BỘ các cột trong hệ thống (Tất cả cột)
+        </label>
+      </div>
+    `;
+  }
+
   for (const field of targetFields) {
     if (field.key === 'display') {
       html += `
@@ -330,35 +341,46 @@ window.submitBulkEdit = async function (moduleKey, ids) {
   }
 
   try {
-    const updatePromises = ids.map(async (id) => {
-      const getEndpoint = getRecordEndpoint(moduleKey, id);
+    if (moduleKey === 'permissions') {
+      const applyToAll = !!(document.getElementById('bulk-apply-to-all') && document.getElementById('bulk-apply-to-all').checked);
+      const res = await apiPost('/permissions/column-permissions/bulk', {
+        ids,
+        apply_to_all: applyToAll,
+        ...fieldsToApply
+      });
+      closeModal('form-modal');
+      const countMsg = (res && res.count) ? res.count : ids.length;
+      showToast(`Đã cập nhật hàng loạt ${countMsg} cột thành công!`, 'success');
+      delete selectCache[moduleKey];
+      await refreshTableData(moduleKey, true);
+      return;
+    }
 
-      const record = await apiGet(getEndpoint);
-      const payload = { ...record };
+    // For other modules, batch updates in chunks of 5 to avoid connection pool exhaustion
+    for (let i = 0; i < ids.length; i += 5) {
+      const batchIds = ids.slice(i, i + 5);
+      await Promise.all(batchIds.map(async (id) => {
+        const getEndpoint = getRecordEndpoint(moduleKey, id);
+        const record = await apiGet(getEndpoint);
+        const payload = { ...record };
 
-      for (const [key, selectedVals] of Object.entries(fieldsToApply)) {
-        if (moduleKey === 'permissions') {
-          payload[key] = selectedVals;
-        } else if (key === 'display') {
-          payload[key] = selectedVals;
-        } else if (key === 'display_name') {
-          payload[key] = selectedVals;
-        } else {
-          payload[key] = selectedVals.length > 0 ? selectedVals.map(v => `[${v}]`).join(', ') : null;
+        for (const [key, selectedVals] of Object.entries(fieldsToApply)) {
+          if (key === 'display' || key === 'display_name') {
+            payload[key] = selectedVals;
+          } else {
+            payload[key] = selectedVals.length > 0 ? selectedVals.map(v => `[${v}]`).join(', ') : null;
+          }
         }
-      }
 
-      delete payload.created_by;
-      delete payload.created_date;
-      delete payload.updated_by;
-      delete payload.updated_date;
+        delete payload.created_by;
+        delete payload.created_date;
+        delete payload.updated_by;
+        delete payload.updated_date;
 
-      const putEndpoint = getRecordEndpoint(moduleKey, id);
-
-      await apiPut(putEndpoint, payload);
-    });
-
-    await Promise.all(updatePromises);
+        const putEndpoint = getRecordEndpoint(moduleKey, id);
+        await apiPut(putEndpoint, payload);
+      }));
+    }
 
     closeModal('form-modal');
     showToast(`Đã cập nhật hàng loạt ${ids.length} bản ghi thành công!`, 'success');

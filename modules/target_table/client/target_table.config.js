@@ -18,7 +18,7 @@
       { key: 'record_ids', label: 'Scope / Records', labelKey: 'col.scope_records', html: true }
     ],
     fields: [
-      { key: 'type', label: 'TYPE', type: 'segmented', options: ['Add', 'Edit', 'Delete'], defaultValue: 'Add', required: true, onchange: 'handleTargetTableTypeChange(this.dataset ? this.dataset.value : this.getAttribute("data-value"))' },
+      { key: 'type', label: 'TYPE', type: 'segmented', options: ['Add', 'Edit', 'Delete'], defaultValue: 'Add', required: true, onchange: 'handleTargetTableTypeChange()' },
       {
         key: 'table_name',
         label: 'TABLE',

@@ -2574,6 +2574,20 @@ async function seedDefaultPermissions() {
     );
   }
 
+  // ── 2b. Ensure all column_permissions have 'Staff' role allowed by default ──
+  await pool.query(`
+    INSERT INTO permission_roles (permission_id, role)
+    SELECT cp.id, 'Staff'
+    FROM column_permissions cp
+    WHERE cp.deleted_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM permission_roles pr 
+        WHERE pr.permission_id = cp.id 
+          AND pr.role = 'Staff' 
+          AND pr.deleted_at IS NULL
+      )
+  `);
+
   // ── 3. Clean up obsolete columns from column_permissions ──────────────────
   await pool.query(
     `DELETE FROM column_permissions
