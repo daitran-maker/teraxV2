@@ -203,8 +203,9 @@ const ACTION_LOGIC = {
       } else if (r.approval_flow && r.approval_flow.steps) {
         r.approval_flow.steps.forEach(s => approvers[s.level] = s.approver);
       }
-      const curApprover = approvers[curLevel];
-      return (curApprover && curApprover.toLowerCase() === u.employee_id.toLowerCase()) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
+      const curApprover = approvers[curLevel] ? String(approvers[curLevel]).trim().toLowerCase() : '';
+      const userIdentities = [u?.employee_id, u?.email, u?.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+      return (curApprover && userIdentities.includes(curApprover)) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
     }
   },
   'reject_request': {
@@ -231,8 +232,9 @@ const ACTION_LOGIC = {
       } else if (r.approval_flow && r.approval_flow.steps) {
         r.approval_flow.steps.forEach(s => approvers[s.level] = s.approver);
       }
-      const curApprover = approvers[curLevel];
-      return (curApprover && curApprover.toLowerCase() === u.employee_id.toLowerCase()) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
+      const curApprover = approvers[curLevel] ? String(approvers[curLevel]).trim().toLowerCase() : '';
+      const userIdentities = [u?.employee_id, u?.email, u?.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+      return (curApprover && userIdentities.includes(curApprover)) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
     }
   },
   'ACT-REQUEST-016': {

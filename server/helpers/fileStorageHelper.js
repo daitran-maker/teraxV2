@@ -137,8 +137,9 @@ async function checkRecordAccess(tableName, recordId, req) {
         const policyLead = targetRequest.policy_lead || '';
                   let isInApprovalFlow = false;
           if (targetRequest.approval_flow && Array.isArray(targetRequest.approval_flow.steps)) {
+            const userIdentities = [user.employee_id, user.email, user.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
             isInApprovalFlow = targetRequest.approval_flow.steps.some(step => 
-              step.approver && step.approver === userEmpId
+              step.approver && userIdentities.includes(String(step.approver).trim().toLowerCase())
             );
           }
           let isTaggedInComment = false;

@@ -208,7 +208,8 @@ const ACTION_LOGIC = {
       const srStatus = getRecordStatusId(r, 'request', 'sr_status');
       const isValidStatus = srStatus !== 5 && srStatus !== 6; // 5=closed, 6=cancelled
 
-      const isPolicyLead = r.policy_lead && u && r.policy_lead.toLowerCase() === u.employee_id.toLowerCase();
+      const userIds = [u?.employee_id, u?.email, u?.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+      const isPolicyLead = r.policy_lead && u && userIds.includes(String(r.policy_lead).trim().toLowerCase());
       const isSuperAdmin = u && u.role && u.role.toUpperCase() === 'SUPER ADMIN';
 
       return isValidStatus && (isPolicyLead || isSuperAdmin);
@@ -346,8 +347,9 @@ const ACTION_LOGIC = {
       } else if (r.approval_flow && r.approval_flow.steps) {
         r.approval_flow.steps.forEach(s => approvers[s.level] = s.approver);
       }
-      const curApprover = approvers[curLevel];
-      return (curApprover && curApprover.toLowerCase() === u.employee_id.toLowerCase()) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
+      const curApprover = approvers[curLevel] ? String(approvers[curLevel]).trim().toLowerCase() : '';
+      const userIdentities = [u?.employee_id, u?.email, u?.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+      return (curApprover && userIdentities.includes(curApprover)) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
     }
   },
   'reject_request': {
@@ -374,8 +376,9 @@ const ACTION_LOGIC = {
       } else if (r.approval_flow && r.approval_flow.steps) {
         r.approval_flow.steps.forEach(s => approvers[s.level] = s.approver);
       }
-      const curApprover = approvers[curLevel];
-      return (curApprover && curApprover.toLowerCase() === u.employee_id.toLowerCase()) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
+      const curApprover = approvers[curLevel] ? String(approvers[curLevel]).trim().toLowerCase() : '';
+      const userIdentities = [u?.employee_id, u?.email, u?.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+      return (curApprover && userIdentities.includes(curApprover)) || (u && u.role && u.role.toUpperCase() === 'SUPER ADMIN');
     }
   },
   'ACT-REQUEST-016': {
@@ -747,11 +750,11 @@ router.get('/:tableName/:recordId', async (req, res) => {
       if (!hasAccess && actionId === 'ACT-REQUEST-016' && viewName === 'my_approval') {
         try {
           const flow = typeof record.approval_flow === 'string' ? JSON.parse(record.approval_flow) : JSON.parse(JSON.stringify(record.approval_flow || {}));
-          const userIds = [user.employee_id]
+          const userIds = [user.employee_id, user.email, user.username]
             .filter(Boolean)
-            .map(v => String(v).toLowerCase());
+            .map(v => String(v).trim().toLowerCase());
           hasAccess = !!(flow && Array.isArray(flow.steps) && flow.steps.some(step => {
-            const approver = step && step.approver ? String(step.approver).toLowerCase() : '';
+            const approver = step && step.approver ? String(step.approver).trim().toLowerCase() : '';
             return approver && userIds.includes(approver);
           }));
         } catch (e) {
@@ -773,18 +776,18 @@ router.get('/:tableName/:recordId', async (req, res) => {
               `SELECT finance_control, transaction_managed_by FROM account WHERE company_entity = $1`,
               [record.my_company]
             );
-            const uEmailNormalized = (user.employee_id || "").toLowerCase();
+            const userIdentities = [user.employee_id, user.email, user.username].filter(Boolean).map(s => normalizeEmail(s.trim()));
             for (const row of accRes.rows) {
               if (row.finance_control) {
                 const controls = row.finance_control.split(',').map(s => normalizeEmail(s.trim()));
-                if (controls.includes(uEmailNormalized)) {
+                if (controls.some(c => userIdentities.includes(c))) {
                   hasFinanceAccess = true;
                   break;
                 }
               }
               if (row.transaction_managed_by) {
                 const managers = row.transaction_managed_by.split(',').map(s => normalizeEmail(s.trim()));
-                if (managers.includes(uEmailNormalized)) {
+                if (managers.some(m => userIdentities.includes(m))) {
                   hasFinanceAccess = true;
                   break;
                 }
@@ -821,9 +824,10 @@ router.get('/:tableName/:recordId', async (req, res) => {
                   }
                   let checkLevel = level;
                   let approvedCount = 0;
+                  const userIdentities = [user.employee_id, user.email, user.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
                   while (checkLevel <= flow.total_levels) {
-                    const approverEmailForThisLevel = emails[checkLevel]?.toLowerCase();
-                    const isApprover = approverEmailForThisLevel === user.employee_id.toLowerCase();
+                    const approverEmailForThisLevel = (emails[checkLevel] || '').trim().toLowerCase();
+                    const isApprover = approverEmailForThisLevel && userIdentities.includes(approverEmailForThisLevel);
                     const isSuperAdmin = user.role && user.role.toUpperCase() === 'SUPER ADMIN';
                     if (isApprover || (isSuperAdmin && checkLevel === level)) {
                       approvedCount++;
@@ -1529,11 +1533,11 @@ router.post('/execute', async (req, res) => {
         let dateUpdates = [];
         console.log(`[APPROVE] record_id=${record_id}, user=${user.employee_id}, level=${level}, emails=${emails.join(',')}`);
 
-        const currentApprover = (emails[level] || '').toLowerCase();
-        const userIdentities = [user.employee_id]
+        const currentApprover = (emails[level] || '').trim().toLowerCase();
+        const userIdentities = [user.employee_id, user.email, user.username]
           .filter(Boolean)
-          .map(v => String(v).toLowerCase());
-        const isCurrentApprover = userIdentities.includes(currentApprover);
+          .map(v => String(v).trim().toLowerCase());
+        const isCurrentApprover = currentApprover && userIdentities.includes(currentApprover);
         const isSuperAdminUser = user.role && user.role.toUpperCase() === 'SUPER ADMIN';
         if (!isCurrentApprover && !isSuperAdminUser) {
           throw new Error(`You are not authorized to approve Tier ${level}`);
@@ -1542,8 +1546,8 @@ router.post('/execute', async (req, res) => {
 
         while (level <= flow.total_levels) {
           const stepIdx = level - 1;
-          const approverForThisLevel = (emails[level] || '').toLowerCase();
-          const isApprover = userIdentities.includes(approverForThisLevel);
+          const approverForThisLevel = (emails[level] || '').trim().toLowerCase();
+          const isApprover = approverForThisLevel && userIdentities.includes(approverForThisLevel);
           const isSuperAdmin = user.role && user.role.toUpperCase() === 'SUPER ADMIN';
 
           console.log(`[APPROVE] Loop iteration for level ${level}. isApprover=${isApprover}, isSuperAdmin=${isSuperAdmin}, flow.current_level=${flow.current_level}`);
@@ -1685,6 +1689,19 @@ router.post('/execute', async (req, res) => {
       } else { // Reject
         const level = flow.current_level;
         const stepIdx = level - 1;
+        let emails = [null];
+        if (flow && flow.steps) {
+          flow.steps.forEach(s => emails[s.level] = s.approver);
+        }
+        const currentApprover = (emails[level] || '').trim().toLowerCase();
+        const userIdentities = [user.employee_id, user.email, user.username]
+          .filter(Boolean)
+          .map(v => String(v).trim().toLowerCase());
+        const isCurrentApprover = currentApprover && userIdentities.includes(currentApprover);
+        const isSuperAdminUser = user.role && user.role.toUpperCase() === 'SUPER ADMIN';
+        if (!isCurrentApprover && !isSuperAdminUser) {
+          throw new Error(`You are not authorized to reject Tier ${level}`);
+        }
 
         const tzTimeStr = new Date().toISOString();
 
@@ -2155,19 +2172,19 @@ router.post('/execute', async (req, res) => {
           throw new Error("MTR Transaction không hợp lệ hoặc không tồn tại.");
         }
         const row = checkRes.rows[0];
-        const userEmailNormalized = (user.employee_id || "").toLowerCase();
+        const uIdentities = [user.employee_id, user.email, user.username].filter(Boolean).map(s => normalizeEmail(s.trim()));
         let hasAccess = false;
 
-        if (row.finance_control && userEmailNormalized) {
+        if (row.finance_control && uIdentities.length > 0) {
           const controls = row.finance_control.split(',').map(s => normalizeEmail(s.trim()));
-          if (controls.includes(userEmailNormalized)) {
+          if (controls.some(c => uIdentities.includes(c))) {
             hasAccess = true;
           }
         }
 
-        if (row.transaction_managed_by && userEmailNormalized) {
+        if (row.transaction_managed_by && uIdentities.length > 0) {
           const managers = row.transaction_managed_by.split(',').map(s => normalizeEmail(s.trim()));
-          if (managers.includes(userEmailNormalized)) {
+          if (managers.some(m => uIdentities.includes(m))) {
             hasAccess = true;
           }
         }
@@ -2408,24 +2425,24 @@ router.get('/payment/:paymentId/mtrs', async (req, res) => {
       [myCompany]
     );
 
-    const userEmailNormalized = (user.employee_id || "").toLowerCase();
+    const uIdentities = [user.employee_id, user.email, user.username].filter(Boolean).map(s => normalizeEmail(s.trim()));
     const isSuperAdmin = user.role && user.role.toUpperCase() === 'SUPER ADMIN';
 
     // Lọc danh sách account mà user được quyền quản lý (chỉ check nếu không phải Super Admin)
     const allowedAccounts = accRes.rows.filter(row => {
       if (isSuperAdmin) return true;
-      if (!userEmailNormalized) return false;
+      if (uIdentities.length === 0) return false;
 
       // Check finance_control (comma-separated list of emails)
       if (row.finance_control) {
         const controls = row.finance_control.split(',').map(s => normalizeEmail(s.trim()));
-        if (controls.includes(userEmailNormalized)) return true;
+        if (controls.some(c => uIdentities.includes(c))) return true;
       }
 
       // Check transaction_managed_by (comma-separated list of emails)
       if (row.transaction_managed_by) {
         const managers = row.transaction_managed_by.split(',').map(s => normalizeEmail(s.trim()));
-        if (managers.includes(userEmailNormalized)) return true;
+        if (managers.some(m => uIdentities.includes(m))) return true;
       }
 
       return false;
