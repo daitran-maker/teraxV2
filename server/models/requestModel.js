@@ -94,9 +94,28 @@ class RequestModel {
         }
       }
 
-      const t1Approval = resolvedT1 || policy.tier1_approval || null;
-      const t2Approval = policy.tier2_approval || null;
-      const t3Approval = policy.tier3_approval || null;
+      const resolveToEmpId = async (val) => {
+        if (!val || typeof val !== 'string') return val;
+        const clean = val.trim();
+        if (!clean || clean.toLowerCase() === 'direct manager') return clean;
+        const eRes = await client.query(
+          'SELECT employee_id FROM employee WHERE employee_id = $1 OR LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1) LIMIT 1',
+          [clean]
+        );
+        return eRes.rows.length > 0 ? eRes.rows[0].employee_id : clean;
+      };
+
+      const t1Approval = await resolveToEmpId(resolvedT1 || policy.tier1_approval || null);
+      const t2Approval = await resolveToEmpId(policy.tier2_approval || null);
+      const t3Approval = await resolveToEmpId(policy.tier3_approval || null);
+      if (data.policy_lead) data.policy_lead = await resolveToEmpId(data.policy_lead);
+      if (data.sr_owner) {
+        if (Array.isArray(data.sr_owner)) {
+          data.sr_owner = await Promise.all(data.sr_owner.map(o => resolveToEmpId(o)));
+        } else if (typeof data.sr_owner === 'string') {
+          data.sr_owner = await resolveToEmpId(data.sr_owner);
+        }
+      }
 
       // Determine if Non-Standard option is applicable
       let isNonStandardApplicable = false;

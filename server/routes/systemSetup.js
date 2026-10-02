@@ -933,11 +933,23 @@ router.post('/commit-draft', async (req, res) => {
     }
 
     // 4. COMMIT POLICIES
+    if (pool.ensureSystemPoliciesSeed) {
+      await pool.ensureSystemPoliciesSeed(client);
+    }
+
     if (Array.isArray(policies) && policies.length > 0) {
       const adminRes = await client.query(`
         SELECT employee_id FROM employee WHERE role = 'Super Admin' OR employee_id = 'EMP-001' ORDER BY employee_id ASC LIMIT 1
       `);
       const defaultLead = adminRes.rows[0] ? adminRes.rows[0].employee_id : 'EMP-001';
+
+      const resolveEmp = async (val) => {
+        if (!val || typeof val !== 'string') return val;
+        const clean = val.trim();
+        if (!clean || clean.toLowerCase() === 'direct manager') return clean;
+        const eCheck = await client.query('SELECT employee_id FROM employee WHERE employee_id = $1 OR LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1) LIMIT 1', [clean]);
+        return eCheck.rows.length > 0 ? eCheck.rows[0].employee_id : clean;
+      };
 
       for (const p of policies) {
         const pName = String(p.policy_name || '').trim();
@@ -945,12 +957,17 @@ router.post('/commit-draft', async (req, res) => {
         const pType = String(p.policy_type || 'Operation').trim();
         const pDesc = String(p.description || pName).trim();
         const pSla = p.sla || 3;
-        const tier1 = p.tier1_approval || 'Direct Manager';
-        const tier2 = p.tier2_approval || null;
-        const tier3 = p.tier3_approval || null;
+        const tier1 = await resolveEmp(p.tier1_approval || 'Direct Manager');
+        const tier2 = await resolveEmp(p.tier2_approval || null);
+        const tier3 = await resolveEmp(p.tier3_approval || null);
         const appLevel = String(p.approval_level || (tier3 ? 'Tier 3' : tier2 ? 'Tier 2' : 'Tier 1')).trim();
-        const lead = p.policy_lead || defaultLead;
-        const owner = p.sr_owner || defaultLead;
+        const lead = await resolveEmp(p.policy_lead || defaultLead);
+        let owner = p.sr_owner || defaultLead;
+        if (typeof owner === 'string' && owner.includes(',')) {
+          owner = (await Promise.all(owner.split(',').map(s => resolveEmp(s.trim())))).join(',');
+        } else {
+          owner = await resolveEmp(owner);
+        }
         const dept = p.department_id ? (deptIdMap.get(String(p.department_id).toLowerCase()) || p.department_id) : null;
         const elem = p.elements || 'ASSIGN_TASK';
 

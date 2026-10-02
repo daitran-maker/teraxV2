@@ -431,9 +431,10 @@ async function initDb() {
   -- Dynamic check for tier columns presence
   DO $dyn_trg$
   BEGIN
-    IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'request' AND column_name = 'tier_1_status') THEN
-      EXECUTE '
-        CREATE OR REPLACE FUNCTION public.enforce_request_submit_status()
+    BEGIN
+      IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'request' AND column_name = 'tier_1_status') THEN
+        EXECUTE '
+          CREATE OR REPLACE FUNCTION public.enforce_request_submit_status()
         RETURNS trigger AS $trg$
         BEGIN
           IF NEW.sr_status::text = ''2'' OR LOWER(COALESCE(NEW.sr_status::text, '''')) IN (''submit'', ''submitted'', ''pending approval'', ''2'') THEN
@@ -596,15 +597,24 @@ async function initDb() {
         WHERE sr_status = 1;
       ';
     END IF;
+    EXCEPTION WHEN OTHERS THEN
+      -- If function cannot be replaced due to permissions (e.g. non-owner tenant user), keep existing function
+      NULL;
+    END;
   END $dyn_trg$;
 
-  DROP TRIGGER IF EXISTS trg_request_submit_status ON public.request;
+  DO $$
+  BEGIN
+    DROP TRIGGER IF EXISTS trg_request_submit_status ON public.request;
 
-  CREATE TRIGGER trg_request_submit_status
-  BEFORE INSERT OR UPDATE OF sr_status
-  ON public.request
-  FOR EACH ROW
-  EXECUTE FUNCTION public.enforce_request_submit_status();
+    CREATE TRIGGER trg_request_submit_status
+    BEFORE INSERT OR UPDATE OF sr_status
+    ON public.request
+    FOR EACH ROW
+    EXECUTE FUNCTION public.enforce_request_submit_status();
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END $$;
 
   UPDATE public.request
   SET sr_status = 2,
@@ -2020,6 +2030,11 @@ async function initDb() {
   `).then(async () => {
     console.log('Auto-migration finished.');
     try {
+      await ensureSystemPoliciesSeed();
+    } catch (e) {
+      console.error('Failed to run ensureSystemPoliciesSeed:', e);
+    }
+    try {
       await migrateCompanyData();
     } catch (e) {
       console.error('Failed to run company data migration:', e);
@@ -2070,6 +2085,104 @@ async function initDb() {
 }
 
 initDb();
+ensureSystemPoliciesSeed().catch(err => console.error('[init] ensureSystemPoliciesSeed error:', err));
+
+/**
+ * Ensure system automation policies (Payment ID 5 / RPM, Assign Task) always exist
+ * with correct configuration and reserved IDs so tenant custom processes never overwrite them.
+ */
+async function ensureSystemPoliciesSeed(client = pool) {
+  try {
+    const tableExists = await client.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = current_schema() AND table_name = 'policy_and_program'
+    `);
+    if (tableExists.rows.length === 0) return;
+
+    // Get default admin / employee
+    let defaultEmp = 'EMP-001';
+    let defaultEmp2 = 'EMP-001';
+    try {
+      const empRes = await client.query(`
+        SELECT employee_id FROM employee 
+        WHERE role = 'Super Admin' OR employee_id = 'EMP-001' 
+        ORDER BY employee_id ASC LIMIT 2
+      `);
+      if (empRes.rows.length > 0) defaultEmp = empRes.rows[0].employee_id;
+      if (empRes.rows.length > 1) defaultEmp2 = empRes.rows[1].employee_id;
+      else defaultEmp2 = defaultEmp;
+    } catch (e) {}
+
+    // Get primary company id
+    let compId = '1';
+    try {
+      const compRes = await client.query(`SELECT my_company_id FROM my_company ORDER BY my_company_id ASC LIMIT 1`);
+      if (compRes.rows.length > 0) compId = compRes.rows[0].my_company_id;
+    } catch (e) {}
+
+    const systemPolicies = [
+      {
+        policy_id: '5',
+        policy_type: 'Finance',
+        policy_name: 'Payment',
+        description: 'Yêu cầu thực hiện thanh toán (Payment Request)',
+        approval_level: 'Tier 2',
+        tier1_approval: defaultEmp,
+        tier2_approval: defaultEmp2,
+        policy_lead: defaultEmp,
+        sr_owner: defaultEmp,
+        elements: 'CONTRACT, PAYMENT, EXPENSE, FINANCE'
+      },
+      {
+        policy_id: 'RPM',
+        policy_type: 'Finance',
+        policy_name: 'Payment (RPM)',
+        description: 'Yêu cầu thực hiện thanh toán (Payment Request)',
+        approval_level: 'Tier 2',
+        tier1_approval: defaultEmp,
+        tier2_approval: defaultEmp2,
+        policy_lead: defaultEmp,
+        sr_owner: defaultEmp,
+        elements: 'CONTRACT, PAYMENT, EXPENSE, FINANCE'
+      },
+      {
+        policy_id: 'ASSIGN_TASK',
+        policy_type: 'Workspace',
+        policy_name: 'Assign Task',
+        description: 'Yêu cầu thực hiện giao việc (Assign Task)',
+        approval_level: 'Tier 0',
+        tier1_approval: defaultEmp,
+        tier2_approval: defaultEmp,
+        policy_lead: defaultEmp,
+        sr_owner: defaultEmp,
+        elements: 'ASSIGN_TASK'
+      }
+    ];
+
+    for (const p of systemPolicies) {
+      await client.query(`
+        INSERT INTO policy_and_program (
+          policy_id, policy_type, policy_name, description, 
+          approval_level, company_id, 
+          tier1_approval, tier2_approval, policy_lead, sr_owner, elements
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (policy_id) DO UPDATE SET
+          policy_type = EXCLUDED.policy_type,
+          policy_name = CASE 
+            WHEN policy_and_program.policy_name IS NULL OR policy_and_program.policy_name = '' 
+            THEN EXCLUDED.policy_name 
+            ELSE policy_and_program.policy_name 
+          END,
+          elements = COALESCE(policy_and_program.elements, EXCLUDED.elements)
+      `, [p.policy_id, p.policy_type, p.policy_name, p.description, p.approval_level, compId, p.tier1_approval, p.tier2_approval, p.policy_lead, p.sr_owner, p.elements]);
+    }
+    console.log('[Migration] ensureSystemPoliciesSeed completed successfully.');
+  } catch (err) {
+    console.error('[Migration] Error in ensureSystemPoliciesSeed:', err);
+  }
+}
+pool.ensureSystemPoliciesSeed = ensureSystemPoliciesSeed;
+pool.cleanLegacyEmails = cleanLegacyEmails;
 
 async function cleanLegacyEmails() {
   const client = await pool.connect();
@@ -2094,9 +2207,9 @@ async function cleanLegacyEmails() {
       const clean = val.trim().toLowerCase();
       const prefix = clean.split('@')[0];
       const match = employees.find(e => 
-        (e.email && e.email.trim().toLowerCase() === clean) ||
-        (e.username && e.username.trim().toLowerCase() === prefix) ||
-        (e.email && e.email.trim().toLowerCase().split('@')[0] === prefix)
+        (e.email && typeof e.email === 'string' && e.email.trim().toLowerCase() === clean) ||
+        (e.username && typeof e.username === 'string' && e.username.trim().toLowerCase() === prefix) ||
+        (e.email && typeof e.email === 'string' && e.email.trim().toLowerCase().split('@')[0] === prefix)
       );
       return match ? match.employee_id : val;
     };
@@ -3129,7 +3242,11 @@ async function migrateAuditLogTrigger() {
       END;
       $$ LANGUAGE plpgsql;
     `;
-    await client.query(triggerSQL);
+    try {
+      await client.query(triggerSQL);
+    } catch (tErr) {
+      console.warn('[Migration] Skipping audit_log_trigger recreation (function owner permission):', tErr.message);
+    }
 
     // Clean up bogus notification_logs entries in audit_logs
     await client.query(`

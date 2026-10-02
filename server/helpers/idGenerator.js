@@ -54,7 +54,15 @@ async function generateSequentialId(tableName, client) {
     }
   });
 
-  const nextSeq = maxSeq + 1;
+  let nextSeq = maxSeq + 1;
+  // If policy_and_program, skip reserved IDs dedicated to system automations (e.g. 5 = Payment, 12 = Invoice)
+  if (tableName === 'policy_and_program') {
+    const RESERVED_POLICY_NUMBERS = new Set([5, 12]);
+    while (RESERVED_POLICY_NUMBERS.has(nextSeq)) {
+      nextSeq++;
+    }
+  }
+
   const seqStr = config.padding ? String(nextSeq).padStart(config.padding, '0') : String(nextSeq);
   return `${config.prefix}${seqStr}`;
 }
