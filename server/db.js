@@ -1352,19 +1352,24 @@ async function initDb() {
   DROP INDEX IF EXISTS idx_request_tier_3_approval;
 
   -- Create safe JSONB parsing function if not exists
-  CREATE OR REPLACE FUNCTION safe_parse_jsonb(val text)
-  RETURNS jsonb AS $$
+  DO $$
   BEGIN
-      RETURN val::jsonb;
+    CREATE OR REPLACE FUNCTION safe_parse_jsonb(val text)
+    RETURNS jsonb AS $f$
+    BEGIN
+        RETURN val::jsonb;
+    EXCEPTION WHEN OTHERS THEN
+        RETURN jsonb_build_object(
+            'timestamp', to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            'user', 'system',
+            'action', val,
+            'changes', '{}'::jsonb
+        );
+    END;
+    $f$ LANGUAGE plpgsql;
   EXCEPTION WHEN OTHERS THEN
-      RETURN jsonb_build_object(
-          'timestamp', to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-          'user', 'system',
-          'action', val,
-          'changes', '{}'::jsonb
-      );
-  END;
-  $$ LANGUAGE plpgsql;
+    RAISE NOTICE 'Skipping safe_parse_jsonb recreation: %', SQLERRM;
+  END $$;
 
   -- Migrate existing tables with TEXT log columns to JSONB
   DO $$
