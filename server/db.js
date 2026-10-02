@@ -330,24 +330,8 @@ async function initDb() {
             policy_lead = EXCLUDED.policy_lead,
             sr_owner = EXCLUDED.sr_owner;
 
-          INSERT INTO policy_and_program (
-            policy_id, policy_type, policy_name, description, 
-            approval_level, company_id, 
-            tier1_approval, tier2_approval, policy_lead, sr_owner
-          ) VALUES (
-            ''RPM'', ''Finance'', ''Payment'', ''Yêu cầu thực hiện thanh toán'', 
-            ''Tier 2'', ''1'', 
-            v_emp1, v_emp2, v_emp1, v_emp1
-          ) ON CONFLICT (policy_id) DO UPDATE SET
-            policy_type = EXCLUDED.policy_type,
-            policy_name = EXCLUDED.policy_name,
-            description = EXCLUDED.description,
-            approval_level = EXCLUDED.approval_level,
-            company_id = EXCLUDED.company_id,
-            tier1_approval = EXCLUDED.tier1_approval,
-            tier2_approval = EXCLUDED.tier2_approval,
-            policy_lead = EXCLUDED.policy_lead,
-            sr_owner = EXCLUDED.sr_owner;
+          -- Remove redundant RPM policy if exists
+          DELETE FROM policy_and_program WHERE policy_id = ''RPM'';
 
           INSERT INTO policy_and_program (
             policy_id, policy_type, policy_name, description, 
@@ -2157,18 +2141,6 @@ async function ensureSystemPoliciesSeed(client = pool) {
         elements: 'CONTRACT, PAYMENT, EXPENSE, FINANCE'
       },
       {
-        policy_id: 'RPM',
-        policy_type: 'Finance',
-        policy_name: 'Payment (RPM)',
-        description: 'Yêu cầu thực hiện thanh toán (Payment Request)',
-        approval_level: 'Tier 2',
-        tier1_approval: defaultEmp,
-        tier2_approval: defaultEmp2,
-        policy_lead: defaultEmp,
-        sr_owner: defaultEmp,
-        elements: 'CONTRACT, PAYMENT, EXPENSE, FINANCE'
-      },
-      {
         policy_id: 'ASSIGN_TASK',
         policy_type: 'Workspace',
         policy_name: 'Assign Task',
@@ -2199,6 +2171,9 @@ async function ensureSystemPoliciesSeed(client = pool) {
           elements = COALESCE(policy_and_program.elements, EXCLUDED.elements)
       `, [p.policy_id, p.policy_type, p.policy_name, p.description, p.approval_level, compId, p.tier1_approval, p.tier2_approval, p.policy_lead, p.sr_owner, p.elements]);
     }
+
+    // Clean up redundant RPM process if exists
+    await client.query("DELETE FROM policy_and_program WHERE policy_id = 'RPM'");
     console.log('[Migration] ensureSystemPoliciesSeed completed successfully.');
   } catch (err) {
     console.error('[Migration] Error in ensureSystemPoliciesSeed:', err);
