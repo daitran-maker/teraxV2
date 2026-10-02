@@ -403,7 +403,7 @@ router.get('/:viewType', async (req, res) => {
         LIMIT 1000
       `;
       values = [userEmpId, userEmail];
-    } else if (viewType === 'my-team') {
+    } else if (viewType === 'my-team' || viewType === 'my_team') {
       // My Process / My Team: user is policy lead (ID or Email), prior steps Approved, excludes Draft (1), Rejected (4), Cancelled (6)
       query = `
         SELECT r.*, mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla 

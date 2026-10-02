@@ -111,9 +111,8 @@ async function switchToUser(employeeId) {
       try {
         await apiGet(`/table/request/${encodeURIComponent(recordId)}?pk=request_id&view=${viewName}`);
       } catch (err) {
-        if (typeof redirectToAccessDenied === 'function') {
-          redirectToAccessDenied();
-        }
+        window.location.hash = 'my_request';
+        window.location.reload();
         return;
       }
     }
