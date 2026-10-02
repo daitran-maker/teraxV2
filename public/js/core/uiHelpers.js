@@ -369,6 +369,9 @@ function redirectToAccessDenied() {
 
 function isAccessDeniedError(err) {
   const msg = String(err && err.message ? err.message : err || '').toLowerCase();
+  if (msg.includes('permission denied for relation') || msg.includes('permission denied for table') || msg.includes('permission denied for sequence')) {
+    return false;
+  }
   return msg.includes('access denied') ||
     msg.includes('permission') ||
     msg.includes('403');

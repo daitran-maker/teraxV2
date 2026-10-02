@@ -98,12 +98,16 @@ async function checkRecordAccess(tableName, recordId, req) {
       recordSubdomain = record.tenant_domain;
     } else if (tableName === 'ticket' || tableName === 'request') {
       recordSubdomain = record.subdomain;
-    } else {
-      const ticketId = record.ticket || record.request;
+    } else if (HELPDESK_TABLES.includes(tableName)) {
+      const ticketId = record.ticket;
       if (ticketId) {
-        const tRes = await getHelpdeskPool().query('SELECT subdomain FROM "ticket" WHERE ticket_id = $1', [ticketId]);
-        if (tRes.rows.length > 0) {
-          recordSubdomain = tRes.rows[0].subdomain;
+        try {
+          const tRes = await getHelpdeskPool().query('SELECT subdomain FROM "ticket" WHERE ticket_id = $1', [ticketId]);
+          if (tRes.rows.length > 0) {
+            recordSubdomain = tRes.rows[0].subdomain;
+          }
+        } catch (e) {
+          console.warn('Subdomain check error in fileStorageHelper:', e.message);
         }
       }
     }
@@ -113,7 +117,7 @@ async function checkRecordAccess(tableName, recordId, req) {
   }
 
   // === ROW-LEVEL SECURITY for request and child records ===
-  const tablesWithRequestCol = ['mtr', 'payment', 'comment', 'service', 'contract', 'asset', 'invoice'];
+  const tablesWithRequestCol = ['mtr', 'payment', 'comment', 'service', 'contract', 'asset', 'invoice', 'target_table'];
   if (tableName === 'request' || tablesWithRequestCol.includes(tableName)) {
     if (!isAdmin && user.employee_id) {
       const userEmpId = user.employee_id;

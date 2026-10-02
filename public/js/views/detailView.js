@@ -251,11 +251,7 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
       }
     } catch (err) {
       if (!silent) {
-        if (isAccessDeniedError(err)) {
-          redirectToAccessDenied();
-          return;
-        }
-        showToast(err.message, 'error');
+        showToast(err.message || 'Access denied: You do not have permission to view this content.', 'error');
         setTimeout(() => {
           goBack(moduleKey);
         }, 1500);
@@ -337,11 +333,7 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
       }
     }).catch(err => {
       if (!silent && !record) {
-        if (isAccessDeniedError(err)) {
-          redirectToAccessDenied();
-          return;
-        }
-        showToast(err.message, 'error');
+        showToast(err.message || 'Access denied: You do not have permission to view this content.', 'error');
         setTimeout(() => {
           goBack(moduleKey);
         }, 1500);
