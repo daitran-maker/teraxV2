@@ -97,8 +97,8 @@ app.use(express.static(path.join(__dirname, '../public'), {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-    } else if (filepath.endsWith('setupWizard.js')) {
-      // Setup Wizard changes frequently during setup/onboarding dev, bypass cache
+    } else if (filepath.endsWith('setupWizard.js') || filepath.endsWith('tableView.js') || filepath.endsWith('detailView.js') || filepath.endsWith('i18n.js')) {
+      // Frequently updated core views/i18n, bypass cache to ensure instant client updates
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');

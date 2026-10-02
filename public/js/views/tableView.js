@@ -1339,6 +1339,9 @@ function resolveFilterDisplayVal(groupKey, val) {
       }
     }
   }
+  if (typeof displayVal === 'string' && (displayVal.includes('CầU') || displayVal.includes('GiấY'))) {
+    displayVal = displayVal.replace(/CầU/g, 'Cầu').replace(/GiấY/g, 'Giấy');
+  }
   return displayVal;
 }
 
