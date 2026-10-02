@@ -1226,7 +1226,7 @@ function buildTableStatusCards(moduleKey, data) {
     const bgLight = getBgLight(color);
 
     // Capitalize status to Title Case or translate if possible
-    const label = typeof t_val === 'function' ? t_val(status) : status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const label = typeof t_val === 'function' ? t_val(status) : (typeof status === 'string' && /^[a-z0-9]+([_-][a-z0-9]+)+$/i.test(status) ? status.replace(/[_-]+/g, ' ').replace(/(^|\s)(\S)/g, (m, p1, p2) => p1 + p2.toUpperCase()) : status);
     const sumVal = cardBaseSums[status];
     const detail = sumVal ? `${formatNumber(Math.round(sumVal))} ${baseCurr}` : '';
 
@@ -1334,8 +1334,8 @@ function resolveFilterDisplayVal(groupKey, val) {
       const translated = t_val(val);
       if (translated && translated !== val) {
         displayVal = translated;
-      } else if (typeof displayVal === 'string' && displayVal.length > 0) {
-        displayVal = displayVal.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      } else if (typeof displayVal === 'string' && /^[a-z0-9]+([_-][a-z0-9]+)+$/i.test(displayVal)) {
+        displayVal = displayVal.replace(/[_-]+/g, ' ').replace(/(^|\s)(\S)/g, (m, p1, p2) => p1 + p2.toUpperCase());
       }
     }
   }

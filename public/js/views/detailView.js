@@ -2946,7 +2946,7 @@ function buildDetailViewHTML(moduleKey, record) {
       // Proper Case: only apply if no custom label was provided (pure snake_case key)
       let displayLabel = colLabel.replace(/_/g, ' ');
       if (colLabel === labelRaw && !row.label) {
-        displayLabel = displayLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        displayLabel = displayLabel.toLowerCase().replace(/(^|\s)(\S)/g, (m, p1, p2) => p1 + p2.toUpperCase());
       }
       displayLabel = displayLabel
         .replace(/\bProcess Sla\b/g, 'Process SLA')

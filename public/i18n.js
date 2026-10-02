@@ -152,7 +152,7 @@ function t_val(value) {
     if (/^[a-z]+(_[a-z]+)+$/i.test(mappedValue)) {
       const formatted = mappedValue
         .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
+        .replace(/(^|\s)(\S)/g, (m, p1, p2) => p1 + p2.toUpperCase());
       return formatted;
     }
   }
