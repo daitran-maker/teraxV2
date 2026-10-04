@@ -111,7 +111,7 @@ async function initDb() {
       EXECUTE 'ALTER TABLE "request" ADD COLUMN rating JSONB';
     END IF;
 
-    -- Create request_rating table
+    -- Create request_rating table (strictly anonymous, no created_by/updated_by)
     EXECUTE 'CREATE TABLE IF NOT EXISTS public.request_rating (
       id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
       request_id character varying(255) NOT NULL,
@@ -120,9 +120,6 @@ async function initDb() {
       point integer NOT NULL,
       comment text,
       created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-      created_by character varying(255),
-      updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-      updated_by character varying(255),
       deleted_at timestamp without time zone
     )';
 
@@ -1504,6 +1501,15 @@ async function initDb() {
         user_val TEXT;
         changed_fields JSONB;
     BEGIN
+        -- Never audit log anonymous tables (e.g., request_rating feedback)
+        IF TG_TABLE_NAME = 'request_rating' THEN
+            IF (TG_OP = 'DELETE') THEN
+                RETURN OLD;
+            ELSE
+                RETURN NEW;
+            END IF;
+        END IF;
+
         -- Query the primary key column name dynamically from postgres catalogs
         SELECT a.attname INTO v_pk_col
         FROM pg_index i
@@ -1603,7 +1609,7 @@ async function initDb() {
           FROM information_schema.tables 
           WHERE table_schema = current_schema() 
             AND table_type = 'BASE TABLE'
-            AND table_name NOT IN ('pg_stat_statements', 'push_subscriptions', 'audit_logs')
+            AND table_name NOT IN ('pg_stat_statements', 'push_subscriptions', 'audit_logs', 'request_rating')
       ) LOOP
           -- 1. Ensure log column exists as JSONB
           IF NOT EXISTS (
@@ -3172,6 +3178,15 @@ async function migrateAuditLogTrigger() {
           user_val TEXT;
           changed_fields JSONB;
       BEGIN
+          -- Never audit log anonymous tables (e.g., request_rating feedback)
+          IF TG_TABLE_NAME = 'request_rating' THEN
+              IF (TG_OP = 'DELETE') THEN
+                  RETURN OLD;
+              ELSE
+                  RETURN NEW;
+              END IF;
+          END IF;
+
           SELECT a.attname INTO v_pk_col
           FROM pg_index i
           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -3276,6 +3291,23 @@ async function migrateAuditLogTrigger() {
       ALTER TABLE "expense" ADD COLUMN IF NOT EXISTS updated_by varchar(255);
       ALTER TABLE "asset" ADD COLUMN IF NOT EXISTS updated_by varchar(255);
       ALTER TABLE "service" ADD COLUMN IF NOT EXISTS updated_by varchar(255);
+
+      -- Ensure request_rating is strictly anonymous: drop trigger, clean audit logs, nullify created_by/updated_by
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'request_rating') THEN
+          DROP TRIGGER IF EXISTS trg_audit_log ON public.request_rating;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'request_rating' AND column_name = 'created_by') THEN
+            EXECUTE 'UPDATE request_rating SET created_by = NULL WHERE created_by IS NOT NULL';
+          END IF;
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'request_rating' AND column_name = 'updated_by') THEN
+            EXECUTE 'UPDATE request_rating SET updated_by = NULL WHERE updated_by IS NOT NULL';
+          END IF;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'audit_logs') THEN
+          DELETE FROM audit_logs WHERE table_name = 'request_rating';
+        END IF;
+      END $$;
     `);
     console.log('[Migration] audit_log_trigger verified and bogus notification_logs purged.');
   } finally {

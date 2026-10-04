@@ -29,7 +29,7 @@ router.get('/request-activity-log', async (req, res) => {
     'employee', 'payment', 'expense', 'request', 'service', 'asset', 'mtr', 'account',
     'contract', 'invoice', 'department', 'my_company', 'company', 'contact',
     'policy_and_program', 'oppotunity', 'target_table', 'my_location', 'assigned_task',
-    'task_subtask', 'operation_program', 'ticket', 'cms_tenant_info', 'request_rating'
+    'task_subtask', 'operation_program', 'ticket', 'cms_tenant_info'
   ];
   const allowedLogsTables = ALLOWED_TABLES.map(t => `'${t}'`).join(',');
 

@@ -68,10 +68,9 @@ async function getRecordAuditLogs(tableName, recordId, existingRecordLog = null)
         pool.query('SELECT service_id::text AS id FROM service WHERE request::text = $1', [recordId]).catch(() => ({ rows: [] })),
         pool.query('SELECT task_id::text AS id FROM assigned_task WHERE request_id::text = $1', [recordId]).catch(() => ({ rows: [] })),
         pool.query('SELECT id::text AS id FROM target_table WHERE request::text = $1', [recordId]).catch(() => ({ rows: [] })),
-        pool.query('SELECT id::text AS id FROM request_rating WHERE request_id::text = $1', [recordId]).catch(() => ({ rows: [] })),
       ]);
 
-      const tableMap = ['comment', 'payment', 'invoice', 'expense', 'contract', 'asset', 'service', 'assigned_task', 'target_table', 'request_rating'];
+      const tableMap = ['comment', 'payment', 'invoice', 'expense', 'contract', 'asset', 'service', 'assigned_task', 'target_table'];
       const targetPairs = tableNames.map(t => ({ table: t, id: String(recordId) }));
       childQueries.forEach((q, idx) => {
         const tbl = tableMap[idx];
@@ -212,7 +211,7 @@ async function getRecordAuditLogs(tableName, recordId, existingRecordLog = null)
       if (row.table_name && !tableNames.includes(row.table_name)) {
         const act = String(row.action || '').toLowerCase();
         let formattedAction = act;
-        const targetEntity = row.table_name === 'request_rating' ? 'feedback' : row.table_name;
+        const targetEntity = row.table_name;
         if (act.includes('created') || act === 'insert') {
           formattedAction = `added ${targetEntity}`;
         } else if (act.includes('updated') || act === 'update') {

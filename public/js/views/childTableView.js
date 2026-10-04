@@ -1514,10 +1514,12 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   resolvedRow[c.key] = resolveLookupValue(childKey, c.key, resolvedRow[c.key]);
                 }
               });
+              const isNonClickableChild = ['request_rating', 'rating', 'feedback', 'logs', 'request_activity_log', 'history'].includes(childKey);
               const rowClickTarget = childKey === 'opportunity_list' ? 'policy' : childKey;
-              const rowOnClick = `window.location.hash = '${rowClickTarget}/${pkVal}'`;
+              const rowOnClick = isNonClickableChild ? '' : `window.location.hash = '${rowClickTarget}/${pkVal}'`;
+              const cursorStyle = isNonClickableChild ? 'cursor: default;' : 'cursor: pointer;';
               return `
-                           <tr onclick="${rowOnClick}" style="cursor: pointer; border-bottom: 1px solid #F1F5F9; transition: background 0.15s;" class="child-table-row">
+                           <tr ${rowOnClick ? `onclick="${rowOnClick}"` : ''} style="${cursorStyle} border-bottom: 1px solid #F1F5F9; transition: background 0.15s;" class="child-table-row">
                              ${allowChildActions ? `
                                ${['payment', 'contract', 'invoice', 'mtr', 'expense', 'asset', 'service'].includes(childKey) ? `
                                 <td style="padding: 6px 14px; text-align: center;" onclick="event.stopPropagation();">

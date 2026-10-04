@@ -1412,8 +1412,14 @@ router.post('/:tableName/bulk', async (req, res) => {
 
       // 3. Audit Fields
       // We only set created_by/updated_by if necessary, DB trigger handles dates and logs.
-      if (colCreatedBy && !finalData[colCreatedBy]) finalData[colCreatedBy] = userEmployeeId;
-      if (colUpdatedBy && !finalData[colUpdatedBy]) finalData[colUpdatedBy] = userEmployeeId;
+      if (tableName === 'request_rating') {
+        delete finalData.created_by;
+        delete finalData.updated_by;
+        delete finalData.from_user;
+      } else {
+        if (colCreatedBy && !finalData[colCreatedBy]) finalData[colCreatedBy] = userEmployeeId;
+        if (colUpdatedBy && !finalData[colUpdatedBy]) finalData[colUpdatedBy] = userEmployeeId;
+      }
 
       const keys = Object.keys(finalData);
       if (keys.length === 0) continue;
@@ -3117,7 +3123,7 @@ router.get('/:tableName', async (req, res) => {
       responseDataRows = await maskTicketComments(responseDataRows);
     } else if (tableName === 'request_rating') {
       responseDataRows = responseDataRows.map(r => {
-        const { from_user, ...rest } = r;
+        const { from_user, created_by, updated_by, ...rest } = r;
         return rest;
       });
     }
@@ -3412,7 +3418,7 @@ router.get('/:tableName/:id', async (req, res) => {
       const masked = await maskTicketComments([record]);
       record = masked[0];
     } else if (tableName === 'request_rating') {
-      const { from_user, ...rest } = record;
+      const { from_user, created_by, updated_by, ...rest } = record;
       record = rest;
     }
     enrichRecordWithStatusCatalog(tableName, record);
@@ -3763,8 +3769,14 @@ router.post('/:tableName', async (req, res) => {
     }
 
     // We let the database trigger handle created_date, updated_date, and logs.
-    if (colCreatedBy && !data[colCreatedBy]) data[colCreatedBy] = userEmployeeId;
-    if (colUpdatedBy && !data[colUpdatedBy]) data[colUpdatedBy] = userEmployeeId;
+    if (tableName === 'request_rating') {
+      delete data.created_by;
+      delete data.updated_by;
+      delete data.from_user;
+    } else {
+      if (colCreatedBy && !data[colCreatedBy]) data[colCreatedBy] = userEmployeeId;
+      if (colUpdatedBy && !data[colUpdatedBy]) data[colUpdatedBy] = userEmployeeId;
+    }
 
     if (tableName === 'ticket') {
       const requestHost = (req.headers.host || '').split(':')[0].toLowerCase();
@@ -4270,7 +4282,13 @@ router.put('/:tableName/:id', async (req, res) => {
   if (colCreatedBy) delete data[colCreatedBy];
   if (colCreatedDate) delete data[colCreatedDate];
 
-  if (colUpdatedBy) data[colUpdatedBy] = userEmployeeId;
+  if (tableName === 'request_rating') {
+    delete data.created_by;
+    delete data.updated_by;
+    delete data.from_user;
+  } else {
+    if (colUpdatedBy) data[colUpdatedBy] = userEmployeeId;
+  }
   // Let the DB trigger handle updated_date and diff logs
 
   autoCalculateBaseCurrencyFields(tableName, data, oldRecord);

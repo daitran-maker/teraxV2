@@ -2966,7 +2966,7 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
             <input type="checkbox" id="bulk-select-all" onclick="toggleSelectAllRows('${moduleKey}', this)">
           </th>
         ` : ''}
-        ${QUICK_MENU_MODULES.includes(moduleKey) ? `<th class="request-row-menu-cell col-pinned" style="width: 45px; min-width: 45px; max-width: 45px; padding: 0; text-align: center; position: sticky; left: ${['permissions', 'exception_rules', 'action_rules', 'contract', 'request', 'payment', 'invoice', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey) ? '40px' : '0'}; background: #F8FAFC; z-index: 25;"></th>` : ''}
+        ${(window.QUICK_MENU_MODULES || QUICK_MENU_MODULES).includes(moduleKey) ? `<th class="request-row-menu-cell col-pinned" style="width: 45px; min-width: 45px; max-width: 45px; padding: 0; text-align: center; position: sticky; left: ${['permissions', 'exception_rules', 'action_rules', 'contract', 'request', 'payment', 'invoice', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey) ? '40px' : '0'}; background: #F8FAFC; z-index: 25;"></th>` : ''}
         ${mod.hasRowActions ? `<th class="row-actions col-pinned" style="width:70px; min-width:70px; max-width:70px; text-align:center; ${moduleKey === 'finance' ? 'position: sticky; left: 0; background: #F8FAFC; z-index: 25; border-right: 1px solid #E2E8F0;' : ''}"></th>` : ''}
         ${mod.columns.filter(c => !c.hidden && isColumnAllowed(moduleKey, c.key)).map(c => {
       const isPinned = isColumnPinned(moduleKey, c.key);
@@ -3819,13 +3819,11 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
 
   const hasCheckbox = ['permissions', 'exception_rules', 'action_rules', 'contract', 'request', 'payment', 'invoice', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
   const checkboxHTML = hasCheckbox ? `
-    <td class="row-bulk-checkbox-cell col-pinned" style="width: 40px; min-width: 40px; max-width: 40px; text-align: center; position: sticky; left: 0; background: #ffffff; z-index: 10;" onclick="event.stopPropagation()">
-      <input type="checkbox" class="row-bulk-checkbox" data-pk="${pkVal}" onchange="handleRowCheckboxChange('${moduleKey}')">
-    </td>
+    <td class="row-bulk-checkbox-cell col-pinned" style="width: 40px; min-width: 40px; max-width: 40px; padding: 0; text-align: center; position: sticky; left: 0; background: #ffffff; z-index: 10; overflow: visible; text-overflow: clip;" onclick="event.stopPropagation()"><input type="checkbox" class="row-bulk-checkbox" data-pk="${pkVal}" onchange="handleRowCheckboxChange('${moduleKey}')"></td>
   ` : '';
 
-  // Hamburger quick-action menu for request dashboards, contract, invoice, payment, expense, asset, service
-  const hasQuickMenu = QUICK_MENU_MODULES.includes(moduleKey);
+  // Hamburger quick-action menu for request dashboards, contract, invoice, payment, expense, asset, service, permissions, action_rules, exception_rules
+  const hasQuickMenu = (window.QUICK_MENU_MODULES || QUICK_MENU_MODULES).includes(moduleKey);
   const menuBtnHTML = hasQuickMenu ? `
     <td class="request-row-menu-cell col-pinned" style="width: 45px; min-width: 45px; max-width: 45px; padding: 0; text-align: center; position: sticky; left: ${hasCheckbox ? '40px' : '0'}; background: #ffffff; z-index: 10;" onclick="event.stopPropagation()">
       <button class="row-action-menu-btn" title="Quick actions"

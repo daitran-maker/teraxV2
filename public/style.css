@@ -5742,6 +5742,12 @@ button[onclick*="openEditModal"].btn-custom-action {
 
 .data-table th.request-row-menu-cell,
 .data-table td.request-row-menu-cell,
+#view-permissions .data-table th.request-row-menu-cell,
+#view-permissions .data-table td.request-row-menu-cell,
+#view-action_rules .data-table th.request-row-menu-cell,
+#view-action_rules .data-table td.request-row-menu-cell,
+#view-exception_rules .data-table th.request-row-menu-cell,
+#view-exception_rules .data-table td.request-row-menu-cell,
 #view-expense .data-table th.request-row-menu-cell,
 #view-expense .data-table td.request-row-menu-cell,
 #view-service .data-table th.request-row-menu-cell,
@@ -5762,6 +5768,14 @@ button[onclick*="openEditModal"].btn-custom-action {
   vertical-align: middle !important;
 }
 
+.data-table th.row-bulk-checkbox-cell,
+.data-table td.row-bulk-checkbox-cell,
+#view-permissions .data-table th.row-bulk-checkbox-cell,
+#view-permissions .data-table td.row-bulk-checkbox-cell,
+#view-action_rules .data-table th.row-bulk-checkbox-cell,
+#view-action_rules .data-table td.row-bulk-checkbox-cell,
+#view-exception_rules .data-table th.row-bulk-checkbox-cell,
+#view-exception_rules .data-table td.row-bulk-checkbox-cell,
 #view-payment .data-table th.row-bulk-checkbox-cell,
 #view-payment .data-table td.row-bulk-checkbox-cell,
 #view-invoice .data-table th.row-bulk-checkbox-cell,
@@ -5773,6 +5787,9 @@ button[onclick*="openEditModal"].btn-custom-action {
   max-width: 40px !important;
   padding: 0 !important;
   text-align: center !important;
+  vertical-align: middle !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
 /* Finance account picker in Expense forms */

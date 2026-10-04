@@ -1001,11 +1001,9 @@ router.get('/request/:id/all-ratings', async (req, res) => {
 
   try {
     const ratingsRes = await pool.query(
-      `SELECT r.id, r.request_id, r.from_user, r.to_user, r.point, r.comment, r.created_at,
-              ef.full_name as from_user_name, ef.email as from_user_email, ef.username as from_user_username,
+      `SELECT r.id, r.request_id, r.to_user, r.point, r.comment, r.created_at,
               et.full_name as to_user_name, et.email as to_user_email, et.username as to_user_username
        FROM request_rating r
-       LEFT JOIN employee ef ON (LOWER(ef.employee_id) = LOWER(r.from_user) OR LOWER(ef.email) = LOWER(r.from_user) OR LOWER(ef.username) = LOWER(r.from_user))
        LEFT JOIN employee et ON (LOWER(et.employee_id) = LOWER(r.to_user) OR LOWER(et.email) = LOWER(r.to_user) OR LOWER(et.username) = LOWER(r.to_user))
        WHERE r.request_id = $1 AND r.deleted_at IS NULL
        ORDER BY r.created_at DESC`,
@@ -1057,7 +1055,7 @@ router.get('/request/:id/all-ratings', async (req, res) => {
         ...(roleMap.get(toUsername) || [])
       ]));
 
-      const { from_user, from_user_name, from_user_email, from_user_username, ...safeItem } = item;
+      const { from_user, from_user_name, from_user_email, from_user_username, created_by, updated_by, ...safeItem } = item;
 
       return {
         ...safeItem,

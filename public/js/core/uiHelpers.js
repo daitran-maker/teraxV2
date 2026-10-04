@@ -62,7 +62,12 @@ function sortFilterEntries(filterModuleKey, filterKey, entries) {
 }
 window.sortFilterEntries = sortFilterEntries;
 
-const QUICK_MENU_MODULES = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'contract', 'invoice', 'payment', 'expense', 'asset', 'service'];
+const QUICK_MENU_MODULES = [
+  'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team',
+  'contract', 'invoice', 'payment', 'expense', 'asset', 'service',
+  'permissions', 'action_rules', 'exception_rules'
+];
+window.QUICK_MENU_MODULES = QUICK_MENU_MODULES;
 
 function isColumnPinned(moduleKey, columnKey) {
   if (!moduleKey || !columnKey) return false;

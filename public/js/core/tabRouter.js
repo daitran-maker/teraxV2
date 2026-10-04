@@ -489,6 +489,10 @@ async function handleHashChange() {
   const [path] = hash.split('&');
   const parts = path.split('/');
   const moduleKey = parts[0];
+  if (moduleKey === 'employee_active') {
+    window.location.hash = 'employee';
+    return;
+  }
   if (moduleKey === 'operation_program') {
     window.location.hash = 'request';
     return;
