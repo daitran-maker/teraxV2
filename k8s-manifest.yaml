@@ -1,0 +1,153 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crc-app-env
+  namespace: default
+  labels:
+    app: crc-web-app
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://teraxadmin:TeraX123!%40%23@10.91.1.51:30543/crcdevdb"
+  PORT: "5221"
+  JWT_SECRET: "f61b0048e7ecc1456badb69a872b51b6ad2f092041482dd5d19f3c3bafa8e25127aa6416bb88df3d0d44f157496184f195c3145014f20ac430f912cf14484400"
+  TUNNEL_TOKEN: "eyJhIjoiN2NiYjQ2ZDllOTdkOGZlMmU2NTkwYWMwZTU1ODMzZTgiLCJ0IjoiM2Q2ZDMzNjEtMTBhYi00ODZkLWFlY2YtZWNkMzkyMTJhNzIwIiwicyI6Ik1tTmpZVFUxWVdJdE9ETTJNQzAwWkdJd0xUZzFZell0T0ROallUY3pORGt4WWpRMyJ9"
+  CMS_HMAC_SECRET: "0a36c944128c6d1845b2d91ba26f4b62d1aa397469b0a7188858715984b54757"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crc-app-deployment
+  namespace: default
+  labels:
+    app: crc-web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crc-web-app
+  template:
+    metadata:
+      labels:
+        app: crc-web-app
+    spec:
+      containers:
+        - name: crc-web-app
+          image: crc-web-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5221
+          envFrom:
+            - secretRef:
+                name: crc-app-env
+          resources:
+            limits:
+              memory: "768Mi"
+              cpu: "1000m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crc-app-service
+  namespace: default
+  labels:
+    app: crc-web-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: crc-web-app
+  ports:
+    - name: http
+      port: 5221
+      targetPort: 5221
+      protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-viewer
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-viewer-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-viewer-binding
+subjects:
+- kind: ServiceAccount
+  name: pod-viewer
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: pod-viewer-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dozzle-deployment
+  namespace: default
+  labels:
+    app: dozzle
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dozzle
+  template:
+    metadata:
+      labels:
+        app: dozzle
+    spec:
+      serviceAccountName: pod-viewer
+      containers:
+      - name: dozzle
+        image: amir20/dozzle:latest
+        env:
+        - name: DOZZLE_MODE
+          value: "k8s"
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dozzle-service
+  namespace: default
+  labels:
+    app: dozzle
+spec:
+  type: LoadBalancer
+  selector:
+    app: dozzle
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

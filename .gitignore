@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data files (large, sensitive — never commit)
+data/
+*.dump
+*.bak
+*.zip
+*.tar
+*.tar.gz
+*.xlsx
+*.xls
+*.pdf
+backups/
+
+# Dev & analysis scripts (local only)
+scripts/dev/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+scratch/
+public/ChatGPT*
+public/test_logo.html
+public/uploads/upload_*

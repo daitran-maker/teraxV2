@@ -1,0 +1,3 @@
+#!/bin/bash
+echo 'Lee@122598' | sudo -S docker exec crc_db_standalone psql -U crc_user -d crc_db -c "UPDATE request SET tier_1_approval = 'leeanh1002@gmail.com', tier_2_approval = 'leeanh1002@gmail.com', tier_3_approval = 'leeanh1002@gmail.com', sr_owner = 'leeanh1002@gmail.com', requester = 'leeanh1002@gmail.com', sr_creater = 'leeanh1002@gmail.com' WHERE request_id IN (SELECT request_id FROM request LIMIT 5000);"
+echo 'Lee@122598' | sudo -S docker exec crc_db_standalone psql -U crc_user -d crc_db -c "SELECT request_id, sr_status, tier_1_status, log FROM request WHERE log IS NOT NULL LIMIT 5;"

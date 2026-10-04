@@ -1,0 +1,69 @@
+ID,,Module,Location,Test case,Field,Input,Steps,Expected,Actual,Date,Time,Count,Error/Log,DB,Result,Bug,Fix,DEV-NOTE
+ARQ-138,UI,Request,Add request button,Kiểm tra bố cục hiển thị list Process Type,Add request form,Danh sách các lựa chọn,"- Mở Process type
+- Quan sát",Mỗi Process Type hợp lệ được hiển thị đúng số lượng; không xuất hiện item bị double ngoài chủ đích,Fail,,,1,,,,Process type bị trùng về giao diện hiển thị,,Process khác nhau về các thông tin chi tiết bên trong
+ARQ-170,VAL,Request,Add request button,Upload file không thuộc định dạng cho phép,Add request form,TXT/ZIP/EXE,Chọn file,File bị từ chối và hiển thị validation phù hợp,Fail,,,1,,,,Lỗi nhận được  mọi định dạng file,,Check lại thông tin từ aNeo để setup có giới hạn hay không?
+ARQ-171,FUN,Request,Add request button,Xoá file sau khi upload,Add request form,Đã upload file,Xoá file,Có nút hoặc biểu tượng để xoá file,Fail,,,1,,,,Không có thao tác/nút Xóa file trực tiếp; người dùng chỉ có thể thay thế file hoặc đóng panel,,
+ARQ-179,VAL,Request,Add request button,Submit khi xoá Process Type,Add request form,Không chọn,"- Chọn 1 process type bất kỳ
+- Xoá process type
+- Click submit",Không cho Submit,Fail,,,1,,,,"Hệ thống vẫn ghi nhận process type, vẫn submit thành công",,
+ARQ-181,VAL,Request,Add request button,Kt comment và file sau submit,Add request form,Điền đầy đủ thông tin,"- Upload file 
+- Click submit",Hiển thị comment và file đã upload,Fail,,,,,,,Không có hiển thị file đã upload,,
+SR-226,FUN,Request,Request Detail,Ghi nhận Submit Date sau khi Submit,Request,Submit thành công,Submit → Confirm,Submit Date được ghi nhận ngay với ngày/giờ thực tế hệ thống,Fail,,,1,,,,"Chỉ có ghi nhận ngày, ko có ghi nhận giờ submit",,Check lại với aNeo có hiển thị time hay không
+SR-241,FUN,Request,Request Detail, KT Submit Date sau Withdraw,Request,Request đã Withdraw,Withdraw → Confirm,Submit Date được xoá ,Fail,,,1,,,,Submit date vẫn giữ của lần submit trc đó,,
+SR-247,FUN,Request,Request Detail,Chỉnh sửa Requester,Edit,Requester hợp lệ,Chọn Requester mới → Save Draft,Requester được cập nhật,Fail,,,1,,,,"Không cho phép chỉnh sửa dù vẫn draft, hiển thị thông báo:"" Chỉ có thể chỉnh sửa yêu cầu ở trạng thái Draft hoặc Pending Approval (khi chưa có cấp nào duyệt).""",,
+SR-248,FUN,Request,Request Detail,Chỉnh sửa My Company,Edit,Company hợp lệ,Chọn Company mới → Save Draft,My Company được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-249,FUN,Request,Request Detail,Chỉnh sửa Process Type,Edit,Process Type hợp lệ,Chọn Process Type mới → Save Draft,Process Type được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-250,FUN,Request,Request Detail,Chỉnh sửa Description,Edit,Description mới,Nhập Description → Save Draft,Description được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-251,FUN,Request,Request Detail,Chỉnh sửa nhiều field cùng lúc,Edit,Nhiều field mới,Thay đổi nhiều field → Save Draft,Tất cả dữ liệu được cập nhật chính xác,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-252,FUN,Request,Request Detail,Thêm Comment khi Edit,Edit,Comment hợp lệ,Nhập Comment → Save Draft,Comment được lưu theo Request,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-253,FUN,Request,Request Detail,Thêm File khi Edit,Edit,File hợp lệ ≤ 10MB,Upload File → Save Draft,File được upload và gắn vào Request,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-256,FUN,Request,Request Detail,Save Draft sau khi chỉnh sửa,Edit,Dữ liệu hợp lệ,Click Save Draft,Dữ liệu được lưu nhưng Request vẫn ở trạng thái Draft,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-257,FUN,Request,Request Detail,Save Draft nhiều lần liên tiếp,Edit,Dữ liệu hợp lệ,Click Save Draft liên tục,Không tạo duplicate Request / duplicate dữ liệu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-258,FUN,Request,Request Detail,Refresh sau Save Draft,Edit,Request Draft,Save Draft → Refresh,Dữ liệu vừa chỉnh sửa vẫn được hiển thị chính xác,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-261,FUN,Request,Request Detail,Không nhập Requester,Edit,Empty,Xóa Requester → Save Draft,Requester được chọn mặc đinh ban đầu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-262,FUN,Request,Request Detail,Không nhập My Company,Edit,Empty,Xóa Company → Save Draft,My Company được chọn mặc đinh ban đầu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-263,FUN,Request,Request Detail,Không nhập Process Type,Edit,Empty,Xóa Process Type → Save Draft,Process Type được chọn mặc đinh ban đầu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-264,FUN,Request,Request Detail,Không nhập Description,Edit,Empty,Xóa Description → Save Draft,"Hiển thị validation, không cho lưu",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-265,FUN,Request,Request Detail,Description chỉ chứa khoảng trắng,Edit,Empty,Nhập khoảng trắng → Save Draft,Không cho lưu nếu blank không hợp lệ,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-267,FUN,Request,Request Detail,Upload File sai định dạng,Edit,EXE/ZIP/MP4...,Upload File,File bị từ chối và hiển thị validation,Fail,,,1,,,,File ko hợp lệ vẫn upload đc (vd: exe),,
+SR-275,FUN,Request,Request Detail,Submit sau khi Edit,Edit,Dữ liệu hợp lệ,Edit → Submit,"Request chuyển từ Draft → Pending Approval, dữ liệu Edit được lưu",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-279,FUN,Request,Request Detail,Submit khi File upload đang lỗi,Edit,File không hợp lệ,Upload → Submit,Không Submit Request với file lỗi; hiển thị lỗi phù hợp,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-280,FUN,Request,Request Detail,Submit liên tục sau khi Edit,Edit,Dữ liệu hợp lệ,Click Submit nhiều lần,"Chỉ tạo một lần Submit, không duplicate log/request",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-284,FUN,Request,Request Detail,Submit khi dữ liệu Request đã bị thay đổi từ tab khác,Request,Dữ liệu stale,Tab A sửa → Tab B Submit,"Hệ thống xử lý dữ liệu stale đúng rule, không âm thầm ghi đè dữ liệu mới",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-336,FUN,Request,Request Detail,Ghi nhận Submit Date sau khi Submit,Request,Submit thành công,Submit → Confirm,Submit Date được ghi nhận ngay với ngày/giờ thực tế hệ thống,Fail,,,1,,,,"Chỉ ghi nhận ngày, ko ghi nhận giờ",,
+SR-351,FUN,Request,Request Detail, KT Submit Date sau Withdraw,Request,Request đã Withdraw,Withdraw → Confirm,Submit Date được xoá ,Fail,,,1,,,,,,
+SR-357,FUN,Request,Request Detail,Chỉnh sửa Requester,Edit,Requester hợp lệ,Chọn Requester mới → Save Draft,Requester được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-358,FUN,Request,Request Detail,Chỉnh sửa My Company,Edit,Company hợp lệ,Chọn Company mới → Save Draft,My Company được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-359,FUN,Request,Request Detail,Chỉnh sửa Process Type,Edit,Process Type hợp lệ,Chọn Process Type mới → Save Draft,Process Type được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-360,FUN,Request,Request Detail,Chỉnh sửa Description,Edit,Description mới,Nhập Description → Save Draft,Description được cập nhật,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-361,FUN,Request,Request Detail,Chỉnh sửa nhiều field cùng lúc,Edit,Nhiều field mới,Thay đổi nhiều field → Save Draft,Tất cả dữ liệu được cập nhật chính xác,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-362,FUN,Request,Request Detail,Thêm Comment khi Edit,Edit,Comment hợp lệ,Nhập Comment → Save Draft,Comment được lưu theo Request,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-363,FUN,Request,Request Detail,Thêm File khi Edit,Edit,File hợp lệ ≤ 10MB,Upload File → Save Draft,File được upload và gắn vào Request,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-364,FUN,Request,Request Detail,Save Draft sau khi chỉnh sửa,Edit,Dữ liệu hợp lệ,Click Save Draft,Dữ liệu được lưu nhưng Request vẫn ở trạng thái Draft,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-365,FUN,Request,Request Detail,Save Draft nhiều lần liên tiếp,Edit,Dữ liệu hợp lệ,Click Save Draft liên tục,Không tạo duplicate Request / duplicate dữ liệu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-366,FUN,Request,Request Detail,Refresh sau Save Draft,Edit,Request Draft,Save Draft → Refresh,Dữ liệu vừa chỉnh sửa vẫn được hiển thị chính xác,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-369,FUN,Request,Request Detail,Không nhập Requester,Edit,Empty,Xóa Requester → Save Draft,Requester được chọn mặc đinh ban đầu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-370,FUN,Request,Request Detail,Không nhập My Company,Edit,Empty,Xóa Company → Save Draft,My Company được chọn mặc đinh ban đầu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-371,FUN,Request,Request Detail,Không nhập Process Type,Edit,Empty,Xóa Process Type → Save Draft,Process Type được chọn mặc đinh ban đầu,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-372,FUN,Request,Request Detail,Không nhập Description,Edit,Empty,Xóa Description → Save Draft,"Hiển thị validation, không cho lưu",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-373,FUN,Request,Request Detail,Description chỉ chứa khoảng trắng,Edit,Empty,Nhập khoảng trắng → Save Draft,Không cho lưu nếu blank không hợp lệ,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-375,FUN,Request,Request Detail,Upload File sai định dạng,Edit,EXE/ZIP/MP4...,Upload File,File bị từ chối và hiển thị validation,Fail,,,1,,,,Vẫn uplod đc file sai định dạng,,
+SR-380,FUN,Request,Request Detail,Submit sau khi Edit,Edit,Dữ liệu hợp lệ,Edit → Submit,"Request chuyển từ Draft → Pending Approval, dữ liệu Edit được lưu",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-381,FUN,Request,Request Detail,Submit khi File upload đang lỗi,Request,File không hợp lệ,Upload → Submit,Không Submit Request với file lỗi; hiển thị lỗi phù hợp,Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-382,FUN,Request,Request Detail,Submit liên tục sau khi Edit,Request,Dữ liệu hợp lệ,Click Submit nhiều lần,"Chỉ tạo một lần Submit, không duplicate log/request",Fail,,,1,,,,Không cho phép chỉnh sửa dù vẫn draft,,
+SR-386,FUN,Request,Request Detail,Submit khi dữ liệu Request đã bị thay đổi từ tab khác,Request,Dữ liệu stale,Tab A sửa → Tab B Submit,"Hệ thống xử lý dữ liệu stale đúng rule, không âm thầm ghi đè dữ liệu mới",Fail,,,1,,,,,,
+SR-398,FUN,Request,Request Detail,Delete request ở trạng thái Draft,Request,Draft có sẵn,"- Chọn request đang ở trạng thái Draft
+- Click Delete
+","Hệ thống thực hiện Delete theo business, request không còn ở trạng thái hoạt động",Fail,,,1,,,,Không thực hiện xoá được dù đang ở trạng thái draft,,
+SR-400,FUN,Request,Request Detail,Delete request đã có Comment/Attached Link/File,Request,"Upload file, link, comment",Click Delete,"Hệ thống thực hiện Delete theo business, request không còn ở trạng thái hoạt động",Fail,,,1,,,,Không thực hiện xoá được dù đang ở trạng thái draft,,
+SR-402,VAL,Request,Request Detail,Delete request – kiểm tra dữ liệu sau khi Delete,Request,N/A,Refresh trang / tìm request trên My Requests,Không còn hiển thị Request,Fail,,,1,,,,Không thực hiện xoá được dù đang ở trạng thái draft,,
+SR-403,VAL,Request,Request Detail,Delete request – mở lại URL trực tiếp,Request,N/A,"- Delete request 
+- Copy URL request 
+- mở lại",Không được phép truy cập request theo rule; hiển thị trạng thái/thông báo phù hợp,Fail,,,1,,,,Không thực hiện xoá được dù đang ở trạng thái draft,,
+SR-410,FUN,Request,Request Detail,Delete – Confirm,Request,N/A,Click Confirm,Delete được thực hiện thành công,Fail,,,1,,,,Không thực hiện xoá được dù đang ở trạng thái draft,,
+SR-411,FUN,Request,Request Detail,KT Hard Delete trong request detail,Request,Request có sẵn,"-Mở request 
+- Click Hard Delete 
+- Confirm",Request bị xóa vĩnh viễn ,Fail,,,1,,,,Hiển thị thông báo từ chối,,
+SR-420,FUN,Request,Request Detail,Delete sau đó Hard Delete,Request,N/A,Delete → sau đó Hard Delete,Request chuyển từ trạng thái Delete sang xóa vĩnh viễn đúng flow,Fail,,,1,,,,Không thực hiện xoá được dù đang ở trạng thái draft,,
+SR-466,FUN,Request,Request Detail,Thay đổi thông tin request sau Withdraw,Request,N/A,Thay đổi Description / thông tin request → Save Draft,Dữ liệu mới được lưu; request vẫn ở trạng thái Draft,Fail,,,,,,Lỗi ko save draft edit đc dù đang là draft,,,
+SR-469,FUN,Request,Request Detail,Submit lại request sau Withdraw,Request,N/A,Withdraw → Edit → chỉnh sửa → Submit,Request trở lại Pending Approval và approval flow được kích hoạt lại,Fail,,,,,,Ko submit đc,,,
