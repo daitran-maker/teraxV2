@@ -10,7 +10,8 @@
     "qa:routes": "node scripts/qa/route-inventory.js --check",
     "qa:routes:baseline": "node scripts/qa/route-inventory.js --write",
     "qa:smoke": "node scripts/qa/smoke.js",
-    "qa": "npm run qa:requires && npm run qa:routes"
+    "qa": "npm run qa:requires && npm run qa:routes",
+    "qa:clone": "node scripts/qa/clone-test.js . qa/clone.current.json"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
