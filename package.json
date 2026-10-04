@@ -5,7 +5,12 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js"
+    "dev": "nodemon server/index.js",
+    "qa:requires": "node scripts/qa/require-graph.js",
+    "qa:routes": "node scripts/qa/route-inventory.js --check",
+    "qa:routes:baseline": "node scripts/qa/route-inventory.js --write",
+    "qa:smoke": "node scripts/qa/smoke.js",
+    "qa": "npm run qa:requires && npm run qa:routes"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

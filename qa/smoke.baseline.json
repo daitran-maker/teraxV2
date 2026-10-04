@@ -1,0 +1,948 @@
+{
+  "/api/branding": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/system-status": {
+    "status": 200,
+    "shape": {
+      "activeUsers": {
+        "count": "number",
+        "limit": "number",
+        "list": "array",
+        "percentage": "number"
+      },
+      "employees": {
+        "count": "number",
+        "limit": "number",
+        "percentage": "number"
+      },
+      "features": {},
+      "storage": {
+        "codeBytes": "number",
+        "dbBytes": "number",
+        "limitBytes": "number",
+        "limitGb": "number",
+        "percentage": "number",
+        "uploadsBytes": "number",
+        "usedBytes": "number"
+      },
+      "tenant": {
+        "base_currency": "string",
+        "billing_status": "string",
+        "company_name": "string",
+        "customer_id": "null",
+        "deleted_at": "null",
+        "features": "object",
+        "id": "string",
+        "last_billing_amount": "string",
+        "last_sync_signature": "null",
+        "last_sync_timestamp": "null",
+        "log": "array",
+        "logo": "null",
+        "next_payment_date": "null",
+        "plan_id": "null",
+        "plan_name": "string",
+        "subscription_start_date": "null",
+        "subscription_status": "string",
+        "super_admin_email": "null",
+        "tenant_api_key": "string",
+        "tenant_domain": "string",
+        "updated_at": "string",
+        "user_limit": "null"
+      }
+    }
+  },
+  "/api/schema": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/permissions": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/my-company": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "account": "number",
+        "address": "string",
+        "base_currency": "string",
+        "city": "string",
+        "company_fullname": "string",
+        "company_shortname": "string",
+        "country": "string",
+        "currency_list": "null",
+        "deleted_at": "null",
+        "department": "number",
+        "employee": "number",
+        "log": "array",
+        "logo": "string",
+        "my_company_id": "string",
+        "my_location": "number",
+        "operation_program": "number",
+        "policy": "number",
+        "province": "string",
+        "state": "null",
+        "status": "number",
+        "tax_code": "string",
+        "website": "null"
+      }
+    }
+  },
+  "/api/departments": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "company_id": "string",
+        "company_shortname": "string",
+        "deleted_at": "null",
+        "department_code": "string",
+        "department_id": "string",
+        "department_label": "string",
+        "department_name": "string",
+        "log": "array",
+        "manager_email": "null",
+        "type": "string"
+      }
+    }
+  },
+  "/api/employees": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "app_user_enabled": "boolean",
+        "avatar": "null",
+        "company_id": "string",
+        "company_shortname": "string",
+        "deleted_at": "null",
+        "department_id": "string",
+        "department_name": "string",
+        "direct_manager": "string",
+        "display_label": "string",
+        "email": "string",
+        "employee_code": "null",
+        "employee_id": "string",
+        "employee_level": "string",
+        "full_name": "string",
+        "gen": "string",
+        "head_manager": "null",
+        "location_base": "string",
+        "manager_name": "string",
+        "nick_name": "null",
+        "phone": "null",
+        "position": "string",
+        "role": "string",
+        "status": "number",
+        "username": "string"
+      }
+    }
+  },
+  "/api/companies": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "address": "string",
+        "city": "string",
+        "company_fullname": "string",
+        "company_id": "string",
+        "company_shortname": "string",
+        "country": "string",
+        "deleted_at": "null",
+        "log": "array",
+        "logo": "null",
+        "province": "string",
+        "state": "null",
+        "tax_code": "null",
+        "type": "string",
+        "website": "null"
+      }
+    }
+  },
+  "/api/contacts": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "birthday": "string",
+        "company_id": "string",
+        "company_shortname": "string",
+        "contact_id": "string",
+        "deleted_at": "null",
+        "email": "string",
+        "gen": "string",
+        "log": "array",
+        "mobile_no": "string",
+        "name": "string",
+        "title": "string"
+      }
+    }
+  },
+  "/api/policies": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "approval_level": "string",
+        "company_id": "string",
+        "company_shortname": "string",
+        "coordinator": "null",
+        "deleted_at": "null",
+        "department_id": "string",
+        "department_name": "string",
+        "description": "string",
+        "elements": "string",
+        "id__request": "null",
+        "log": "array",
+        "policy_id": "string",
+        "policy_lead": "string",
+        "policy_lead_name": "string",
+        "policy_name": "string",
+        "policy_type": "string",
+        "priority": "null",
+        "procedure_file": "null",
+        "procedure_link": "null",
+        "request_count": "number",
+        "server": "null",
+        "sla": "string",
+        "sr_owner": "string",
+        "sr_owner_name": "string",
+        "subscription": "null",
+        "tier1_approval": "string",
+        "tier1_name": "null",
+        "tier2_approval": "string",
+        "tier2_name": "string",
+        "tier3_approval": "string",
+        "tier3_name": "string"
+      }
+    }
+  },
+  "/api/notifications": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "limit": "number",
+      "notifications": {
+        "array": "object"
+      },
+      "page": "number",
+      "total": "number",
+      "totalPages": "number",
+      "unreadCount": "number",
+      "unread_count": "number"
+    }
+  },
+  "/api/my-views": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/cms-lookups": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/actions": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/nonexistent-route-check": {
+    "status": 404,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/schema/tables": {
+    "status": 200,
+    "shape": {
+      "account": {
+        "array": "object"
+      },
+      "action_rules": {
+        "array": "object"
+      },
+      "asset": {
+        "array": "object"
+      },
+      "column_permissions": {
+        "array": "object"
+      },
+      "company": {
+        "array": "object"
+      },
+      "contact": {
+        "array": "object"
+      },
+      "contract": {
+        "array": "object"
+      },
+      "customize": {
+        "array": "object"
+      },
+      "department": {
+        "array": "object"
+      },
+      "employee": {
+        "array": "object"
+      },
+      "exception_rules": {
+        "array": "object"
+      },
+      "expense": {
+        "array": "object"
+      },
+      "invoice": {
+        "array": "object"
+      },
+      "mtr": {
+        "array": "object"
+      },
+      "my_company": {
+        "array": "object"
+      },
+      "my_location": {
+        "array": "object"
+      },
+      "my_product_and_service": {
+        "array": "object"
+      },
+      "operation_program": {
+        "array": "object"
+      },
+      "oppotunity": {
+        "array": "object"
+      },
+      "payment": {
+        "array": "object"
+      },
+      "permission_exceptions": {
+        "array": "object"
+      },
+      "permission_levels": {
+        "array": "object"
+      },
+      "permission_positions": {
+        "array": "object"
+      },
+      "permission_roles": {
+        "array": "object"
+      },
+      "policy_and_program": {
+        "array": "object"
+      },
+      "project": {
+        "array": "object"
+      },
+      "request": {
+        "array": "object"
+      },
+      "service": {
+        "array": "object"
+      },
+      "v_department": {
+        "array": "object"
+      },
+      "v_finance": {
+        "array": "object"
+      }
+    }
+  },
+  "/api/permissions/my-slices": {
+    "status": 200,
+    "shape": {
+      "account": "boolean",
+      "action_rules": "boolean",
+      "asset": "boolean",
+      "assigned_task": "boolean",
+      "cms_tenant_info": "boolean",
+      "comment": "boolean",
+      "company": "boolean",
+      "contact": "boolean",
+      "department": "boolean",
+      "employee": "boolean",
+      "employee_active": "boolean",
+      "exception_rules": "boolean",
+      "finance": "boolean",
+      "finance_logs": "boolean",
+      "invoice": "boolean",
+      "logs": "boolean",
+      "mtr": "boolean",
+      "my_approval": "boolean",
+      "my_company": "boolean",
+      "my_location": "boolean",
+      "my_process_owner": "boolean",
+      "my_request": "boolean",
+      "my_task": "boolean",
+      "my_team": "boolean",
+      "operation_program": "boolean",
+      "opportunity_list": "boolean",
+      "payment": "boolean",
+      "permissions": "boolean",
+      "policy": "boolean",
+      "request": "boolean",
+      "request_activity_log": "boolean",
+      "request_rating": "boolean",
+      "service": "boolean",
+      "support": "boolean",
+      "target_table": "boolean",
+      "task_subtask": "boolean"
+    }
+  },
+  "/api/permissions/my-action-permissions": {
+    "status": 200,
+    "shape": {
+      "act-request-016": {
+        "my_approval": "boolean",
+        "my_process_owner": "boolean",
+        "my_request": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean",
+        "request": "boolean"
+      },
+      "act-request-02": {
+        "my_process_owner": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-03": {
+        "my_approval": "boolean",
+        "my_process_owner": "boolean",
+        "my_request": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-03-re": {
+        "my_approval": "boolean",
+        "my_process_owner": "boolean",
+        "my_request": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-04": {
+        "my_process_owner": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-05": {
+        "my_process_owner": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-06": {
+        "my_request": "boolean"
+      },
+      "act-request-07": {
+        "my_process_owner": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-08": {
+        "my_process_owner": "boolean",
+        "my_task": "boolean",
+        "my_team": "boolean"
+      },
+      "act-request-09": {
+        "my_request": "boolean"
+      },
+      "add": {
+        "account": "boolean",
+        "account@account": "boolean",
+        "action_rules": "boolean",
+        "action_rules@action_rules": "boolean",
+        "asset": "boolean",
+        "asset@request": "boolean",
+        "assigned_task": "boolean",
+        "assigned_task@request": "boolean",
+        "company": "boolean",
+        "company@company": "boolean",
+        "contact": "boolean",
+        "contact@contact": "boolean",
+        "contract": "boolean",
+        "contract@request": "boolean",
+        "department": "boolean",
+        "department@department": "boolean",
+        "employee": "boolean",
+        "employee@employee": "boolean",
+        "employee_active": "boolean",
+        "employee_active@employee_active": "boolean",
+        "exception_rules": "boolean",
+        "exception_rules@exception_rules": "boolean",
+        "expense": "boolean",
+        "expense@request": "boolean",
+        "finance": "boolean",
+        "finance@finance": "boolean",
+        "finance_logs": "boolean",
+        "finance_logs@finance_logs": "boolean",
+        "invoice": "boolean",
+        "invoice@request": "boolean",
+        "mtr": "boolean",
+        "mtr@request": "boolean",
+        "my_approval": "boolean",
+        "my_approval@my_approval": "boolean",
+        "my_company": "boolean",
+        "my_company@my_company": "boolean",
+        "my_location": "boolean",
+        "my_location@my_location": "boolean",
+        "my_process_owner": "boolean",
+        "my_process_owner@my_process_owner": "boolean",
+        "my_request": "boolean",
+        "my_request@my_request": "boolean",
+        "my_task": "boolean",
+        "my_task@my_process_owner": "boolean",
+        "my_task@my_task": "boolean",
+        "my_team": "boolean",
+        "my_team@my_team": "boolean",
+        "opportunity_list": "boolean",
+        "opportunity_list@opportunity_list": "boolean",
+        "payment": "boolean",
+        "payment@request": "boolean",
+        "permissions": "boolean",
+        "permissions@permissions": "boolean",
+        "policy": "boolean",
+        "policy@policy": "boolean",
+        "request": "boolean",
+        "request@my_request": "boolean",
+        "service": "boolean",
+        "service@request": "boolean",
+        "support": "boolean",
+        "support@support": "boolean",
+        "target_table": "boolean",
+        "target_table@request": "boolean",
+        "task_subtask": "boolean",
+        "task_subtask@task_subtask": "boolean"
+      },
+      "approve_request": {
+        "my_approval": "boolean"
+      },
+      "change_sr_owner": {
+        "my_team": "boolean"
+      },
+      "delete": {
+        "account": "boolean",
+        "account@account": "boolean",
+        "action_rules": "boolean",
+        "action_rules@action_rules": "boolean",
+        "asset": "boolean",
+        "asset@request": "boolean",
+        "assigned_task": "boolean",
+        "assigned_task@request": "boolean",
+        "comment": "boolean",
+        "comment@comment": "boolean",
+        "company": "boolean",
+        "company@company": "boolean",
+        "contact": "boolean",
+        "contact@contact": "boolean",
+        "contract": "boolean",
+        "contract@request": "boolean",
+        "department": "boolean",
+        "department@department": "boolean",
+        "employee": "boolean",
+        "employee@employee": "boolean",
+        "employee_active": "boolean",
+        "employee_active@employee_active": "boolean",
+        "exception_rules": "boolean",
+        "exception_rules@exception_rules": "boolean",
+        "expense": "boolean",
+        "expense@request": "boolean",
+        "finance": "boolean",
+        "finance@finance": "boolean",
+        "finance_logs": "boolean",
+        "finance_logs@finance_logs": "boolean",
+        "invoice": "boolean",
+        "invoice@request": "boolean",
+        "mtr": "boolean",
+        "mtr@request": "boolean",
+        "my_approval": "boolean",
+        "my_approval@my_approval": "boolean",
+        "my_company": "boolean",
+        "my_company@my_company": "boolean",
+        "my_location": "boolean",
+        "my_location@my_location": "boolean",
+        "my_process_owner": "boolean",
+        "my_process_owner@my_process_owner": "boolean",
+        "my_request": "boolean",
+        "my_request@my_request": "boolean",
+        "my_task": "boolean",
+        "my_task@my_process_owner": "boolean",
+        "my_task@my_task": "boolean",
+        "my_team": "boolean",
+        "my_team@my_team": "boolean",
+        "opportunity_list": "boolean",
+        "opportunity_list@opportunity_list": "boolean",
+        "payment": "boolean",
+        "payment@request": "boolean",
+        "permissions": "boolean",
+        "permissions@permissions": "boolean",
+        "policy": "boolean",
+        "policy@policy": "boolean",
+        "request": "boolean",
+        "request@my_request": "boolean",
+        "service": "boolean",
+        "service@request": "boolean",
+        "target_table": "boolean",
+        "target_table@request": "boolean",
+        "task_subtask": "boolean",
+        "task_subtask@task_subtask": "boolean"
+      },
+      "edit": {
+        "account": "boolean",
+        "account@account": "boolean",
+        "action_rules": "boolean",
+        "action_rules@action_rules": "boolean",
+        "asset": "boolean",
+        "asset@request": "boolean",
+        "assigned_task": "boolean",
+        "assigned_task@request": "boolean",
+        "company": "boolean",
+        "company@company": "boolean",
+        "contact": "boolean",
+        "contact@contact": "boolean",
+        "contract": "boolean",
+        "contract@request": "boolean",
+        "department": "boolean",
+        "department@department": "boolean",
+        "employee": "boolean",
+        "employee@employee": "boolean",
+        "employee_active": "boolean",
+        "employee_active@employee_active": "boolean",
+        "exception_rules": "boolean",
+        "exception_rules@exception_rules": "boolean",
+        "expense": "boolean",
+        "expense@request": "boolean",
+        "finance": "boolean",
+        "finance@finance": "boolean",
+        "finance_logs": "boolean",
+        "finance_logs@finance_logs": "boolean",
+        "invoice": "boolean",
+        "invoice@request": "boolean",
+        "mtr": "boolean",
+        "mtr@request": "boolean",
+        "my_approval": "boolean",
+        "my_approval@my_approval": "boolean",
+        "my_company": "boolean",
+        "my_company@my_company": "boolean",
+        "my_location": "boolean",
+        "my_location@my_location": "boolean",
+        "my_process_owner": "boolean",
+        "my_process_owner@my_process_owner": "boolean",
+        "my_request": "boolean",
+        "my_request@my_request": "boolean",
+        "my_task": "boolean",
+        "my_task@my_process_owner": "boolean",
+        "my_task@my_task": "boolean",
+        "my_team": "boolean",
+        "my_team@my_team": "boolean",
+        "opportunity_list": "boolean",
+        "opportunity_list@opportunity_list": "boolean",
+        "payment": "boolean",
+        "payment@request": "boolean",
+        "permissions": "boolean",
+        "permissions@permissions": "boolean",
+        "policy": "boolean",
+        "policy@policy": "boolean",
+        "request": "boolean",
+        "request@my_process_owner": "boolean",
+        "request@my_request": "boolean",
+        "request@my_task": "boolean",
+        "request@my_team": "boolean",
+        "service": "boolean",
+        "service@request": "boolean",
+        "support": "boolean",
+        "support@support": "boolean",
+        "target_table": "boolean",
+        "target_table@request": "boolean",
+        "task_subtask": "boolean",
+        "task_subtask@task_subtask": "boolean"
+      },
+      "payment_change_mtr": {
+        "payment": "boolean"
+      },
+      "payment_paid": {
+        "payment": "boolean"
+      },
+      "payment_ready": {
+        "payment": "boolean"
+      },
+      "payment_req_incoming_collection": {
+        "payment": "boolean"
+      },
+      "payment_req_incoming_status": {
+        "payment": "boolean"
+      },
+      "payment_req_outgoing": {
+        "payment": "boolean"
+      },
+      "payment_update_transaction": {
+        "payment": "boolean"
+      },
+      "reject_request": {
+        "my_approval": "boolean"
+      },
+      "update_task_status": {
+        "assigned_task": "boolean"
+      },
+      "withdraw_request": {
+        "my_request": "boolean"
+      }
+    }
+  },
+  "/api/permissions/my-columns": {
+    "status": 200,
+    "shape": {}
+  },
+  "/api/permissions/column-permissions": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "column_name": "string",
+        "deleted_at": "null",
+        "exceptions": "null",
+        "id": "string",
+        "levels": "null",
+        "log": "array",
+        "positions": "null",
+        "roles": "null",
+        "table_name": "string"
+      }
+    }
+  },
+  "/api/my-views/stats/summary": {
+    "status": 200,
+    "shape": {
+      "my_approval": "number",
+      "my_process_owner": "number",
+      "my_request": "number",
+      "my_task": "number"
+    }
+  },
+  "/api/cms-lookups/countries": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      }
+    }
+  },
+  "/api/cms-lookups/currencies": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      }
+    }
+  },
+  "/api/system-setup/status": {
+    "status": 200,
+    "shape": {
+      "isHelpdesk": "boolean",
+      "setupCompleted": "boolean",
+      "tableCounts": {
+        "account": "number",
+        "asset": "number",
+        "company": "number",
+        "contact": "number",
+        "department": "number",
+        "employee": "number",
+        "my_company": "number",
+        "my_location": "number",
+        "policy_and_program": "number",
+        "service": "number"
+      }
+    }
+  },
+  "/api/automations": {
+    "status": 200,
+    "shape": {
+      "array": {
+        "active": "boolean",
+        "code_location": "string",
+        "condition": "string",
+        "description": "string",
+        "id": "string",
+        "last_run_at": "null",
+        "name": "string",
+        "output": "string",
+        "run_count": "number",
+        "schedule": "string",
+        "source": "string",
+        "tables": "array",
+        "trigger": "string",
+        "type": "string",
+        "updated_at": "string",
+        "updated_by": "null"
+      }
+    }
+  },
+  "/api/table/account-currencies/all": {
+    "status": 200,
+    "shape": {
+      "array": "string"
+    }
+  },
+  "/api/table/request": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/payment": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/invoice": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/expense": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/contract": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/asset": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/service": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/target_table": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/employee": {
+    "status": 200,
+    "shape": {
+      "data": {
+        "array": "object"
+      },
+      "meta": {
+        "faceted_summary": "object",
+        "limit": "number",
+        "page": "number",
+        "summary": "object",
+        "total": "number",
+        "totalPages": "number"
+      }
+    }
+  },
+  "/api/table/notification": {
+    "status": 403,
+    "shape": {
+      "error": "string"
+    }
+  },
+  "/api/table/nonexistent_table_check": {
+    "status": 403,
+    "shape": {
+      "error": "string"
+    }
+  }
+}
