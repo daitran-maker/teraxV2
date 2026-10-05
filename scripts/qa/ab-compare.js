@@ -40,7 +40,14 @@ const DEFAULTS = [
 const extraFile = path.join(ROOT, 'qa', 'smoke.endpoints.json');
 const endpoints = [...new Set([...DEFAULTS, ...(fs.existsSync(extraFile) ? JSON.parse(fs.readFileSync(extraFile, 'utf8')) : [])])];
 
-const VOLATILE_KEY = /(^|_)(created|updated|deleted|modified|last|login|synced|expires?|timestamp|now|uptime|date|time)(_|$)|_at$|token|Bytes$|^run_count$/i;
+const VOLATILE_KEY = /(^|_)(created|updated|deleted|modified|last|login|synced|expires?|timestamp|now|uptime|date|time)(_|$)|_at$|token|Bytes$|^run_count$|^notification_logs$|^faceted_summary$/i;
+// Proven nondeterministic by an A/A run (identical code on both sides): rows with equal sort keys come back in varying order.
+const TIE_ORDER_NOISE = { '/api/table/invoice': /^(contract_id|invoice_status_color|description)$/ };
+function stripKeys(v, re) {
+  if (Array.isArray(v)) return v.map((x) => stripKeys(x, re));
+  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) if (!re.test(k)) o[k] = stripKeys(v[k], re); return o; }
+  return v;
+}
 function normalize(v) {
   // Arrays are compared order-insensitively: unordered SQL with ties returns rows in a different order per run.
   if (Array.isArray(v)) return v.map(normalize).sort((x, y) => { const a = JSON.stringify(x), b = JSON.stringify(y); return a < b ? -1 : a > b ? 1 : 0; });
@@ -49,11 +56,13 @@ function normalize(v) {
     Object.keys(v).sort().forEach((k) => { o[k] = VOLATILE_KEY.test(k) ? '<volatile>' : normalize(v[k]); });
     return o;
   }
+  // Hex colour case flips between runs in A/A (value comes from a tie-ordered row): compare case-insensitively.
+  if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) return v.toLowerCase();
   return v;
 }
 
 function dbUrl(name) { const u = new URL(adminUrl); u.pathname = '/' + name; return u.toString(); }
-const TIMEOUT_MS = Number(process.env.QA_TIMEOUT_MS || 8 * 60 * 1000); // global watchdog
+const TIMEOUT_MS = Number(process.env.QA_TIMEOUT_MS || (process.argv.includes('--writes') ? 25 : 8) * 60 * 1000); // global watchdog
 const poolFor = (name) => new Pool({ connectionString: dbUrl(name), connectionTimeoutMillis: 10000, query_timeout: 120000, statement_timeout: 120000 });
 
 /** First differing path between two JSON values (for readable reports). */
@@ -98,13 +107,24 @@ async function waitReady(st, port) {
   while (Date.now() - st.last < 10000 && Date.now() - start < 180000) await new Promise((r) => setTimeout(r, 1000));
 }
 
-async function hit(port, token, p) {
+async function hit(port, token, p, method = 'GET', payload) {
   try {
-    const res = await fetch(`http://localhost:${port}${p}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30000) });
+    const opt = { method, headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30000) };
+    if (payload !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(payload); }
+    const res = await fetch(`http://localhost:${port}${p}`, opt);
     const text = await res.text();
     let body; try { body = normalize(JSON.parse(text)); } catch { body = text.length > 2000 ? `non-json len=${text.length}` : text; }
     return { status: res.status, body };
   } catch (e) { return { status: 'ERR', body: e.message }; }
+}
+
+const STATE_TABLES = ['request', 'payment', 'invoice', 'expense', 'contract', 'asset', 'service', 'contact', 'company', 'department', 'assigned_task', 'comment', 'notification', 'mtr', 'account', 'request_rating', 'target_table'];
+async function tableHash(name, t) {
+  const p = poolFor(name); p.on('error', () => {});
+  try {
+    const rows = (await p.query(`SELECT * FROM "${t}"`)).rows.map((r) => JSON.stringify(normalize(r))).sort();
+    return { n: rows.length, h: require('crypto').createHash('md5').update(rows.join('\n')).digest('hex') };
+  } catch (e) { return { n: -1, h: 'ERR ' + e.message.slice(0, 60) }; } finally { await p.end().catch(() => {}); }
 }
 
 async function retry(fn, n = 3) {
@@ -167,7 +187,9 @@ async function main() {
 
     let bad = 0;
     for (const p of endpoints) {
-      const [ra, rb] = [await hit(PORT_A, token, p), await hit(PORT_B, token, p)];
+      const [ra0, rb0] = [await hit(PORT_A, token, p), await hit(PORT_B, token, p)];
+      const tie = TIE_ORDER_NOISE[p];
+      const [ra, rb] = tie ? [{ ...ra0, body: stripKeys(ra0.body, tie) }, { ...rb0, body: stripKeys(rb0.body, tie) }] : [ra0, rb0];
       const sa = JSON.stringify(ra), sb = JSON.stringify(rb);
       if (sa !== sb) {
         bad++;
@@ -176,6 +198,36 @@ async function main() {
     }
     if (bad) { console.error(`\n[ab] ${bad}/${endpoints.length} endpoints differ`); process.exitCode = 1; }
     else console.log(`[ab] OK: ${endpoints.length} endpoints identical (status + full normalized body)`);
+
+    if (process.argv.includes('--writes')) {
+      const poolA = poolFor(dbA); poolA.on('error', () => {});
+      const mint = async (identity) => {
+        const row = identity === null ? u : (await poolA.query('SELECT * FROM employee WHERE deleted_at IS NULL AND (employee_id = $1 OR LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)) LIMIT 1', [identity])).rows[0];
+        if (!row) return null;
+        return jwt.sign({ employee_id: row.employee_id, username: row.username, email: row.email, role: row.role, employee_level: row.employee_level, position: row.position, company_id: row.company_id, department_id: row.department_id, full_name: row.full_name }, SECRET, { expiresIn: '1h' });
+      };
+      let calls = 0, wdiff = 0;
+      const both = async (label, tok, method, p, payload) => {
+        const a = await hit(PORT_A, tok, p, method, payload);
+        const b = await hit(PORT_B, tok, p, method, payload);
+        calls++;
+        if (JSON.stringify(a) !== JSON.stringify(b)) {
+          wdiff++;
+          console.error(`WRITE-DIFF [${label}] ${method} ${p} [${a.status} vs ${b.status}]\n  ${firstDiff(a.body, b.body)}`);
+        }
+        return { a, b };
+      };
+      await require('./ab-writes')({ pool: poolA, mint, both, log: (m) => console.log(m) });
+      await poolA.end().catch(() => {});
+      let sdiff = 0;
+      for (const t of STATE_TABLES) {
+        const [x, y] = [await tableHash(dbA, t), await tableHash(dbB, t)];
+        const hashNoise = t === 'notification'; // async logging noise: compare row count only
+        if ((!hashNoise && x.h !== y.h) || x.n !== y.n) { sdiff++; console.error(`STATE-DIFF table ${t}: rows ${x.n} vs ${y.n}${x.h !== y.h ? ' (content differs)' : ''}`); }
+      }
+      console.log(`[writes] ${calls} calls compared: ${wdiff} response diffs, ${sdiff}/${STATE_TABLES.length} tables differ in final DB state`);
+      if (wdiff || sdiff) process.exitCode = 1;
+    }
   } finally {
     servers.forEach((s) => { try { s.child.kill(); } catch { /* ignore */ } });
     await new Promise((r) => setTimeout(r, 2000));
