@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
-const { generateSequentialId } = require('../helpers/idGenerator');
-const { broadcastSSE } = require('../helpers/sseHelper');
-const { validateTableData } = require('../helpers/validation');
-const { checkPermission } = require('../helpers/permissionHelper');
-const { getRecordAuditLogs } = require('../helpers/auditHelper');
+const pool = require('../../../server/db');
+const { generateSequentialId } = require('../../../server/helpers/idGenerator');
+const { broadcastSSE } = require('../../../server/helpers/sseHelper');
+const { validateTableData } = require('../../../server/helpers/validation');
+const { checkPermission } = require('../../../server/helpers/permissionHelper');
+const { getRecordAuditLogs } = require('../../../server/helpers/auditHelper');
 
 function normalizeCompanyRecord(rec) {
   if (!rec) return rec;

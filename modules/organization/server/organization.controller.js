@@ -1,8 +1,8 @@
-﻿const employeeRouter = require('../../../server/routes/employee');
-const departmentRouter = require('../../../server/routes/department');
-const companyRouter = require('../../../server/routes/company');
-const contactRouter = require('../../../server/routes/contact');
-const myCompanyRouter = require('../../../server/routes/myCompany');
+const employeeRouter = require('./employee.routes');
+const departmentRouter = require('./department.routes');
+const companyRouter = require('./company.routes');
+const contactRouter = require('./contact.routes');
+const myCompanyRouter = require('./myCompany.routes');
 
 module.exports = {
   employeeRouter,

@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 const bcrypt = require('bcryptjs');
-const { validateTableData } = require('../helpers/validation');
-const { broadcastSSE } = require('../helpers/sseHelper');
-const { generateSequentialId } = require('../helpers/idGenerator');
-const { pushAppAccessToCMS } = require('../helpers/cmsSeats');
-const { getRecordAuditLogs } = require('../helpers/auditHelper');
+const { validateTableData } = require('../../../server/helpers/validation');
+const { broadcastSSE } = require('../../../server/helpers/sseHelper');
+const { generateSequentialId } = require('../../../server/helpers/idGenerator');
+const { pushAppAccessToCMS } = require('../../../server/helpers/cmsSeats');
+const { getRecordAuditLogs } = require('../../../server/helpers/auditHelper');
 const crypto = require('crypto');
 
 const CMS_BASE_URL = process.env.CMS_BASE_URL || 'http://cms.terax.ai';
@@ -392,7 +392,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: `Dữ liệu không hợp lệ: ${errorDetails}`, details: validationErrors });
   }
 
-  const { cleanEmptyStringsForTable, convertStatusFieldsToIds } = require('./dynamic_crud');
+  const { cleanEmptyStringsForTable, convertStatusFieldsToIds } = require('../../../server/routes/dynamic_crud');
   await cleanEmptyStringsForTable('employee', data);
   convertStatusFieldsToIds('employee', data);
 
@@ -556,7 +556,7 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: `Dữ liệu không hợp lệ: ${errorDetails}`, details: validationErrors });
   }
 
-  const { cleanEmptyStringsForTable, convertStatusFieldsToIds } = require('./dynamic_crud');
+  const { cleanEmptyStringsForTable, convertStatusFieldsToIds } = require('../../../server/routes/dynamic_crud');
   await cleanEmptyStringsForTable('employee', data);
   convertStatusFieldsToIds('employee', data);
 
