@@ -1,0 +1,7 @@
+{
+  "name": "@terax/invoice",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeraX v2 module: invoice",
+  "main": "server/index.js"
+}

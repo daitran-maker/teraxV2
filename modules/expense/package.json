@@ -1,0 +1,7 @@
+{
+  "name": "@terax/expense",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeraX v2 module: expense",
+  "main": "server/index.js"
+}

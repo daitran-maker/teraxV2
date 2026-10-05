@@ -1,0 +1,7 @@
+{
+  "name": "@terax/identity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeraX v2 module: identity",
+  "main": "server/index.js"
+}

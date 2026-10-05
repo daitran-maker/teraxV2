@@ -1,0 +1,7 @@
+{
+  "name": "@terax/payment",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeraX v2 module: payment",
+  "main": "server/index.js"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@terax/target_table",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeraX v2 module: target_table",
+  "main": "server/index.js"
+}

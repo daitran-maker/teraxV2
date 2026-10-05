@@ -1,0 +1,7 @@
+{
+  "name": "@terax/notification",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeraX v2 module: notification",
+  "main": "server/index.js"
+}
