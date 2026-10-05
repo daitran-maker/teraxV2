@@ -11,7 +11,9 @@
     "qa:routes:baseline": "node scripts/qa/route-inventory.js --write",
     "qa:smoke": "node scripts/qa/smoke.js",
     "qa": "npm run qa:requires && npm run qa:routes",
-    "qa:clone": "node scripts/qa/clone-test.js . qa/clone.current.json"
+    "qa:clone": "node scripts/qa/clone-test.js . qa/clone.current.json",
+    "qa:clone:diff": "node scripts/qa/clone-test.js . qa/clone.current.json && node scripts/qa/clone-fingerprint.js --diff qa/clone.baseline.json qa/clone.current.json",
+    "qa:all": "npm run qa && npm run qa:clone:diff"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
