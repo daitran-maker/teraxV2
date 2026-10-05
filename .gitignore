@@ -37,3 +37,7 @@ scratch/
 public/ChatGPT*
 public/test_logo.html
 public/uploads/upload_*
+
+# QA generated output
+qa/clone.current.json
+qa/*.applog.txt

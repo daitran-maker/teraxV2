@@ -10,7 +10,8 @@
     "qa:routes": "node scripts/qa/route-inventory.js --check",
     "qa:routes:baseline": "node scripts/qa/route-inventory.js --write",
     "qa:smoke": "node scripts/qa/smoke.js",
-    "qa": "npm run qa:requires && npm run qa:routes",
+    "qa:clone-strings": "node scripts/qa/clone-strings.js",
+    "qa": "npm run qa:requires && npm run qa:routes && npm run qa:clone-strings",
     "qa:clone": "node scripts/qa/clone-test.js . qa/clone.current.json",
     "qa:clone:diff": "node scripts/qa/clone-test.js . qa/clone.current.json && node scripts/qa/clone-fingerprint.js --diff qa/clone.baseline.json qa/clone.current.json",
     "qa:all": "npm run qa && npm run qa:clone:diff"
