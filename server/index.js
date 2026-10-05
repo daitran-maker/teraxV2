@@ -19,9 +19,9 @@ const pool = require('./db');
 // Trigger server reload to apply view_name updates in DB action rules
 // Modular Monolith Core Event Bus & Subscribed Modules
 require('./core/events');
-require('./modules/notification');
-const identityModule = require('./modules/identity');
-const organizationModule = require('./modules/organization');
+require('../modules/notification/server');
+const identityModule = require('../modules/identity/server');
+const organizationModule = require('../modules/organization/server');
 
 const app = express();
 app.set('trust proxy', true);
@@ -466,7 +466,7 @@ app.use('/api/cms-lookups', require('./routes/cmsLookups'));
 app.use('/api/table', require('./routes/dynamic_crud')); // Dynamic Router for 15+ Tables
 app.use('/api/actions', require('./routes/actions'));
 app.use('/api/my-views', require('./routes/myViews'));
-app.use('/api/notifications', require('./modules/notification').router);
+app.use('/api/notifications', require('../modules/notification/server').router);
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/automations', require('./routes/automations'));
 

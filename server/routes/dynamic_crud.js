@@ -1,13 +1,13 @@
 const tableRegistry = require('../core/tableRegistry');
-const { requestHandler, requestService } = require('../modules/request');
-const { financeHandler, financeService } = require('../modules/finance');
-const { paymentHandler } = require('../modules/payment');
-const { invoiceHandler } = require('../modules/invoice');
-const { expenseHandler } = require('../modules/expense');
-const { contractHandler } = require('../modules/contract');
-const { assetHandler } = require('../modules/asset');
-const { serviceHandler } = require('../modules/service');
-const { targetTableHandler, targetTableService } = require('../modules/target_table');
+const { requestHandler, requestService } = require('../../modules/request/server');
+const { financeHandler, financeService } = require('../../modules/finance/server');
+const { paymentHandler } = require('../../modules/payment/server');
+const { invoiceHandler } = require('../../modules/invoice/server');
+const { expenseHandler } = require('../../modules/expense/server');
+const { contractHandler } = require('../../modules/contract/server');
+const { assetHandler } = require('../../modules/asset/server');
+const { serviceHandler } = require('../../modules/service/server');
+const { targetTableHandler, targetTableService } = require('../../modules/target_table/server');
 
 tableRegistry.register(['request', 'ticket', 'assigned_task', 'task_subtask', 'comment', 'ticket_comment'], requestHandler);
 tableRegistry.register(['payment'], paymentHandler);

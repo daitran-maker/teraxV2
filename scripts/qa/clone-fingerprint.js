@@ -72,6 +72,7 @@ function diff(a, b) {
   for (const t of tn) {
     const x = a.tables[t], y = b.tables[t];
     if (!x || !y) continue;
+    if (t === 'audit_logs') continue; // trigger-generated during startup; count differs between runs of identical code
     if (x.count !== y.count) out.push(`rows(${t}): ${x.count} vs ${y.count}`);
     else if (x.hash !== y.hash) out.push(`row content differs: ${t} (count ${x.count})`);
   }

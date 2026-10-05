@@ -22,7 +22,8 @@ const port = process.argv[4] || '5298';
 const adminUrl = new URL(process.env.DATABASE_URL);
 if (!['localhost', '127.0.0.1', '::1'].includes(adminUrl.hostname)) { console.error('Refusing: non-local DB host'); process.exit(2); }
 const dbName = `qa_clone_${Date.now().toString(36)}`;
-const adminPool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adminPool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 10000, query_timeout: 120000 });
+adminPool.on('error', () => {});
 const cloneUrl = new URL(adminUrl); cloneUrl.pathname = '/' + dbName;
 
 const psql = [process.env.PSQL, 'C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe', 'psql'].filter(Boolean).find((p) => p === 'psql' || fs.existsSync(p));
@@ -33,7 +34,7 @@ async function main() {
   console.log(`[clone-test] code: ${codeDir}\n[clone-test] creating empty database ${dbName}`);
   await adminPool.query(`CREATE DATABASE "${dbName}"`);
 
-  const load = spawnSync(psql, ['--dbname', cloneUrl.toString(), '-q', '-v', 'ON_ERROR_STOP=0', '-f', initSql], { encoding: 'utf8' });
+  const load = spawnSync(psql, ['--dbname', cloneUrl.toString(), '-q', '-v', 'ON_ERROR_STOP=0', '-f', initSql], { encoding: 'utf8', timeout: 180000 });
   const initErrors = (load.stderr || '').split(/\r?\n/).filter((l) => /ERROR/.test(l));
   console.log(`[clone-test] init.sql loaded (${initErrors.length} errors)`);
   initErrors.slice(0, 5).forEach((l) => console.log('   ' + l));
@@ -63,7 +64,7 @@ async function main() {
   errs.slice(0, 8).forEach((l) => console.log('   ' + l.slice(0, 200)));
 
   const fpScript = path.resolve(__dirname, 'clone-fingerprint.js');
-  const fp = spawnSync(process.execPath, [fpScript, outFile], { env: { ...process.env, DATABASE_URL: cloneUrl.toString() }, encoding: 'utf8' });
+  const fp = spawnSync(process.execPath, [fpScript, outFile], { env: { ...process.env, DATABASE_URL: cloneUrl.toString() }, encoding: 'utf8', timeout: 180000 });
   console.log('[clone-test] ' + (fp.stdout || fp.stderr).trim());
 }
 

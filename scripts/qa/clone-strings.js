@@ -27,6 +27,7 @@ const CONTRACT = {
 
 /** Files allowed to contain '/opt/app/terax' (captured at baseline-pre-modular + deploy tooling). */
 const ALLOWED_TERAX_PATH = new Set([
+  'scripts/qa/clone-strings.js',
   'deploy.sh',
   'scripts/clone_apps.sh',
   'scripts/copy_settings_to_clones.sh',
