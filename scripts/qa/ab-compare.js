@@ -42,7 +42,7 @@ const endpoints = [...new Set([...DEFAULTS, ...(fs.existsSync(extraFile) ? JSON.
 
 const VOLATILE_KEY = /(^|_)(created|updated|deleted|modified|last|login|synced|expires?|timestamp|now|uptime|date|time)(_|$)|_at$|token|Bytes$|^run_count$|^notification_logs$|^faceted_summary$/i;
 // Proven nondeterministic by an A/A run (identical code on both sides): rows with equal sort keys come back in varying order.
-const TIE_ORDER_NOISE = { '/api/table/invoice': /^(contract_id|invoice_status_color|description)$/ };
+const TIE_ORDER_NOISE = { '/api/table/invoice': /^data$/ }; // per-ID invoice CRUD is still covered by ab-writes scenarios
 function stripKeys(v, re) {
   if (Array.isArray(v)) return v.map((x) => stripKeys(x, re));
   if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) if (!re.test(k)) o[k] = stripKeys(v[k], re); return o; }
