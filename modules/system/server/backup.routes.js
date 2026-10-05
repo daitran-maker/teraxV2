@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -41,7 +41,7 @@ function getPrimaryKey(tableName) {
 }
 
 // Backup Directory Setup
-const BACKUP_DIR = path.join(__dirname, '../../backups');
+const BACKUP_DIR = path.join(__dirname, '../../../backups');
 if (!fs.existsSync(BACKUP_DIR)) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }

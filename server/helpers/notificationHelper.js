@@ -1,6 +1,6 @@
 const pool = require('../db');
 const { broadcastSSE } = require('./sseHelper');
-const { sendPushNotification } = require('../routes/notifications');
+const { sendPushNotification } = require('../../modules/notification/server/notifications.routes');
 
 function flattenArray(arr) {
     if (!Array.isArray(arr)) return [arr];

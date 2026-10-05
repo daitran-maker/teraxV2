@@ -314,8 +314,8 @@ app.get('/api/stream', (req, res) => {
 });
 
 // Public CMS Sync Route (bypasses standard JWT token auth)
-app.use('/api/cms', require('./routes/cmsSync'));
-app.use('/api/support', require('./routes/support').router);
+app.use('/api/cms', require('../modules/system/server/cmsSync.routes'));
+app.use('/api/support', require('../modules/support/server/support.routes').router);
 
 // Health check (Public for K8s readiness/liveness probes)
 app.get('/api/health', (req, res) => {
@@ -453,7 +453,7 @@ app.post('/api/system-status/cleanup-logs', async (req, res) => {
 
 // API Routes
 app.get('/api/files/download/:id/:filename', require('./helpers/fileStorageHelper').handleFileDownload);
-app.use('/api/system-setup', require('./routes/systemSetup'));
+app.use('/api/system-setup', require('../modules/system/server/systemSetup.routes'));
 app.use('/api/my-company', organizationModule.myCompanyRouter);
 app.use('/api/departments', organizationModule.departmentRouter);
 app.use('/api/employees', organizationModule.employeeRouter);
@@ -461,14 +461,14 @@ app.use('/api/companies', organizationModule.companyRouter);
 app.use('/api/contacts', organizationModule.contactRouter);
 app.use('/api/policies', require('./routes/policy'));
 app.use('/api/permissions', identityModule.permissionsRouter);
-app.use('/api/schema', require('./routes/schema'));
-app.use('/api/cms-lookups', require('./routes/cmsLookups'));
+app.use('/api/schema', require('../modules/system/server/schema.routes'));
+app.use('/api/cms-lookups', require('../modules/system/server/cmsLookups.routes'));
 app.use('/api/table', require('./routes/dynamic_crud')); // Dynamic Router for 15+ Tables
 app.use('/api/actions', require('./routes/actions'));
 app.use('/api/my-views', require('./routes/myViews'));
 app.use('/api/notifications', require('../modules/notification/server').router);
-app.use('/api/backup', require('./routes/backup'));
-app.use('/api/automations', require('./routes/automations'));
+app.use('/api/backup', require('../modules/system/server/backup.routes'));
+app.use('/api/automations', require('../modules/system/server/automations.routes'));
 
 // Fallback: serve index.html for all non-API routes
 // 404 handler for unmatched API routes

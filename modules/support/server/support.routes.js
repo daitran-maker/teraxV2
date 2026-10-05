@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 const { Pool } = require('pg');
 const crypto = require('crypto');
-const { broadcastSSE } = require('../helpers/sseHelper');
+const { broadcastSSE } = require('../../../server/helpers/sseHelper');
 
 const HELPDESK_SECRET = process.env.HELPDESK_SECRET || process.env.CMS_HMAC_SECRET;
 const IS_HELPDESK = process.env.IS_HELPDESK === 'true';

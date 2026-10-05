@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 const https = require('https');
 const http = require('http');
 
@@ -24,7 +24,7 @@ function cmsGet(path) {
   });
 }
 
-const cmsLookups = require('./cmsLookups');
+const cmsLookups = require('./cmsLookups.routes');
 
 const POPULAR_5_COUNTRIES = ['VN', 'US', 'SG', 'JP', 'KR'];
 const POPULAR_5_CURRENCIES = ['VND', 'USD', 'EUR', 'SGD', 'JPY'];
@@ -123,8 +123,8 @@ async function ensureSetupTable() {
   `);
 }
 
-const { generateSequentialId } = require('../helpers/idGenerator');
-const { broadcastSSE } = require('../helpers/sseHelper');
+const { generateSequentialId } = require('../../../server/helpers/idGenerator');
+const { broadcastSSE } = require('../../../server/helpers/sseHelper');
 
 
 // GET /api/system-setup/status

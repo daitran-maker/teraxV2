@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 const {
   AUTOMATIONS,
   ensureAutomationTables,
   getAutomationRows,
   setAutomationActive
-} = require('../helpers/automationHelper');
+} = require('../../../server/helpers/automationHelper');
 
 router.get('/', async (req, res) => {
   try {

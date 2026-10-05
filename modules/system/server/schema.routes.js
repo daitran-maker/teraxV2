@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 
 const ALLOWED_TABLES = [
   'account',               'action_rules',

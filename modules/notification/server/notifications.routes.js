@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../../../server/db');
 const webpush = require('web-push');
 
 const DEBUG_SQL = process.env.DEBUG_SQL === 'true';
