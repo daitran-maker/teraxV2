@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
-const RequestModel = require('../models/requestModel');
-const { checkPermission } = require('../helpers/permissionHelper');
-const { enrichRecordWithStatusCatalog } = require('../helpers/statuses');
+const pool = require('../../../server/db');
+const RequestModel = require('../../../server/models/requestModel');
+const { checkPermission } = require('../../../server/helpers/permissionHelper');
+const { enrichRecordWithStatusCatalog } = require('../../../server/helpers/statuses');
 
 const DEBUG_MYVIEWS = process.env.DEBUG_MYVIEWS === 'true' || process.env.DEBUG_SQL === 'true';
 

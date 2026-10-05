@@ -459,13 +459,13 @@ app.use('/api/departments', organizationModule.departmentRouter);
 app.use('/api/employees', organizationModule.employeeRouter);
 app.use('/api/companies', organizationModule.companyRouter);
 app.use('/api/contacts', organizationModule.contactRouter);
-app.use('/api/policies', require('./routes/policy'));
+app.use('/api/policies', require('../modules/workflow/server/policy.routes'));
 app.use('/api/permissions', identityModule.permissionsRouter);
 app.use('/api/schema', require('../modules/system/server/schema.routes'));
 app.use('/api/cms-lookups', require('../modules/system/server/cmsLookups.routes'));
 app.use('/api/table', require('./routes/dynamic_crud')); // Dynamic Router for 15+ Tables
 app.use('/api/actions', require('./routes/actions'));
-app.use('/api/my-views', require('./routes/myViews'));
+app.use('/api/my-views', require('../modules/request/server/myViews.routes'));
 app.use('/api/notifications', require('../modules/notification/server').router);
 app.use('/api/backup', require('../modules/system/server/backup.routes'));
 app.use('/api/automations', require('../modules/system/server/automations.routes'));
