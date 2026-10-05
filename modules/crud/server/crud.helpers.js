@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 const pool = require('../../../server/db');
-const { resolveStatusId, STATUS } = require('../../../server/helpers/statuses');
+const { resolveStatusId, STATUS, enrichRecordWithStatusKeys } = require('../../../server/helpers/statuses');
 const { financeService } = require('../../finance/server');
 
 function convertStatusFieldsToIds(tableName, data) {
@@ -634,6 +634,242 @@ async function canUserViewRequestInView(targetRequest, user, viewName) {
   return await isUserNamedOnRequest(targetRequest, user);
 }
 
+async function executeCascadeHardDelete(client, tableName, id) {
+  if (tableName === 'request') {
+    await client.query(`DELETE FROM comment WHERE request = $1`, [id]);
+
+    await client.query(`DELETE FROM payment WHERE request = $1`, [id]);
+    await client.query(`DELETE FROM invoice WHERE request = $1`, [id]);
+    await client.query(`DELETE FROM mtr WHERE request = $1`, [id]);
+    await client.query(`DELETE FROM service WHERE request = $1`, [id]);
+    await client.query(`DELETE FROM asset WHERE request = $1`, [id]);
+    await client.query(`DELETE FROM contract WHERE request = $1`, [id]);
+    await client.query(`DELETE FROM request_watches WHERE request_id = $1`, [id]);
+    await client.query(`DELETE FROM policy_and_program WHERE id__request = $1`, [id]);
+    await client.query(`UPDATE account SET id__request = NULL WHERE id__request = $1`, [id]);
+  } else if (tableName === 'my_company') {
+    const compRes = await client.query(`SELECT company_shortname FROM my_company WHERE my_company_id = $1`, [id]);
+    if (compRes.rows.length > 0) {
+      const shortname = compRes.rows[0].company_shortname;
+      await client.query(`DELETE FROM account WHERE company_entity = $1`, [shortname]);
+    }
+    await client.query(`DELETE FROM department WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM employee WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM my_location WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM operation_program WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM policy_and_program WHERE company_id = $1`, [id]);
+  } else if (tableName === 'department') {
+    await client.query(`DELETE FROM employee WHERE department_id = $1`, [id]);
+  } else if (tableName === 'contract') {
+    await client.query(`DELETE FROM payment WHERE contract_id = $1`, [id]);
+  }
+
+  // Helper to determine primary key from table name (since getPrimaryKey is defined above, we can call it)
+  const pk = getPrimaryKey(tableName);
+  const dbCols = await getTableColumns(tableName);
+  const hasIdCol = dbCols.includes('id');
+  let deleteQuery = `DELETE FROM "${tableName}" WHERE (${pk}::text = $1`;
+  if (hasIdCol && pk !== 'id') {
+    deleteQuery += ` OR id::text = $1`;
+  }
+  if (tableName === 'action_rules') {
+    deleteQuery += ` OR action_id = $1`;
+  }
+  deleteQuery += `) RETURNING *`;
+  return await client.query(deleteQuery, [id]);
+}
+
+async function validateRequestTypeRestrictions(requesterEmail, requestType, client = pool) {
+  return; // Bypass validation to make REQUESTER, MY COMPANY, and PROCESS TYPE independent
+  if (!requestType) return;
+  const policyRes = await client.query(
+    `SELECT company_id, department_id, policy_name 
+     FROM policy_and_program 
+     WHERE policy_id::text = $1`,
+    [requestType]
+  );
+  if (policyRes.rows.length === 0) return;
+  const policy = policyRes.rows[0];
+  const policyComp = policy.company_id;
+  const policyDept = policy.department_id;
+  if (!policyComp && !policyDept) return;
+  const empRes = await client.query(
+    `SELECT company_id, department_id, employee_id 
+     FROM employee 
+     WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) 
+        OR LOWER(TRIM(employee_id)) = LOWER(TRIM($1)) 
+        OR LOWER(TRIM(username)) = LOWER(TRIM($1))`,
+    [requesterEmail]
+  );
+  if (empRes.rows.length === 0) {
+    throw new Error(`Không tìm thấy thông tin nhân viên: ${requesterEmail}`);
+  }
+  const emp = empRes.rows[0];
+  if (policyComp && String(policyComp).trim()) {
+    if (!emp.company_id || String(emp.company_id).trim() !== String(policyComp).trim()) {
+      throw new Error(`Nhân viên không thuộc công ty được cấu hình cho quy trình "${policy.policy_name}"`);
+    }
+  }
+  if (policyDept && String(policyDept).trim()) {
+    if (!emp.department_id || String(emp.department_id).trim() !== String(policyDept).trim()) {
+      throw new Error(`Nhân viên không thuộc phòng ban được cấu hình cho quy trình "${policy.policy_name}"`);
+    }
+  }
+}
+
+async function validateRequestChildPermissions(tableName, requestId, userEmployeeId, userRole, client = pool) {
+  const requestChildren = ['payment', 'invoice', 'service', 'asset', 'contract', 'expense', 'target_table'];
+  if (!requestChildren.includes(tableName)) return;
+
+  if (userRole && userRole.toUpperCase() === 'SUPER ADMIN') return;
+
+  if (!requestId) {
+    throw new Error('Yêu cầu ID Request để thực hiện thao tác trên bảng con.');
+  }
+
+  const res = await client.query(
+    `SELECT sr_status, process_status, sr_creater, requester, sr_owner, policy_lead FROM request WHERE request_id = $1`,
+    [requestId]
+  );
+  if (res.rows.length === 0) {
+    throw new Error('Không tìm thấy Request tương ứng.');
+  }
+
+  const req = res.rows[0];
+  enrichRecordWithStatusKeys('request', req);
+  const srStatus = req.sr_status_key || String(req.sr_status || '').toLowerCase();
+  const processStatus = req.process_status_key || String(req.process_status || '').toLowerCase();
+  const email = (userEmployeeId || '').toLowerCase();
+
+  const srOwnerArr = Array.isArray(req.sr_owner)
+    ? req.sr_owner.map(s => s.toLowerCase())
+    : (req.sr_owner ? [req.sr_owner.toLowerCase()] : []);
+  const policyLead = (req.policy_lead || '').toLowerCase();
+  const creator = (req.sr_creater || '').toLowerCase();
+  const requester = (req.requester || '').toLowerCase();
+
+  // For target_table: Allowed by Creator / Requester or SR Owner / Policy Lead at any stage
+  if (tableName === 'target_table') {
+    const isAuthorized = (email === creator || email === requester || srOwnerArr.includes(email) || email === policyLead);
+    if (!isAuthorized) {
+      throw new Error('Chỉ Người tạo (Requester), SR Owner hoặc Policy Lead mới được phép thao tác cấu hình Target Table.');
+    }
+    return;
+  }
+
+  const isDraftOrRejected = [1, 4].includes(Number(req.sr_status)) || srStatus === 'draft' || srStatus === 'rejected';
+  const isProcessingOrCompleted = [8, 9].includes(Number(req.process_status)) || processStatus === 'processing' || processStatus === 'completed';
+
+  const isDraftOwner = isDraftOrRejected && (email === creator || email === requester);
+  const isProcessHandler = isProcessingOrCompleted && (srOwnerArr.includes(email) || email === policyLead);
+
+  if (!isDraftOwner && !isProcessHandler) {
+    throw new Error('Bảng con chỉ cho phép thao tác khi trạng thái Request là Draft/Rejected (bởi Người tạo) hoặc Processing/Completed (bởi Người xử lý/Policy Lead).');
+  }
+}
+
+async function maskTicketComments(rows) {
+  if (!rows || rows.length === 0) return rows;
+  const ticketIds = [...new Set(rows.map(r => r.ticket).filter(Boolean))];
+  if (ticketIds.length === 0) return rows;
+  try {
+    const hPool = getHelpdeskPool();
+    const ticketRes = await hPool.query(
+      'SELECT ticket_id, requester, sr_creater FROM ticket WHERE ticket_id = ANY($1)',
+      [ticketIds]
+    );
+    const ticketMap = {};
+    ticketRes.rows.forEach(t => {
+      ticketMap[t.ticket_id] = {
+        requester: (t.requester || '').toLowerCase(),
+        sr_creater: (t.sr_creater || '').toLowerCase()
+      };
+    });
+    rows.forEach(r => {
+      const isFromHelpdesk = r.logs && r.logs.origin === 'helpdesk';
+      const tInfo = ticketMap[r.ticket];
+      const author = (r.created_by || r.comment_by || '').toLowerCase();
+      const shouldMask = isFromHelpdesk || (tInfo && author !== tInfo.requester && author !== tInfo.sr_creater && author !== 'it support');
+      if (shouldMask) {
+        if (r.comment_by) r.comment_by = 'IT support';
+        if (r.created_by) r.created_by = 'IT support';
+        if (r.updated_by) r.updated_by = 'IT support';
+      }
+    });
+  } catch (e) {
+    console.error('Error masking ticket comments:', e);
+  }
+  return rows;
+}
+
+async function syncUploadedFiles(dbClient, tableName, recordId, columnName, procedureFileStr, uploadedBy) {
+  let urls = [];
+  try {
+    if (procedureFileStr) {
+      if (String(procedureFileStr).startsWith('[')) {
+        urls = JSON.parse(procedureFileStr);
+      } else {
+        urls = String(procedureFileStr).split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+  } catch (e) {
+    if (procedureFileStr) urls = [procedureFileStr];
+  }
+
+  // 1. Get current files in uploaded_files for this record
+  const currentRes = await dbClient.query(
+    `SELECT id, file_path FROM "uploaded_files" 
+     WHERE table_name = $1 AND record_id = $2 AND column_name = $3 AND deleted_at IS NULL`,
+    [tableName, recordId, columnName]
+  );
+  const currentFiles = currentRes.rows;
+
+  // 2. Identify files to delete (present in DB but not in incoming urls)
+  const filesToDelete = currentFiles.filter(f => !urls.includes(f.file_path));
+  if (filesToDelete.length > 0) {
+    const deleteIds = filesToDelete.map(f => f.id);
+    await dbClient.query(
+      `UPDATE "uploaded_files" SET deleted_at = NOW() WHERE id = ANY($1::uuid[])`,
+      [deleteIds]
+    );
+  }
+
+  // Helper mapping extension to mime-type
+  const extToMime = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'svg': 'image/svg+xml',
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'txt': 'text/plain',
+    'zip': 'application/zip'
+  };
+
+  // 3. Insert new files (present in incoming urls but not in DB)
+  const existingPaths = currentFiles.map(f => f.file_path);
+  for (const url of urls) {
+    if (!existingPaths.includes(url)) {
+      const rawFilename = url.split('/').pop().split('?')[0];
+      let decodedFilename = rawFilename;
+      try { decodedFilename = decodeURIComponent(rawFilename); } catch (e) {}
+      const cleanDisplayName = decodedFilename.replace(/^upload_\d+(_\d+)?_/i, '').replace(/^[a-zA-Z0-9_-]+_\d{10,}(_\d+)?_/i, '') || decodedFilename;
+      const ext = rawFilename.split('.').pop().toLowerCase();
+      const mimeType = extToMime[ext] || 'application/octet-stream';
+      await dbClient.query(
+        `INSERT INTO "uploaded_files" (id, table_name, record_id, column_name, file_name, mime_type, file_path, uploaded_by)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)`,
+        [tableName, recordId, columnName, cleanDisplayName, mimeType, url, uploadedBy]
+      );
+    }
+  }
+}
+
 module.exports = {
   convertStatusFieldsToIds,
   getRestoreStatusVal,
@@ -658,4 +894,9 @@ module.exports = {
   isUserNamedOnRequest,
   normalizeFinanceCurrency,
   calculateRequestFinanceSummary,
+  executeCascadeHardDelete,
+  validateRequestTypeRestrictions,
+  validateRequestChildPermissions,
+  maskTicketComments,
+  syncUploadedFiles,
 };
