@@ -183,25 +183,7 @@ router.post('/', async (req, res) => {
     } catch (e) {}
   }
   
-  // Verify custom branding support
-  try {
-    const scaleRes = await pool.query('SELECT features FROM cms_tenant_info LIMIT 1');
-    if (scaleRes.rows.length && scaleRes.rows[0].features) {
-      const features = typeof scaleRes.rows[0].features === 'string' ? JSON.parse(scaleRes.rows[0].features) : scaleRes.rows[0].features;
-      if (features.custom_branding !== undefined && features.custom_branding !== null) {
-        const branding = String(features.custom_branding).trim().toLowerCase();
-        const isBrandingDisallowed = branding === '❌' || branding === 'none' || branding === 'không' || branding === 'false';
-        if (isBrandingDisallowed && logo) {
-          return res.status(403).json({
-            error: 'Gói dịch vụ hiện tại không hỗ trợ tải lên logo riêng. Vui lòng nâng cấp gói trên CMS.',
-            error_code: 'my_company.error.branding_not_supported'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Failed to verify custom branding support:', err.message);
-  }
+  // Company logo belongs to company profile and is not subject to app custom branding tier limit
 
   // Get tenant system base currency from cms_tenant_info or existing company
   let systemBaseCurrency = req.body.base_currency;
@@ -272,25 +254,7 @@ router.put('/:id', async (req, res) => {
   }
   const isSuperAdmin = req.user && req.user.role && req.user.role.toUpperCase() === 'SUPER ADMIN';
 
-  // Verify custom branding support
-  try {
-    const scaleRes = await pool.query('SELECT features FROM cms_tenant_info LIMIT 1');
-    if (scaleRes.rows.length && scaleRes.rows[0].features) {
-      const features = typeof scaleRes.rows[0].features === 'string' ? JSON.parse(scaleRes.rows[0].features) : scaleRes.rows[0].features;
-      if (features.custom_branding !== undefined && features.custom_branding !== null) {
-        const branding = String(features.custom_branding).trim().toLowerCase();
-        const isBrandingDisallowed = branding === '❌' || branding === 'none' || branding === 'không' || branding === 'false';
-        if (isBrandingDisallowed && logo) {
-          return res.status(403).json({
-            error: 'Gói dịch vụ hiện tại không hỗ trợ tải lên logo riêng. Vui lòng nâng cấp gói trên CMS.',
-            error_code: 'my_company.error.branding_not_supported'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Failed to verify custom branding support:', err.message);
-  }
+  // Company logo belongs to company profile and is not subject to app custom branding tier limit
   try {
     // Preserve original base_currency from being modified by clients
     let query = `UPDATE MY_COMPANY SET company_shortname=$1, company_fullname=$2, logo=$3, tax_code=$4, website=$5, address=$6, country=$7, city=$8, state=$9, province=$10, currency_list=$11, status=$12

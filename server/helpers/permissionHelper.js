@@ -101,6 +101,11 @@ async function checkPermission(ruleType, ruleName, user, viewName = null) {
       return true;
     }
 
+    // Admin role always has access to support module
+    if (normalizedRuleName === 'support' && user.role && ['ADMIN', 'SUPER ADMIN'].includes(user.role.toUpperCase())) {
+      return true;
+    }
+
     // Helper: check if userVal exists in a comma-separated allowed list
     const match = (allowedStr, userVal) => {
       if (!allowedStr || !userVal) return false;

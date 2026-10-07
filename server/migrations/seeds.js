@@ -442,7 +442,7 @@ async function seedDefaultPermissions() {
          ON CONFLICT (name) DO UPDATE SET roles = COALESCE(exception_rules.roles, 'Super Admin,Admin')`,
         [name]
       );
-    } else if (name === 'assigned_task' || name === 'task_subtask') {
+    } else if (name === 'assigned_task' || name === 'task_subtask' || name === 'support') {
       await pool.query(
         `INSERT INTO exception_rules (name, roles) VALUES ($1, 'Super Admin,Admin,HR,Staff')
          ON CONFLICT (name) DO UPDATE SET roles = COALESCE(exception_rules.roles, 'Super Admin,Admin,HR,Staff')`,

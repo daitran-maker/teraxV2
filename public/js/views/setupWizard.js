@@ -1915,9 +1915,92 @@ window.buildManagerSelectOptions = function(selectedVal) {
   }).join('');
 };
 
+window.getSetupDepartmentList = function() {
+  const list = [];
+  const seen = new Set();
+
+  const add = (code, name) => {
+    const c = String(code || '').trim();
+    const n = String(name || '').trim();
+    if (!c && !n) return;
+    const key = (c || n).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push({
+      code: c || n,
+      name: n || c,
+      department_code: c || n,
+      department_name: n || c
+    });
+  };
+
+  // 1. Process 2: draft departments (các phòng ban đã cấu hình / lưu ở Bước 2)
+  if (window.setupDraft && Array.isArray(window.setupDraft.departments)) {
+    window.setupDraft.departments.forEach(d => {
+      add(d.department_code || d.code, d.department_name || d.name);
+    });
+  }
+
+  // 2. Process 2: excel parsed departments (các phòng ban import ở Bước 2)
+  if (Array.isArray(window.setupParsedDepartments)) {
+    window.setupParsedDepartments.forEach(d => {
+      add(d.department_code || d.code, d.department_name || d.name);
+    });
+  }
+
+  // 3. Process 2 / Database: departments từ dữ liệu setup hiện có
+  if (window.setupWizardData && Array.isArray(window.setupWizardData.departments)) {
+    window.setupWizardData.departments.forEach(d => {
+      add(d.department_code || d.code, d.department_name || d.name);
+    });
+  }
+
+  // 4. Fallback danh sách phòng ban mẫu PRESET_DEPARTMENTS nếu chưa có phòng ban nào
+  if (list.length === 0 && typeof PRESET_DEPARTMENTS !== 'undefined') {
+    PRESET_DEPARTMENTS.forEach(d => {
+      add(d.code, swIsVi() ? d.name : (d.nameEn || d.name));
+    });
+  }
+
+  return list;
+};
+
+window.buildSetupDepartmentSelectOptions = function(selectedVal) {
+  const norm = String(selectedVal || '').trim().toLowerCase();
+  const depts = window.getSetupDepartmentList();
+  const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
+  let options = [];
+
+  options.push({ value: '', label: `-- ${swT('sw.step3_select_dept', isVi ? 'Chọn phòng ban' : 'Select Department')} --` });
+
+  let matched = false;
+  depts.forEach(d => {
+    const code = d.department_code || d.code;
+    const name = d.department_name || d.name;
+    const val = code || name;
+    const label = (code && name && code !== name) ? `${code} - ${name}` : (name || code);
+    if (val) {
+      if (norm && (val.toLowerCase() === norm || (code && code.toLowerCase() === norm) || (name && name.toLowerCase() === norm))) {
+        matched = true;
+      }
+      options.push({ value: val, label: label, code: code, name: name });
+    }
+  });
+
+  if (norm && !matched) {
+    options.push({ value: selectedVal, label: selectedVal, code: selectedVal, name: selectedVal });
+  }
+
+  return options.map(o => {
+    const isSel = (norm && (o.value.toLowerCase() === norm || (o.code && o.code.toLowerCase() === norm) || (o.name && o.name.toLowerCase() === norm))) ? 'selected' : '';
+    return `<option value="${escapeHTML(o.value)}" ${isSel}>${escapeHTML(o.label)}</option>`;
+  }).join('');
+};
+
 function renderQuickEmpCard(idx, data) {
   const d = data || {};
   const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
+  const deptVal = d.dept || d.department_code || d.department_name || '';
   return '<div class="sw-emp-card qemp-card" data-idx="'+idx+'">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F3F4F6;">'
     + '<div style="font-size:12px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:5px;"><span class="material-symbols-rounded" style="font-size:16px;">badge</span> ' + swT('sw.step3_name', 'Nhân viên') + ' #' + (idx+1) + '</div>'
@@ -1929,7 +2012,7 @@ function renderQuickEmpCard(idx, data) {
     + '<div>'+swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name_ph', 'Họ và tên đầy đủ') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
     + '<div>'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true)+'<input type="text" class="sw-input qemp-username" placeholder="' + swT('sw.step3_emp_username_ph', 'john.doe') + '" value="'+escapeHTML(d.username||'')+'"></div>'
     + '<div>'+swLabel(swT('sw.step3_emp_email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="' + swT('sw.step3_emp_email_ph', 'john@company.com') + '" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false)+'<input type="text" class="sw-input qemp-dept" placeholder="' + swT('sw.step3_emp_dept_ph', 'Mã PB / Tên PB') + '" value="'+escapeHTML(d.dept||'')+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false)+'<select class="sw-input qemp-dept">'+(typeof window.buildSetupDepartmentSelectOptions === 'function' ? window.buildSetupDepartmentSelectOptions(deptVal) : '')+'</select></div>'
     // Row 2 (4 inputs)
     + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
     + '<div>'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
@@ -2175,6 +2258,16 @@ window.saveStep3AndAdvance = async function(){
       const en = c.querySelector('.qemp-emg-name')?.value?.trim();
       const ep = c.querySelector('.qemp-emg-phone')?.value?.trim();
 
+      const allDepts = (typeof window.getSetupDepartmentList === 'function') ? window.getSetupDepartmentList() : [];
+      const matchedDept = allDepts.find(d => {
+        const cMatch = d.code && d.code.toLowerCase() === (dp || '').toLowerCase();
+        const nMatch = d.name && d.name.toLowerCase() === (dp || '').toLowerCase();
+        const dcMatch = d.department_code && d.department_code.toLowerCase() === (dp || '').toLowerCase();
+        return cMatch || nMatch || dcMatch;
+      });
+      const deptCode = matchedDept ? (matchedDept.code || matchedDept.department_code || dp) : dp;
+      const deptName = matchedDept ? (matchedDept.name || matchedDept.department_name || deptCode) : dp;
+
       if (fn || un || em) {
         employeesToSave.push({
           employee_id: '',
@@ -2182,8 +2275,8 @@ window.saveStep3AndAdvance = async function(){
           full_name: fn || un || em,
           username: un,
           email: em,
-          department_code: dp,
-          department_name: dp,
+          department_code: deptCode,
+          department_name: deptName,
           position: pos,
           start_date: sd,
           direct_manager: dm,
@@ -3960,22 +4053,10 @@ window.editSetupParsedItem = function(type, index) {
   } else if (type === 'employee') {
     title = (isVi ? 'Sửa thông tin nhân viên #' : 'Edit Employee #') + (index + 1);
 
-    // Build Department dropdown options
-    const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
-      ? window.setupParsedDepartments
-      : (window.setupWizardData?.departments || []);
-    let deptOpts = '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
-    let curDeptMatched = false;
-    for (const d of deptList) {
-      const code = d.department_code || d.code || '';
-      const name = d.department_name || d.name || code;
-      const isSel = (item.department_code && (item.department_code === code || item.department_code === name));
-      if (isSel) curDeptMatched = true;
-      deptOpts += '<option value="' + escapeHTML(code || name) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + name) + '</option>';
-    }
-    if (item.department_code && !curDeptMatched) {
-      deptOpts += '<option value="' + escapeHTML(item.department_code) + '" selected>' + escapeHTML(item.department_code) + '</option>';
-    }
+    // Build Department dropdown options from Process 2
+    const deptOpts = (typeof window.buildSetupDepartmentSelectOptions === 'function')
+      ? window.buildSetupDepartmentSelectOptions(item.department_code || item.department_name || '')
+      : '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
 
     // Build Manager dropdown options (Direct & HR)
     const empList = (window.setupParsedEmployees && window.setupParsedEmployees.length > 0)
@@ -4175,12 +4256,23 @@ window.saveSwParsedEditModal = function(type, index) {
     const emgPhone = document.getElementById('sw-edit-emp-emg-phone')?.value?.trim() || '';
 
     if (window.setupParsedEmployees && window.setupParsedEmployees[index]) {
+      const allDepts = (typeof window.getSetupDepartmentList === 'function') ? window.getSetupDepartmentList() : [];
+      const matchedDept = allDepts.find(d => {
+        const cMatch = d.code && d.code.toLowerCase() === (dept || '').toLowerCase();
+        const nMatch = d.name && d.name.toLowerCase() === (dept || '').toLowerCase();
+        const dcMatch = d.department_code && d.department_code.toLowerCase() === (dept || '').toLowerCase();
+        return cMatch || nMatch || dcMatch;
+      });
+      const deptCode = matchedDept ? (matchedDept.code || matchedDept.department_code || dept) : dept;
+      const deptName = matchedDept ? (matchedDept.name || matchedDept.department_name || deptCode) : dept;
+
       window.setupParsedEmployees[index] = {
         ...window.setupParsedEmployees[index],
         full_name: fullName,
         username: username,
         email: email,
-        department_code: dept,
+        department_code: deptCode,
+        department_name: deptName,
         position: pos,
         start_date: startDate,
         direct_manager: directMgr,
