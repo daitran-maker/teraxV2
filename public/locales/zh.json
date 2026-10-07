@@ -679,5 +679,6 @@
   "sw.cat_sales": "销售市场",
   "sw.cat_other": "其他",
   "sw.tag_popular": "常用",
-  "sw.tag_new": "最新"
+  "sw.tag_new": "最新",
+  "my_company.placeholder.synced_from_signup": "从注册时同步"
 }

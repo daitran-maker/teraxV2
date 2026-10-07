@@ -31,7 +31,7 @@
       { key: 'city', label: 'City', type: 'select', optionsFrom: 'cms_city', optionValue: 'name', optionLabel: 'name', filterByProvinceField: 'province' },
       { key: 'company_fullname', label: 'COMPANY FULL NAME', type: 'text' },
       { key: 'company_shortname', label: 'COMPANY SHORT NAME', type: 'text', required: true, oninput: "this.dataset.vietqrShortName = ''" },
-      { key: 'base_currency', label: 'Base Currency', labelKey: 'col.base_currency', type: 'text', createReadonly: true, editReadonly: true, placeholder: 'Được đồng bộ từ lúc đăng ký' },
+      { key: 'base_currency', label: 'Base Currency', labelKey: 'col.base_currency', type: 'text', createReadonly: true, editReadonly: true, placeholderKey: 'my_company.placeholder.synced_from_signup', placeholder: 'Synced from registration' },
       { key: 'company_label', label: 'COMPANY LABEL', type: 'text', createReadonly: true, editReadonly: true, virtual: true, full: true },
       { key: 'website', label: 'Website', type: 'text' },
       { key: 'address', label: 'Address', type: 'textarea', full: true },
@@ -41,22 +41,7 @@
       { key: 'logo', label: 'Logo', type: 'file', accept: 'image/*', full: true },
     ],
     detailSubtitle: (r) => {
-      let logoUrl = r.logo;
-      if (logoUrl && typeof logoUrl === 'object') {
-        if (logoUrl.type === 'Buffer' && Array.isArray(logoUrl.data)) {
-          try {
-            logoUrl = new TextDecoder('utf-8').decode(new Uint8Array(logoUrl.data));
-          } catch (e) {}
-        } else if (Array.isArray(logoUrl) && logoUrl.length > 0) {
-          logoUrl = logoUrl[0];
-        }
-      }
-      if (logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(logoUrl);
-          if (Array.isArray(parsed) && parsed.length > 0) logoUrl = parsed[0];
-        } catch(e) {}
-      }
+      const logoUrl = (typeof window.extractImageUrl === 'function') ? window.extractImageUrl(r.logo) : r.logo;
       const logo = (logoUrl && typeof logoUrl === 'string') ? `<img src="${logoUrl}" style="width:48px;height:48px;border-radius:6px;margin-right:14px;object-fit:contain;background:#FFFFFF;border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:2px;flex-shrink:0;" />` : '';
       const title = r.company_shortname || r.company_fullname || 'Company';
       const sub = (r.company_shortname && r.company_fullname) ? `<div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-top:2px;">${typeof escapeHTML === 'function' ? escapeHTML(r.company_fullname) : r.company_fullname}</div>` : '';

@@ -31,7 +31,7 @@
       { key: 'city', label: 'City', type: 'select', optionsFrom: 'cms_city', optionValue: 'name', optionLabel: 'name', filterByProvinceField: 'province' },
       { key: 'company_fullname', label: 'COMPANY FULL NAME', type: 'text' },
       { key: 'company_shortname', label: 'COMPANY SHORT NAME', type: 'text', required: true, oninput: "this.dataset.vietqrShortName = ''" },
-      { key: 'base_currency', label: 'Base Currency', labelKey: 'col.base_currency', type: 'text', createReadonly: true, editReadonly: true, placeholder: 'Được đồng bộ từ lúc đăng ký' },
+      { key: 'base_currency', label: 'Base Currency', labelKey: 'col.base_currency', type: 'text', createReadonly: true, editReadonly: true, placeholderKey: 'my_company.placeholder.synced_from_signup', placeholder: 'Synced from registration' },
       { key: 'company_label', label: 'COMPANY LABEL', type: 'text', createReadonly: true, editReadonly: true, virtual: true, full: true },
       { key: 'website', label: 'Website', type: 'text' },
       { key: 'address', label: 'Address', type: 'textarea', full: true },
@@ -41,15 +41,8 @@
       { key: 'logo', label: 'Logo', type: 'file', accept: 'image/*', full: true },
     ],
     detailSubtitle: (r) => {
-      let logoUrl = null;
-      try {
-        logoUrl = typeof extractImageUrl === 'function' ? extractImageUrl(r.logo) : (window.extractImageUrl ? window.extractImageUrl(r.logo) : null);
-      } catch (e) {
-        logoUrl = null;
-      }
-      const logo = (logoUrl && typeof logoUrl === 'string')
-        ? `<img src="${escapeHTML(logoUrl)}" style="width:48px;height:48px;border-radius:6px;margin-right:14px;object-fit:contain;background:#FFFFFF;border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:2px;flex-shrink:0;" onerror="this.style.display='none'" />`
-        : '';
+      const logoUrl = (typeof window.extractImageUrl === 'function') ? window.extractImageUrl(r.logo) : r.logo;
+      const logo = (logoUrl && typeof logoUrl === 'string') ? `<img src="${logoUrl}" style="width:48px;height:48px;border-radius:6px;margin-right:14px;object-fit:contain;background:#FFFFFF;border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:2px;flex-shrink:0;" />` : '';
       const title = r.company_shortname || r.company_fullname || 'Company';
       const sub = (r.company_shortname && r.company_fullname) ? `<div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-top:2px;">${typeof escapeHTML === 'function' ? escapeHTML(r.company_fullname) : r.company_fullname}</div>` : '';
       return `<div style="display:flex;align-items:center;">${logo}<div><h2 style="font-size:20px;font-weight:700;color:var(--text);margin:0;line-height:1.2;">${typeof escapeHTML === 'function' ? escapeHTML(title) : title}</h2>${sub}</div></div>`;
