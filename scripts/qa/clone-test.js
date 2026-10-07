@@ -84,7 +84,7 @@ async function runOnce() {
   console.log(`[clone-test] app log lines with errors: ${errs.length}`);
   errs.slice(0, 8).forEach((l) => console.log('   ' + l.slice(0, 200)));
   // Local Postgres sometimes drops connections under load; that makes startup migrations fail for reasons unrelated to the code.
-  const transient = log.split(/\r?\n/).find((l) => /connection timeout|Connection terminated|ECONNRESET|ECONNREFUSED|too many clients/i.test(l));
+  const transient = log.split(/\r?\n/).filter((l) => !/CMS Lookups/i.test(l)).find((l) => /connection timeout|Connection terminated|ECONNRESET|ECONNREFUSED|too many clients/i.test(l));
   if (transient) { const e = new Error('transient DB connection problem during app startup: ' + transient.slice(0, 160)); e.transient = true; throw e; }
 
   const fpScript = path.resolve(__dirname, 'clone-fingerprint.js');

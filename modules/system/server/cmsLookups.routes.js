@@ -131,10 +131,12 @@ async function getCachedProvinces() {
   return result.rows;
 }
 
-// Warm up cache in background on startup
-getCachedCountries().catch(err => console.warn('[CMS Lookups] Cache warmup countries error:', err.message));
-getCachedCurrencies().catch(err => console.warn('[CMS Lookups] Cache warmup currencies error:', err.message));
-getCachedProvinces().catch(err => console.warn('[CMS Lookups] Cache warmup provinces error:', err.message));
+// Warm up cache in background on startup (delayed to allow DB migration to complete)
+setTimeout(() => {
+  getCachedCountries().catch(err => console.warn('[CMS Lookups] Cache warmup countries error:', err.message));
+  getCachedCurrencies().catch(err => console.warn('[CMS Lookups] Cache warmup currencies error:', err.message));
+  getCachedProvinces().catch(err => console.warn('[CMS Lookups] Cache warmup provinces error:', err.message));
+}, 8000);
 
 router.get('/countries', async (req, res) => {
   try {

@@ -1533,7 +1533,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                                    <span class="material-symbols-rounded" style="font-size: 16px;">content_copy</span>
                                  </button>
                                </td>
-                             ` : ''}
+                             ` : `<td style="padding: 6px 14px; text-align: center;"></td>`}
                              ` : ''}
                              ${cols.map((c, colIdx) => {
                 let val = resolvedRow[c.key];
