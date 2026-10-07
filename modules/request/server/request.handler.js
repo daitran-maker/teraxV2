@@ -1,7 +1,14 @@
-﻿const repo = require('./request.repository');
+const repo = require('./request.repository');
 const service = require('./request.service');
 
 class RequestHandler {
+  async beforeInsert(req, data, client) {
+    const ptUpper = String(data.request_type || '').toUpperCase();
+    if (ptUpper === '5' || ptUpper === 'RPM' || ptUpper === 'PAYMENT') {
+      throw new Error('Process type "Payment" (ID 5 / RPM) được tạo tự động bởi quy trình thanh toán và không thể tạo thủ công.');
+    }
+  }
+
   /**
    * Intercept and enrich query filters specifically for request table
    */

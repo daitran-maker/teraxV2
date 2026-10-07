@@ -2438,91 +2438,7 @@ router.post('/:tableName', async (req, res) => {
           return res.status(400).json({ error: handlerErr.message });
         }
       }
-      // ── Contract validations ──────────────────────────────────────────
-      if (tableName === 'contract') {
-        // Contract No (contractspood_no) is required when Signed Date is set
-        const hasSignedDate = data.contract_signed_date && String(data.contract_signed_date).trim() !== '';
-        const hasContractNo = data.contractspood_no && String(data.contractspood_no).trim() !== '';
-        if (hasSignedDate && !hasContractNo) {
-          return res.status(400).json({ error: 'Contract No (contractspood_no) is required when Signed Date is set.' });
-        }
-        // Contract type must not be Internal (71)
-        if (Number(data.type) === 71) {
-          return res.status(400).json({ error: 'Contract type "Internal" is no longer supported. Please select Selling or Buying.' });
-        }
-      }
 
-      // ── Payment validations ───────────────────────────────────────────
-      if (tableName === 'payment') {
-        // payment_term is required
-        if (!data.payment_term || String(data.payment_term).trim() === '') {
-          return res.status(400).json({ error: 'Payment Condition (payment_term) is required.' });
-        }
-        // payment_period must be a positive integer
-        if (data.payment_period !== undefined && data.payment_period !== null && data.payment_period !== '') {
-          const ppVal = Number(data.payment_period);
-          if (!Number.isInteger(ppVal) || ppVal < 1) {
-            return res.status(400).json({ error: 'Payment Period must be a positive whole number.' });
-          }
-          data.payment_period = ppVal;
-        }
-        if (!data.payment_status) {
-          data.payment_status = 30; // 30=Draft
-        }
-        if (data.contract_id) {
-          const contractRes = await client.query('SELECT type, COALESCE(total_value_in_base_currency, (COALESCE(value_before_vat, 0) + COALESCE(vat_value, 0)) * COALESCE(exchance_rate, 1)) as contract_total FROM contract WHERE contract_id = $1 AND deleted_at IS NULL', [data.contract_id]);
-          if (contractRes.rows.length > 0) {
-            const contractTotal = parseFloat(contractRes.rows[0].contract_total) || 0;
-            let newTotal = 0;
-            if (data.value_in_base_currency !== undefined && data.value_in_base_currency !== null && data.value_in_base_currency !== '') {
-              newTotal = parseFloat(String(data.value_in_base_currency).replace(/,/g, '')) || 0;
-            } else {
-              const val = parseFloat(String(data.value || 0).replace(/,/g, '')) || 0;
-              const rate = parseFloat(String(data.exchange_rate || 1).replace(/,/g, '')) || 1;
-              newTotal = Math.round(val * rate);
-            }
-            
-            const existingRes = await client.query('SELECT SUM(COALESCE(value_in_base_currency, (COALESCE(value, 0) + COALESCE(vat, 0)) * COALESCE(exchange_rate, 1))) as existing_total FROM payment WHERE contract_id = $1 AND deleted_at IS NULL', [data.contract_id]);
-            const existingTotal = parseFloat(existingRes.rows[0].existing_total) || 0;
-            if (existingTotal + newTotal > contractTotal) {
-              throw new Error(`Tổng giá trị các thanh toán (${(existingTotal + newTotal).toLocaleString()}) vượt quá tổng giá trị hợp đồng (${contractTotal.toLocaleString()})`);
-            }
-          }
-        }
-      }
-
-      if (tableName === 'invoice') {
-        if (!data.description || !String(data.description).trim()) {
-          return res.status(400).json({ error: 'Description is required for invoice.' });
-        }
-        if (data.contract_id) {
-          const contractRes = await client.query('SELECT COALESCE(total_value_in_base_currency, (COALESCE(value_before_vat, 0) + COALESCE(vat_value, 0)) * COALESCE(exchance_rate, 1)) as contract_total FROM contract WHERE contract_id = $1 AND deleted_at IS NULL', [data.contract_id]);
-          if (contractRes.rows.length > 0) {
-            const contractTotal = parseFloat(contractRes.rows[0].contract_total) || 0;
-            let newTotal = 0;
-            if (data.total_value_in_base_currency !== undefined && data.total_value_in_base_currency !== null && data.total_value_in_base_currency !== '') {
-              newTotal = parseFloat(String(data.total_value_in_base_currency).replace(/,/g, '')) || 0;
-            } else {
-              const valBefore = parseFloat(String(data.value_before_vat || 0).replace(/,/g, '')) || 0;
-              const valVat = parseFloat(String(data.vat_value || 0).replace(/,/g, '')) || 0;
-              const rate = parseFloat(String(data.exchange_rate || 1).replace(/,/g, '')) || 1;
-              newTotal = Math.round((valBefore + valVat) * rate);
-            }
-            
-            const existingRes = await client.query('SELECT SUM(COALESCE(NULLIF(regexp_replace(COALESCE(total_value_in_base_currency::text, \'\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, (COALESCE(NULLIF(regexp_replace(COALESCE(value_before_vat::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0) + COALESCE(NULLIF(regexp_replace(COALESCE(vat_value::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0)) * COALESCE(NULLIF(regexp_replace(COALESCE(exchange_rate::text, \'1\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 1))) as existing_total FROM invoice WHERE contract_id = $1 AND deleted_at IS NULL', [data.contract_id]);
-            const existingTotal = parseFloat(existingRes.rows[0].existing_total) || 0;
-            if (existingTotal + newTotal > contractTotal) {
-              throw new Error(`Tổng giá trị các hóa đơn (${(existingTotal + newTotal).toLocaleString()}) vượt quá tổng giá trị hợp đồng (${contractTotal.toLocaleString()})`);
-            }
-          }
-        }
-      }
-      if (tableName === 'request') {
-        const ptUpper = String(data.request_type || '').toUpperCase();
-        if (ptUpper === '5' || ptUpper === 'RPM' || ptUpper === 'PAYMENT') {
-          throw new Error('Process type "Payment" (ID 5 / RPM) được tạo tự động bởi quy trình thanh toán và không thể tạo thủ công.');
-        }
-      }
 
       const requestChildren = ['payment', 'invoice', 'service', 'asset', 'contract', 'expense', 'target_table'];
       if (requestChildren.includes(tableName)) {
@@ -3125,106 +3041,13 @@ router.put('/:tableName/:id', async (req, res) => {
   const updateHandler = tableRegistry.resolveHandler(tableName);
   if (updateHandler && typeof updateHandler.beforeUpdate === 'function') {
     try {
-      await updateHandler.beforeUpdate(req, id, data, oldRecord);
+      await updateHandler.beforeUpdate(req, id, data, oldRecord, getPoolForTable(tableName));
     } catch (handlerErr) {
       return res.status(400).json({ error: handlerErr.message });
     }
   }
 
-  // ── Contract validations (PUT) ──────────────────────────────────────
-  if (tableName === 'contract') {
-    // Merge with oldRecord to check effective values
-    const effectiveSignedDate = data.contract_signed_date !== undefined ? data.contract_signed_date : (oldRecord && oldRecord.contract_signed_date);
-    const effectiveContractNo = data.contractspood_no !== undefined ? data.contractspood_no : (oldRecord && oldRecord.contractspood_no);
-    const hasSignedDate = effectiveSignedDate && String(effectiveSignedDate).trim() !== '';
-    const hasContractNo = effectiveContractNo && String(effectiveContractNo).trim() !== '';
-    if (hasSignedDate && !hasContractNo) {
-      return res.status(400).json({ error: 'Contract No (contractspood_no) is required when Signed Date is set.' });
-    }
-    // Contract type must not be Internal (71)
-    if (data.type !== undefined && Number(data.type) === 71) {
-      return res.status(400).json({ error: 'Contract type "Internal" is no longer supported. Please select Selling or Buying.' });
-    }
-  }
-
-  // ── Payment validations (PUT) ─────────────────────────────────────────
-  if (tableName === 'payment') {
-    // payment_term required (check if being explicitly cleared)
-    const effectivePaymentTerm = data.payment_term !== undefined ? data.payment_term : (oldRecord && oldRecord.payment_term);
-    if (effectivePaymentTerm !== undefined && (!effectivePaymentTerm || String(effectivePaymentTerm).trim() === '')) {
-      return res.status(400).json({ error: 'Payment Condition (payment_term) is required.' });
-    }
-    // payment_period must be positive integer
-    if (data.payment_period !== undefined && data.payment_period !== null && data.payment_period !== '') {
-      const ppVal = Number(data.payment_period);
-      if (!Number.isInteger(ppVal) || ppVal < 1) {
-        return res.status(400).json({ error: 'Payment Period must be a positive whole number.' });
-      }
-      data.payment_period = ppVal;
-    }
-  }
-
-  // ── Invoice validations (PUT) ─────────────────────────────────────────
-  if (tableName === 'invoice') {
-    const effectiveDescription = data.description !== undefined ? data.description : (oldRecord && oldRecord.description);
-    if (effectiveDescription !== undefined && (!effectiveDescription || !String(effectiveDescription).trim())) {
-      return res.status(400).json({ error: 'Description is required for invoice.' });
-    }
-  }
-
   try {
-    if (tableName === 'payment' && (data.contract_id !== undefined || (oldRecord && oldRecord.contract_id))) {
-      const contractId = data.contract_id !== undefined ? data.contract_id : (oldRecord ? oldRecord.contract_id : null);
-      if (contractId) {
-        const contractRes = await getPoolForTable(tableName).query('SELECT COALESCE(total_value_in_base_currency, (COALESCE(value_before_vat, 0) + COALESCE(vat_value, 0)) * COALESCE(exchance_rate, 1)) as contract_total FROM contract WHERE contract_id = $1 AND deleted_at IS NULL', [contractId]);
-        if (contractRes.rows.length > 0) {
-          const contractTotal = parseFloat(contractRes.rows[0].contract_total) || 0;
-          let newTotal = 0;
-          if (data.value_in_base_currency !== undefined && data.value_in_base_currency !== null && data.value_in_base_currency !== '') {
-            newTotal = parseFloat(String(data.value_in_base_currency).replace(/,/g, '')) || 0;
-          } else if (data.value !== undefined || data.exchange_rate !== undefined) {
-            const val = parseFloat(String(data.value !== undefined ? data.value : (oldRecord ? oldRecord.value : 0)).replace(/,/g, '')) || 0;
-            const rate = parseFloat(String(data.exchange_rate !== undefined ? data.exchange_rate : (oldRecord ? oldRecord.exchange_rate : 1)).replace(/,/g, '')) || 1;
-            newTotal = Math.round(val * rate);
-          } else {
-            newTotal = oldRecord ? (parseFloat(oldRecord.value_in_base_currency) || (parseFloat(oldRecord.value || 0) * parseFloat(oldRecord.exchange_rate || 1))) : 0;
-          }
-
-          const existingRes = await getPoolForTable(tableName).query('SELECT SUM(COALESCE(value_in_base_currency, (COALESCE(value, 0) + COALESCE(vat, 0)) * COALESCE(exchange_rate, 1))) as existing_total FROM payment WHERE contract_id = $1 AND deleted_at IS NULL AND payment_id <> $2', [contractId, id]);
-          const existingTotal = parseFloat(existingRes.rows[0].existing_total) || 0;
-          if (existingTotal + newTotal > contractTotal) {
-            throw new Error(`Tổng giá trị các thanh toán (${(existingTotal + newTotal).toLocaleString()}) vượt quá tổng giá trị hợp đồng (${contractTotal.toLocaleString()})`);
-          }
-        }
-      }
-    }
-
-    if (tableName === 'invoice' && (data.contract_id !== undefined || (oldRecord && oldRecord.contract_id))) {
-      const contractId = data.contract_id !== undefined ? data.contract_id : (oldRecord ? oldRecord.contract_id : null);
-      if (contractId) {
-        const contractRes = await getPoolForTable(tableName).query('SELECT COALESCE(total_value_in_base_currency, (COALESCE(value_before_vat, 0) + COALESCE(vat_value, 0)) * COALESCE(exchance_rate, 1)) as contract_total FROM contract WHERE contract_id = $1 AND deleted_at IS NULL', [contractId]);
-        if (contractRes.rows.length > 0) {
-          const contractTotal = parseFloat(contractRes.rows[0].contract_total) || 0;
-          let newTotal = 0;
-          if (data.total_value_in_base_currency !== undefined && data.total_value_in_base_currency !== null && data.total_value_in_base_currency !== '') {
-            newTotal = parseFloat(String(data.total_value_in_base_currency).replace(/,/g, '')) || 0;
-          } else if (data.value_before_vat !== undefined || data.vat_value !== undefined || data.exchange_rate !== undefined) {
-            const valBefore = parseFloat(String(data.value_before_vat !== undefined ? data.value_before_vat : (oldRecord ? oldRecord.value_before_vat : 0)).replace(/,/g, '')) || 0;
-            const valVat = parseFloat(String(data.vat_value !== undefined ? data.vat_value : (oldRecord ? oldRecord.vat_value : 0)).replace(/,/g, '')) || 0;
-            const rate = parseFloat(String(data.exchange_rate !== undefined ? data.exchange_rate : (oldRecord ? oldRecord.exchange_rate : 1)).replace(/,/g, '')) || 1;
-            newTotal = Math.round((valBefore + valVat) * rate);
-          } else {
-            newTotal = oldRecord ? (parseFloat(oldRecord.total_value_in_base_currency) || ((parseFloat(oldRecord.value_before_vat || 0) + parseFloat(oldRecord.vat_value || 0)) * parseFloat(oldRecord.exchange_rate || 1))) : 0;
-          }
-
-          const existingRes = await getPoolForTable(tableName).query('SELECT SUM(COALESCE(NULLIF(regexp_replace(COALESCE(total_value_in_base_currency::text, \'\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, (COALESCE(NULLIF(regexp_replace(COALESCE(value_before_vat::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0) + COALESCE(NULLIF(regexp_replace(COALESCE(vat_value::text, \'0\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 0)) * COALESCE(NULLIF(regexp_replace(COALESCE(exchange_rate::text, \'1\'), \'[^0-9.-]\', \'\', \'g\'), \'\')::numeric, 1))) as existing_total FROM invoice WHERE contract_id = $1 AND deleted_at IS NULL AND invoice_id <> $2', [contractId, id]);
-          const existingTotal = parseFloat(existingRes.rows[0].existing_total) || 0;
-          if (existingTotal + newTotal > contractTotal) {
-            throw new Error(`Tổng giá trị các hóa đơn (${(existingTotal + newTotal).toLocaleString()}) vượt quá tổng giá trị hợp đồng (${contractTotal.toLocaleString()})`);
-          }
-        }
-      }
-    }
 
     let whereClause = `(${pk}::text = $${values.length + 1} OR ${pk}::text = $${values.length + 2}`;
     if (hasIdCol && pk !== 'id') {
