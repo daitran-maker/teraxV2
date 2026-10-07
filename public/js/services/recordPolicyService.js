@@ -174,8 +174,14 @@ function fieldContainsEmail(value, email) {
 }
 
 function shouldHideRequestEditDeleteActions(moduleKey) {
+  const normKey = String(moduleKey || '').toLowerCase();
+  const requestViews = ['my_approval', 'my_process_owner', 'my_task', 'my_team', 'request', 'my_request'];
+  // If this check is for a child element module (not the request container itself), don't hide its actions
+  if (normKey && !requestViews.includes(normKey)) {
+    return false;
+  }
   const hashModule = window.location.hash.replace('#', '').split('/')[0];
-  return [moduleKey, hashModule, currentModule]
+  return [normKey, hashModule, currentModule]
     .map(v => String(v || '').toLowerCase())
     .some(v => ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(v));
 }

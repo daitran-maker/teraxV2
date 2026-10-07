@@ -48,7 +48,8 @@ async function loadModule(moduleKey, skipFetch = false) {
     await renderAssignedTaskKanbanView(moduleKey, skipFetch);
   } else {
     const content = document.getElementById('content');
-    if (content && !skipFetch) {
+    const existingView = document.getElementById(`view-${moduleKey}`);
+    if (content && !skipFetch && !existingView) {
       content.innerHTML = `
         <div class="skeleton-table-wrapper" style="padding:16px; background:#FFFFFF; height:100%; display:flex; flex-direction:column; gap:12px; font-family:'Inter',sans-serif;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">

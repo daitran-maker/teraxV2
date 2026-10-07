@@ -769,8 +769,8 @@ async function runSchemaV1(pool, seeds) {
           r.request_type,
           (CASE 
             WHEN ea.exp_fy IS NOT NULL AND ea.exp_fy <> '' THEN 
-              (CASE WHEN ea.exp_fy LIKE 'FY%' THEN ea.exp_fy ELSE 'FY' || ea.exp_fy END)
-            ELSE 'FY' || EXTRACT(YEAR FROM COALESCE(r.sr_submitted_date, r.sr_created_date, CURRENT_TIMESTAMP))::text 
+              REPLACE(ea.exp_fy, 'FY', '')
+            ELSE EXTRACT(YEAR FROM COALESCE(r.sr_submitted_date, r.sr_created_date, CURRENT_TIMESTAMP))::text 
           END) AS fy,
           COALESCE(ca.selling_contract_count, 0) AS selling_contract_count,
           COALESCE(ca.selling, 0) AS selling,

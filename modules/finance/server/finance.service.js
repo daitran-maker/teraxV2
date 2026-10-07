@@ -420,10 +420,9 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
   let fy = Array.from(fyValues)[0];
   if (!fy) {
     const txDate = reqRow.sr_submitted_date || reqRow.sr_created_date || now;
-    fy = 'FY' + new Date(txDate).getFullYear();
-  }
-  if (fy && !String(fy).startsWith('FY')) {
-    fy = 'FY' + fy;
+    fy = String(new Date(txDate).getFullYear());
+  } else {
+    fy = String(fy).replace(/^FY/i, '').trim();
   }
 
   return {

@@ -1156,7 +1156,7 @@ function showPaymentPaidModal(mtrOptions, currentRecord, isChangeMtr = false) {
       : today;
 
     const optionsHTML = mtrOptions.length > 0
-      ? mtrOptions.map(m => `<option value="${m.value}" data-txdate="${m.transaction_date || ''}">${m.label}</option>`).join('')
+      ? mtrOptions.map(m => `<option value="${m.value}" data-txdate="${m.transaction_date || ''}" data-desc="${escapeHTML(m.description || '')}" data-amount="${escapeHTML(m.amount || '')}" data-account="${escapeHTML(m.account || '')}" data-type="${escapeHTML(m.type || '')}">${m.label}</option>`).join('')
       : '<option value="">— No MTR found for this company —</option>';
 
     // Build modal HTML
@@ -1901,7 +1901,11 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
       return {
         value: m.transaction_id,
         label: `${accName} | ${m.description || m.transaction_id} | ${m.transaction_type || ''} | ${formatNumber(m.amount) || ''} ${m.currency || ''} | ${m.transaction_date ? m.transaction_date.slice(0, 10) : 'No date'}`,
-        transaction_date: m.transaction_date
+        transaction_date: m.transaction_date,
+        description: m.description || '',
+        amount: String(m.amount || ''),
+        account: accName,
+        type: m.transaction_type || ''
       };
     });
 
@@ -3010,15 +3014,12 @@ function buildDetailViewHTML(moduleKey, record) {
       } else if ((fieldCfg && fieldCfg.type === 'file') || row.key === 'file' || row.key === 'logo' || row.key === 'avatar') {
         let fileList = [];
         if (val) {
-          if (typeof val === 'object') {
-            if (val.type === 'Buffer' && Array.isArray(val.data)) {
-              try {
-                val = new TextDecoder('utf-8').decode(new Uint8Array(val.data));
-              } catch (e) {
-                val = '';
-              }
-            } else if (Array.isArray(val)) {
-              fileList = val;
+          const directImg = (typeof window.extractImageUrl === 'function') ? window.extractImageUrl(val) : null;
+          if (directImg) {
+            fileList = [directImg];
+          } else if (typeof val === 'object') {
+            if (Array.isArray(val)) {
+              fileList = val.map(v => (typeof window.extractImageUrl === 'function' ? window.extractImageUrl(v) : v) || v);
             }
           }
           if (!fileList.length && val) {

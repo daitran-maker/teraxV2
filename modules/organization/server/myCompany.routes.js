@@ -7,22 +7,43 @@ const { validateTableData } = require('../../../server/helpers/validation');
 const { checkPermission } = require('../../../server/helpers/permissionHelper');
 const { getRecordAuditLogs } = require('../../../server/helpers/auditHelper');
 
+function formatCompanyLogo(logo) {
+  if (!logo) return null;
+  if (Buffer.isBuffer(logo)) {
+    const mime = (logo[0] === 0xFF && logo[1] === 0xD8) ? 'image/jpeg' : 'image/png';
+    return `data:${mime};base64,${logo.toString('base64')}`;
+  }
+  if (typeof logo === 'object' && logo.type === 'Buffer' && Array.isArray(logo.data)) {
+    const buf = Buffer.from(logo.data);
+    const mime = (buf[0] === 0xFF && buf[1] === 0xD8) ? 'image/jpeg' : 'image/png';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  }
+  if (Array.isArray(logo) && logo.length > 0) {
+    return formatCompanyLogo(logo[0]);
+  }
+  if (typeof logo === 'string') {
+    let str = logo.trim();
+    if (str.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed) && parsed.length > 0) return formatCompanyLogo(parsed[0]);
+      } catch (e) {}
+    }
+    if (str.startsWith('data:image') || str.startsWith('http://') || str.startsWith('https://') || str.startsWith('/uploads/') || str.startsWith('uploads/')) {
+      return str;
+    }
+    if (/^[A-Za-z0-9+/=]+$/.test(str.slice(0, 100)) && str.length > 100) {
+      return `data:image/png;base64,${str}`;
+    }
+    return str;
+  }
+  return logo;
+}
+
 function normalizeCompanyRecord(rec) {
   if (!rec) return rec;
   if (rec.logo) {
-    if (Buffer.isBuffer(rec.logo)) {
-      rec.logo = rec.logo.toString('utf8');
-    } else if (typeof rec.logo === 'object' && rec.logo.type === 'Buffer' && Array.isArray(rec.logo.data)) {
-      rec.logo = Buffer.from(rec.logo.data).toString('utf8');
-    } else if (Array.isArray(rec.logo) && rec.logo.length > 0) {
-      rec.logo = rec.logo[0];
-    }
-    if (typeof rec.logo === 'string' && rec.logo.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(rec.logo);
-        if (Array.isArray(parsed) && parsed.length > 0) rec.logo = parsed[0];
-      } catch (e) {}
-    }
+    rec.logo = formatCompanyLogo(rec.logo);
   }
   return rec;
 }

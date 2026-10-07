@@ -774,6 +774,9 @@ window._setupDataLoaded = false;
 window.renderSetupContent = async function (forceRefresh) {
   const contentEl = document.getElementById('content');
   if (!contentEl) return;
+  const prevScrollTop = contentEl.scrollTop || window.scrollY || 0;
+  const detailScroll = contentEl.querySelector('.detail-scroll');
+  const prevDetailScroll = detailScroll ? detailScroll.scrollTop : 0;
 
   if (!window._setupDataLoaded || forceRefresh) {
     contentEl.innerHTML = '<div style="padding:40px;text-align:center;color:#374151;"><div class="spinner" style="margin:0 auto 12px;"></div> ' + swT('sw.loading', 'Đang tải thông tin thiết lập...') + '</div>';
@@ -906,6 +909,15 @@ window.renderSetupContent = async function (forceRefresh) {
     + '</div>'
     + (currentStep < 6 ? progressSidebar : '')
     + '</div></div>';
+
+  if (prevScrollTop) {
+    contentEl.scrollTop = prevScrollTop;
+    window.scrollTo(0, prevScrollTop);
+  }
+  const newDetailScroll = contentEl.querySelector('.detail-scroll');
+  if (newDetailScroll && prevDetailScroll) {
+    newDetailScroll.scrollTop = prevDetailScroll;
+  }
 };
 
 window.setSetupStep = function(n){window.setupCurrentStep=Math.max(1,Math.min(6,n));renderSetupContent();};
@@ -1882,6 +1894,27 @@ function renderStep3HTML(counts){
   return '<div class="sw-card">'+swStepHeader('group', 3, swT('sw.step3_header', 'Thiết lập nhân viên'), swT('sw.step3_desc', 'Nhập danh sách nhân sự. Có thể nhập từ Excel hoặc thêm nhanh.'))+'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">'+modeCards+'</div>'+tc+swBottomNav(2,4,btnLabel,'saveStep3AndAdvance()')+'</div>';
 }
 
+window.buildManagerSelectOptions = function(selectedVal) {
+  const norm = String(selectedVal || '').trim();
+  const emps = (window.setupWizardData && Array.isArray(window.setupWizardData.employees)) ? window.setupWizardData.employees : [];
+  let options = [];
+  options.push({ value: 'Super Admin', label: 'Super Admin' });
+  emps.forEach(e => {
+    const name = e.full_name || e.name || e.email || e.username;
+    const val = e.email || e.username || name;
+    if (val && !options.some(o => o.value === val)) {
+      options.push({ value: val, label: `${name} (${val})` });
+    }
+  });
+  if (norm && !options.some(o => o.value.toLowerCase() === norm.toLowerCase())) {
+    options.push({ value: norm, label: norm });
+  }
+  return options.map(o => {
+    const isSel = (o.value.toLowerCase() === norm.toLowerCase() || (norm === '' && o.value === 'Super Admin')) ? 'selected' : '';
+    return `<option value="${escapeHTML(o.value)}" ${isSel}>${escapeHTML(o.label)}</option>`;
+  }).join('');
+};
+
 function renderQuickEmpCard(idx, data) {
   const d = data || {};
   const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
@@ -1900,8 +1933,8 @@ function renderQuickEmpCard(idx, data) {
     // Row 2 (4 inputs)
     + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
     + '<div>'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true)+'<input type="text" class="sw-input qemp-direct-mgr" placeholder="' + swT('sw.step3_emp_direct_mgr_ph', 'Email / Tên QL') + '" value="'+escapeHTML(d.direct_mgr||'Super Admin')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), true)+'<input type="text" class="sw-input qemp-hr-mgr" placeholder="' + swT('sw.step3_emp_hr_mgr_ph', 'Email / Tên HR') + '" value="'+escapeHTML(d.hr_mgr||'Super Admin')+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true)+'<select class="sw-input qemp-direct-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.direct_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), true)+'<select class="sw-input qemp-hr-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.hr_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
     // Row 3 (2 inputs spanning 2 columns each)
     + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-name" placeholder="' + swT('sw.step3_emp_emg_name_ph', 'Tên người thân') + '" value="'+escapeHTML(d.emg_name||'')+'"></div>'
     + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="' + swT('sw.step3_emp_emg_phone_ph', '0901234567') + '" value="'+escapeHTML(d.emg_phone||'')+'"></div>'

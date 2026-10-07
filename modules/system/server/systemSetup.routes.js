@@ -291,14 +291,13 @@ router.post('/company', async (req, res) => {
 
   let logoParam = null;
   if (logo) {
-    try {
-      if (typeof logo === 'string' && logo.startsWith('data:')) {
-        logoParam = Buffer.from(logo.split(',')[1], 'base64');
-      } else {
-        logoParam = logo;
-      }
-    } catch (e) {
+    if (typeof logo === 'string') {
       logoParam = logo;
+    } else if (Buffer.isBuffer(logo)) {
+      const mime = (logo[0] === 0xFF && logo[1] === 0xD8) ? 'image/jpeg' : 'image/png';
+      logoParam = `data:${mime};base64,${logo.toString('base64')}`;
+    } else {
+      logoParam = String(logo);
     }
   }
 
@@ -739,13 +738,14 @@ router.post('/commit-draft', async (req, res) => {
 
         let logoParam = null;
         if (comp.logo) {
-          try {
-            if (typeof comp.logo === 'string' && comp.logo.startsWith('data:')) {
-              logoParam = Buffer.from(comp.logo.split(',')[1], 'base64');
-            } else {
-              logoParam = comp.logo;
-            }
-          } catch(e) { logoParam = comp.logo; }
+          if (typeof comp.logo === 'string') {
+            logoParam = comp.logo;
+          } else if (Buffer.isBuffer(comp.logo)) {
+            const mime = (comp.logo[0] === 0xFF && comp.logo[1] === 0xD8) ? 'image/jpeg' : 'image/png';
+            logoParam = `data:${mime};base64,${comp.logo.toString('base64')}`;
+          } else {
+            logoParam = String(comp.logo);
+          }
         }
 
         await client.query(`
