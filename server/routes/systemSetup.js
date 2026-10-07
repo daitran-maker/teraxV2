@@ -291,14 +291,12 @@ router.post('/company', async (req, res) => {
 
   let logoParam = null;
   if (logo) {
-    try {
-      if (typeof logo === 'string' && logo.startsWith('data:')) {
-        logoParam = Buffer.from(logo.split(',')[1], 'base64');
-      } else {
-        logoParam = logo;
-      }
-    } catch (e) {
+    if (Buffer.isBuffer(logo)) {
+      logoParam = formatLogo(logo);
+    } else if (typeof logo === 'string') {
       logoParam = logo;
+    } else if (typeof logo === 'object' && Array.isArray(logo.data)) {
+      logoParam = formatLogo(Buffer.from(logo.data));
     }
   }
 
@@ -739,13 +737,13 @@ router.post('/commit-draft', async (req, res) => {
 
         let logoParam = null;
         if (comp.logo) {
-          try {
-            if (typeof comp.logo === 'string' && comp.logo.startsWith('data:')) {
-              logoParam = Buffer.from(comp.logo.split(',')[1], 'base64');
-            } else {
-              logoParam = comp.logo;
-            }
-          } catch(e) { logoParam = comp.logo; }
+          if (Buffer.isBuffer(comp.logo)) {
+            logoParam = formatLogo(comp.logo);
+          } else if (typeof comp.logo === 'string') {
+            logoParam = comp.logo;
+          } else if (typeof comp.logo === 'object' && Array.isArray(comp.logo.data)) {
+            logoParam = formatLogo(Buffer.from(comp.logo.data));
+          }
         }
 
         await client.query(`

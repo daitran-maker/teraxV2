@@ -398,7 +398,9 @@ function applyChildTablePagination(container, childKey, tabPane = null) {
     const startRecord = (currentPage - 1) * PAGE_SIZE + 1;
     const endRecord = Math.min(currentPage * PAGE_SIZE, total);
     if (info) {
-      info.innerHTML = `Showing <strong style="color:#111827;">${startRecord}-${endRecord}</strong> of <strong style="color:#111827;">${total}</strong> records`;
+      info.innerHTML = (typeof window.formatShowingRecords === 'function')
+        ? window.formatShowingRecords(startRecord, endRecord, total)
+        : `Showing <strong style="color:#111827;">${startRecord}-${endRecord}</strong> of <strong style="color:#111827;">${total}</strong> records`;
     }
     if (prev) prev.disabled = currentPage <= 1;
     if (next) next.disabled = currentPage >= totalPages;
@@ -457,7 +459,10 @@ function applyChildTablePagination(container, childKey, tabPane = null) {
 
   footer.innerHTML =
     `<div class="ct-page-info" style="font-size:12px;font-weight:500;color:#6B7280;font-family:'Inter',sans-serif;">` +
-    `Showing <strong style="color:#111827;">1-${Math.min(PAGE_SIZE, total)}</strong> of <strong style="color:#111827;">${total}</strong> records</div>` +
+    ((typeof window.formatShowingRecords === 'function')
+      ? window.formatShowingRecords(1, Math.min(PAGE_SIZE, total), total)
+      : `Showing <strong style="color:#111827;">1-${Math.min(PAGE_SIZE, total)}</strong> of <strong style="color:#111827;">${total}</strong> records`) +
+    `</div>` +
     (totalPages > 1
       ? `<div class="pagination-controls" style="display:flex;gap:6px;align-items:center;height:32px;">` +
       `<button class="btn ct-prev-btn" style="${btnStyle}">${t('table.prev', 'Prev')}</button>` +
@@ -604,31 +609,25 @@ function buildTableStatusCards(moduleKey, data) {
     const iconByType = { customer: 'person', partner: 'handshake', supplier: 'local_shipping' };
     const orderedTypes = ['Customer', 'Partner', 'Supplier'];
 
-    const typeSource = currentFacetedSummary?.type || originalFacetedSummary[moduleKey]?.type || {};
     const activeCounts = {};
     orderedTypes.forEach(t => { activeCounts[t] = 0; });
 
-    if (Object.keys(typeSource).length > 0) {
-      Object.entries(typeSource).forEach(([k, count]) => {
-        const keyLc = String(k).trim().toLowerCase();
-        const matchType = orderedTypes.find(t => t.toLowerCase() === keyLc) || (k.charAt(0).toUpperCase() + k.slice(1).toLowerCase());
-        activeCounts[matchType] = (activeCounts[matchType] || 0) + (count || 0);
-      });
-    } else {
-      data.forEach(r => {
-        const typeVal = r.type || 'Unassigned';
-        activeCounts[typeVal] = (activeCounts[typeVal] || 0) + 1;
-      });
-    }
+    (data || []).forEach(r => {
+      const keyLc = String(r.type || '').trim().toLowerCase();
+      const matchType = orderedTypes.find(t => t.toLowerCase() === keyLc);
+      if (matchType) {
+        activeCounts[matchType] = (activeCounts[matchType] || 0) + 1;
+      }
+    });
 
     const cardConfig = {
-      '': { label: 'Total Companies', color: '#f97316', bg: '#fff1e8', icon: 'domain' },
-      'customer': { label: 'Customers', color: '#3b82f6', bg: '#eff6ff', icon: 'person' },
-      'partner': { label: 'Partners', color: '#7c3aed', bg: '#f5f3ff', icon: 'handshake' },
-      'supplier': { label: 'Suppliers', color: '#10b981', bg: '#ecfdf5', icon: 'local_shipping' }
+      '': { label: typeof t === 'function' ? t('card.total_companies', 'Total Companies') : 'Total Companies', color: '#f97316', bg: '#fff1e8', icon: 'domain' },
+      'customer': { label: typeof t === 'function' ? t('card.customers', 'Customers') : 'Customers', color: '#3b82f6', bg: '#eff6ff', icon: 'person' },
+      'partner': { label: typeof t === 'function' ? t('card.partners', 'Partners') : 'Partners', color: '#7c3aed', bg: '#f5f3ff', icon: 'handshake' },
+      'supplier': { label: typeof t === 'function' ? t('card.suppliers', 'Suppliers') : 'Suppliers', color: '#10b981', bg: '#ecfdf5', icon: 'local_shipping' }
     };
 
-    const totalCount = typeof currentTableTotal !== 'undefined' && currentTableTotal !== null ? currentTableTotal : Object.values(activeCounts).reduce((total, count) => total + Number(count || 0), 0);
+    const totalCount = (data || []).length;
 
     const cards = [
       { key: '', count: totalCount },
@@ -701,12 +700,12 @@ function buildTableStatusCards(moduleKey, data) {
   // My Company uses the same top KPI card pattern as My Requests, but with
   // organization-specific indicators instead of request statuses.
   if (moduleKey === 'my_company') {
-    const totalDepts = data.reduce((sum, r) => sum + (parseInt(r.department) || 0), 0);
-    const totalAccounts = data.reduce((sum, r) => sum + (parseInt(r.account) || 0), 0);
+    const totalDepts = (data || []).reduce((sum, r) => sum + (parseInt(r.department) || 0), 0);
+    const totalAccounts = (data || []).reduce((sum, r) => sum + (parseInt(r.account) || 0), 0);
     const cards = [
-      { label: 'Total Companies', count: currentTableTotal || data.length, icon: 'domain', color: '#f97316', bg: '#fff1e8' },
-      { label: 'Total Department', count: totalDepts, icon: 'corporate_fare', color: '#7c3aed', bg: '#f5f3ff' },
-      { label: 'Total Accounts', count: totalAccounts, icon: 'account_balance', color: '#10b981', bg: '#ecfdf5' }
+      { label: typeof t === 'function' ? t('card.total_companies', 'Total Companies') : 'Total Companies', count: (data || []).length, icon: 'domain', color: '#f97316', bg: '#fff1e8' },
+      { label: typeof t === 'function' ? t('card.total_department', 'Total Department') : 'Total Department', count: totalDepts, icon: 'corporate_fare', color: '#7c3aed', bg: '#f5f3ff' },
+      { label: typeof t === 'function' ? t('card.total_accounts', 'Total Accounts') : 'Total Accounts', count: totalAccounts, icon: 'account_balance', color: '#10b981', bg: '#ecfdf5' }
     ];
     return `<div class="dv-status-cards" style="display:flex; gap:12px; width:100%; overflow-x:auto; padding-bottom:2px;">${cards.map(card => `
       <div class="dv-status-card" style="flex:1; min-width:140px; height:64px; background:#ffffff; border:1px solid #E5E7EB; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 2px rgba(16,24,40,0.04); border-bottom:3px solid ${card.color};">
@@ -2928,7 +2927,9 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
     const paginationHTML = currentTableTotal ? `
       <div class="pagination-container" id="pagination-${moduleKey}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-top: 1px solid #E5E7EB; background: #FFFFFF; flex-shrink: 0; min-height: 44px;">
         <div class="pagination-info" style="font-size:12px; font-weight: 500; color: #6B7280; font-family: 'Inter', sans-serif;">
-          Showing <strong style="color: #111827;">${startRecord}-${endRecord}</strong> of <strong style="color: #111827;">${total}</strong> records
+          ${(typeof window.formatShowingRecords === 'function')
+            ? window.formatShowingRecords(startRecord, endRecord, total)
+            : `Showing <strong style="color: #111827;">${startRecord}-${endRecord}</strong> of <strong style="color: #111827;">${total}</strong> records`}
         </div>
         <div class="pagination-controls" style="display: flex; gap: 6px; align-items: center; height: 32px;">
           <button class="btn" onclick="changePage('${moduleKey}', ${currentTablePage - 1})" ${currentTablePage <= 1 ? 'disabled' : ''} style="height: 28px !important; padding: 4px 10px !important; font-size: 12px !important; border: 1px solid #E5E7EB !important; border-radius: 6px !important; background: #FFFFFF !important; color: #374151 !important; font-weight: 500 !important; cursor: pointer; transition: all 0.2s ease;">${t('table.prev', 'Prev')}</button>
@@ -3690,38 +3691,7 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
     const isPartnerName = moduleKey === 'company' && (k === 'company_fullname' || k === 'company_shortname');
 
     const extractImageUrl = (raw) => {
-      if (!raw) return null;
-      if (typeof raw === 'object') {
-        if (raw.type === 'Buffer' && Array.isArray(raw.data)) {
-          try {
-            raw = new TextDecoder('utf-8').decode(new Uint8Array(raw.data));
-          } catch (e) {
-            return null;
-          }
-        } else if (Array.isArray(raw) && raw.length > 0) {
-          raw = raw[0];
-        }
-      }
-      if (typeof raw !== 'string') return null;
-      let trimmed = raw.trim();
-      if (trimmed.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (Array.isArray(parsed) && parsed.length > 0) trimmed = String(parsed[0]).trim();
-        } catch (e) {}
-      }
-      if (
-        trimmed.toLowerCase().includes('data:image') ||
-        trimmed.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) ||
-        (trimmed.startsWith('/uploads/') && trimmed.match(/\.(png|jpe?g|gif|webp|svg)/i)) ||
-        trimmed.startsWith('/uploads/') ||
-        trimmed.startsWith('uploads/') ||
-        trimmed.startsWith('http://') ||
-        trimmed.startsWith('https://')
-      ) {
-        return trimmed;
-      }
-      return null;
+      return (typeof window.extractImageUrl === 'function') ? window.extractImageUrl(raw) : null;
     };
 
     if (isEmployeeName || isPartnerName) {
@@ -3861,7 +3831,12 @@ const debouncedFilterTable = debounce((moduleKey, query) => {
   if (isServerSearchModule(moduleKey)) {
     moduleStates[moduleKey].serverSearch = query.trim();
     savePersistedFilters(moduleKey);
-    loadModule(moduleKey, false);
+    const existingView = document.getElementById(`view-${moduleKey}`);
+    if (existingView) {
+      renderTableView(moduleKey, 1, false);
+    } else {
+      loadModule(moduleKey, false);
+    }
     return;
   }
 
@@ -4136,7 +4111,12 @@ window.triggerGlobalSearch = function (moduleKey, query) {
   moduleStates[moduleKey].serverSearch = query.trim();
   moduleStates[moduleKey].page = 1;
   savePersistedFilters(moduleKey);
-  loadModule(moduleKey, false);
+  const existingView = document.getElementById(`view-${moduleKey}`);
+  if (existingView) {
+    renderTableView(moduleKey, 1, false);
+  } else {
+    loadModule(moduleKey, false);
+  }
 };
 
 const activeColumnFilters = {};
@@ -4379,9 +4359,13 @@ function applyAllFilters(moduleKey) {
 
     if (pagInfoEl) {
       if (filteredData.length !== currentData.length) {
-        pagInfoEl.innerHTML = `Filtered <strong>${filteredData.length}</strong> of <strong>${currentData.length}</strong> records (Showing <strong>${startRecord}-${endRecord}</strong>)`;
+        pagInfoEl.innerHTML = (typeof window.formatFilteredRecords === 'function')
+          ? window.formatFilteredRecords(filteredData.length, currentData.length, startRecord, endRecord)
+          : `Filtered <strong>${filteredData.length}</strong> of <strong>${currentData.length}</strong> records (Showing <strong>${startRecord}-${endRecord}</strong>)`;
       } else {
-        pagInfoEl.innerHTML = `Showing <strong style="color: #111827;">${startRecord}-${endRecord}</strong> of <strong style="color: #111827;">${filteredData.length}</strong> records`;
+        pagInfoEl.innerHTML = (typeof window.formatShowingRecords === 'function')
+          ? window.formatShowingRecords(startRecord, endRecord, filteredData.length)
+          : `Showing <strong style="color: #111827;">${startRecord}-${endRecord}</strong> of <strong style="color: #111827;">${filteredData.length}</strong> records`;
       }
       pagInfoEl.style.fontSize = '12px';
       pagInfoEl.style.fontWeight = '500';

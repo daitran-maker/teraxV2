@@ -26,6 +26,73 @@ function debounce(func, wait) {
   };
 }
 
+function extractImageUrl(raw) {
+  if (!raw) return null;
+  if (typeof raw === 'object') {
+    if (raw.type === 'Buffer' && Array.isArray(raw.data)) {
+      try {
+        const bytes = new Uint8Array(raw.data);
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const b64 = btoa(binary);
+        const mime = (bytes[0] === 0xFF && bytes[1] === 0xD8) ? 'image/jpeg' : 'image/png';
+        return `data:${mime};base64,${b64}`;
+      } catch (e) {
+        return null;
+      }
+    } else if (Array.isArray(raw) && raw.length > 0) {
+      return extractImageUrl(raw[0]);
+    }
+  }
+  if (typeof raw !== 'string') return null;
+  let trimmed = raw.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed) && parsed.length > 0) return extractImageUrl(parsed[0]);
+    } catch (e) {}
+  }
+  if (trimmed.startsWith('data:image') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  if (
+    trimmed.match(/\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i) ||
+    trimmed.startsWith('/uploads/') ||
+    trimmed.startsWith('uploads/') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://')
+  ) {
+    return trimmed;
+  }
+  if (/^[A-Za-z0-9+/=]+$/.test(trimmed.slice(0, 100)) && trimmed.length > 100) {
+    return `data:image/png;base64,${trimmed}`;
+  }
+  return null;
+}
+window.extractImageUrl = extractImageUrl;
+
+function formatShowingRecords(start, end, total) {
+  const tpl = typeof t === 'function' ? t('table.showing_info', 'Showing {start}-{end} of {total} records') : 'Showing {start}-{end} of {total} records';
+  return tpl
+    .replace('{start}', `<strong style="color:#111827;">${start}</strong>`)
+    .replace('{end}', `<strong style="color:#111827;">${end}</strong>`)
+    .replace('{total}', `<strong style="color:#111827;">${total}</strong>`);
+}
+window.formatShowingRecords = formatShowingRecords;
+
+function formatFilteredRecords(filtered, total, start, end) {
+  const tpl = typeof t === 'function' ? t('table.filtered_info', 'Filtered {filtered} of {total} records (Showing {start}-{end})') : 'Filtered {filtered} of {total} records (Showing {start}-{end})';
+  return tpl
+    .replace('{filtered}', `<strong>${filtered}</strong>`)
+    .replace('{total}', `<strong>${total}</strong>`)
+    .replace('{start}', `<strong>${start}</strong>`)
+    .replace('{end}', `<strong>${end}</strong>`);
+}
+window.formatFilteredRecords = formatFilteredRecords;
+
 const SERVER_SEARCH_MODULES = new Set(['employee', 'employee_active', 'payment', 'expense', 'invoice', 'request', 'service', 'asset', 'mtr', 'account', 'request_activity_log', 'finance', 'contract', 'action_rules']);
 
 function isServerSearchModule(moduleKey) {

@@ -2483,7 +2483,8 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
         saveBtn.disabled = false;
         saveBtn.dataset.uploading = 'false';
         saveBtn.textContent = originalSaveText || 'Save';
-        if (typeof validateFormAndNotify === 'function') validateFormAndNotify(currentFormModuleKey, false);
+        const activeModKey = document.getElementById('form-modal')?.dataset?.moduleKey || (typeof currentModule !== 'undefined' ? currentModule : null);
+        if (typeof validateFormAndNotify === 'function' && activeModKey) validateFormAndNotify(activeModKey, false);
       }
     })
     .catch(err => {

@@ -1156,7 +1156,7 @@ function showPaymentPaidModal(mtrOptions, currentRecord, isChangeMtr = false) {
       : today;
 
     const optionsHTML = mtrOptions.length > 0
-      ? mtrOptions.map(m => `<option value="${m.value}" data-txdate="${m.transaction_date || ''}">${m.label}</option>`).join('')
+      ? mtrOptions.map(m => `<option value="${escapeHTML(m.value)}" data-txdate="${escapeHTML(m.transaction_date || '')}" data-desc="${escapeHTML(m.description || '')}" data-amount="${escapeHTML(m.amount || '')}" data-account="${escapeHTML(m.account || '')}" data-type="${escapeHTML(m.transaction_type || '')}">${escapeHTML(m.label)}</option>`).join('')
       : '<option value="">— No MTR found for this company —</option>';
 
     // Build modal HTML
@@ -1901,7 +1901,11 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
       return {
         value: m.transaction_id,
         label: `${accName} | ${m.description || m.transaction_id} | ${m.transaction_type || ''} | ${formatNumber(m.amount) || ''} ${m.currency || ''} | ${m.transaction_date ? m.transaction_date.slice(0, 10) : 'No date'}`,
-        transaction_date: m.transaction_date
+        transaction_date: m.transaction_date,
+        description: m.description || '',
+        amount: m.amount != null ? String(m.amount) : '',
+        account: accName,
+        transaction_type: m.transaction_type || ''
       };
     });
 
@@ -2817,7 +2821,14 @@ function buildDetailViewHTML(moduleKey, record) {
           <div style="margin-bottom: 24px; width: 100%;">
             ${typeof mod.detailSubtitle === 'function' ? `
               <div style="margin-bottom: 16px; display: flex; align-items: center;">
-                ${mod.detailSubtitle(record)}
+                ${(() => {
+                  try {
+                    return mod.detailSubtitle(record);
+                  } catch (e) {
+                    console.error('Error rendering detailSubtitle:', e);
+                    return `<h2 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 16px 0; line-height: 1.2;">${escapeHTML(headerTitle)}</h2>`;
+                  }
+                })()}
               </div>
             ` : `
               <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 16px 0; line-height: 1.2; display: flex; align-items: center; gap: 8px;">
@@ -3012,11 +3023,7 @@ function buildDetailViewHTML(moduleKey, record) {
         if (val) {
           if (typeof val === 'object') {
             if (val.type === 'Buffer' && Array.isArray(val.data)) {
-              try {
-                val = new TextDecoder('utf-8').decode(new Uint8Array(val.data));
-              } catch (e) {
-                val = '';
-              }
+              val = typeof extractImageUrl === 'function' ? extractImageUrl(val) : '';
             } else if (Array.isArray(val)) {
               fileList = val;
             }

@@ -174,10 +174,19 @@ function fieldContainsEmail(value, email) {
 }
 
 function shouldHideRequestEditDeleteActions(moduleKey) {
-  const hashModule = window.location.hash.replace('#', '').split('/')[0];
-  return [moduleKey, hashModule, currentModule]
-    .map(v => String(v || '').toLowerCase())
-    .some(v => ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(v));
+  const requestViews = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'];
+  const targetMod = String(moduleKey || '').toLowerCase();
+  
+  // If target is not a request module (e.g. child elements: payment, invoice, mtr, expense, etc.), do NOT hide child actions
+  if (!requestViews.includes(targetMod)) {
+    return false;
+  }
+
+  const hashModule = window.location.hash.replace('#', '').split('/')[0].toLowerCase();
+  const currentMod = String(window.currentModule || '').toLowerCase();
+  return ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(targetMod) ||
+         ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(hashModule) ||
+         ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentMod);
 }
 
 function shouldHideRequestDynamicAction(moduleKey, actionId) {

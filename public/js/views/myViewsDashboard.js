@@ -452,16 +452,39 @@ function buildFilterSidebar(viewKey, data) {
   });
   filterGroups.push({ key: 'fy', label: 'FY', values: fyCounts });
 
+  const getNormalizedProcessStatus = (r) => {
+    const procNum = Number(r.process_status);
+    const procKey = String(r.process_status_key || r.process_status || '').toLowerCase().trim();
+    if (procNum === 8 || procKey === 'processing') return 'Processing';
+    if (procNum === 9 || procKey === 'completed') return 'Completed';
+    return 'Not started yet';
+  };
+
+  const getNormalizedSrStatus = (r) => {
+    const srNum = Number(r.sr_status);
+    const srKey = String(r.sr_status_key || r.sr_status || '').toLowerCase().trim();
+    if (srNum === 1 || srKey === 'draft') return 'Draft';
+    if (srNum === 4 || srKey === 'rejected') return 'Rejected';
+    if (srNum === 2 || srKey === 'pending_approval' || srKey === 'submitted' || srKey === 'pending approval' || srKey === 'pending') {
+      return 'Pending Approval';
+    }
+    if (srNum === 3 || srKey === 'approved') return 'Approved';
+    if (Number(r.process_status) === 9 || srNum === 5 || srKey === 'completed' || srKey === 'closed') {
+      return 'Completed';
+    }
+    return r.sr_status_key || r.sr_status || 'Unknown';
+  };
+
   if (viewKey === 'my_request') {
     // SR Status filter
     const srCounts = {};
-    data.forEach(r => { const s = r.sr_status_key || r.sr_status || 'Unknown'; srCounts[s] = (srCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'sr_status', label: 'SR Status', values: srCounts });
+    data.forEach(r => { const s = getNormalizedSrStatus(r); srCounts[s] = (srCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'sr_status', label: typeof t === 'function' ? t('col.sr_status', 'SR Status') : 'SR Status', values: srCounts });
 
     // Process Status filter
     const psCounts = {};
-    data.forEach(r => { const s = r.process_status_key || r.process_status || 'Unknown'; psCounts[s] = (psCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'process_status', label: 'Process Status', values: psCounts });
+    data.forEach(r => { const s = getNormalizedProcessStatus(r); psCounts[s] = (psCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'process_status', label: typeof t === 'function' ? t('col.process_status', 'Process Status') : 'Process Status', values: psCounts });
 
     // Rating Status filter
     const ratingCounts = {};
@@ -470,7 +493,7 @@ function buildFilterSidebar(viewKey, data) {
       const s = isRated ? 'Rated' : 'Pending Rating';
       ratingCounts[s] = (ratingCounts[s] || 0) + 1;
     });
-    filterGroups.push({ key: 'rating_status', label: 'Rating', values: ratingCounts });
+    filterGroups.push({ key: 'rating_status', label: typeof t === 'function' ? t('col.rating', 'Rating') : 'Rating', values: ratingCounts });
   } else if (viewKey === 'my_approval') {
     // Approval Status filter (synchronized with the top KPI cards)
     const appCounts = {};
@@ -478,27 +501,27 @@ function buildFilterSidebar(viewKey, data) {
       const s = r._cache?.approvalStatus || getApprovalStatusForUser(r);
       appCounts[s] = (appCounts[s] || 0) + 1;
     });
-    filterGroups.push({ key: 'approval_status', label: 'Approval Status', values: appCounts });
+    filterGroups.push({ key: 'approval_status', label: typeof t === 'function' ? t('col.approval_flow', 'Approval Status') : 'Approval Status', values: appCounts });
 
     // SR Status filter
     const srCounts = {};
-    data.forEach(r => { const s = r.sr_status_key || r.sr_status || 'Unknown'; srCounts[s] = (srCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'sr_status', label: 'SR Status', values: srCounts });
+    data.forEach(r => { const s = getNormalizedSrStatus(r); srCounts[s] = (srCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'sr_status', label: typeof t === 'function' ? t('col.sr_status', 'SR Status') : 'SR Status', values: srCounts });
 
     // Process Status
     const psCounts = {};
-    data.forEach(r => { const s = r.process_status_key || r.process_status || 'Unknown'; psCounts[s] = (psCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'process_status', label: 'Process Status', values: psCounts });
+    data.forEach(r => { const s = getNormalizedProcessStatus(r); psCounts[s] = (psCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'process_status', label: typeof t === 'function' ? t('col.process_status', 'Process Status') : 'Process Status', values: psCounts });
   } else if (['my_process_owner', 'my_task'].includes(viewKey)) {
     // Process Status
     const psCounts = {};
-    data.forEach(r => { const s = r.process_status_key || r.process_status || 'Unknown'; psCounts[s] = (psCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'process_status', label: 'Process Status', values: psCounts });
+    data.forEach(r => { const s = getNormalizedProcessStatus(r); psCounts[s] = (psCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'process_status', label: typeof t === 'function' ? t('col.process_status', 'Process Status') : 'Process Status', values: psCounts });
 
     // SR Status filter
     const srCounts = {};
-    data.forEach(r => { const s = r.sr_status_key || r.sr_status || 'Unknown'; srCounts[s] = (srCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'sr_status', label: 'SR Status', values: srCounts });
+    data.forEach(r => { const s = getNormalizedSrStatus(r); srCounts[s] = (srCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'sr_status', label: typeof t === 'function' ? t('col.sr_status', 'SR Status') : 'SR Status', values: srCounts });
   } else if (viewKey === 'my_team') {
     // SR Owner filter — sr_owner is TEXT[], handle array
     const ownerCounts = {};
@@ -513,12 +536,12 @@ function buildFilterSidebar(viewKey, data) {
         });
       }
     });
-    filterGroups.push({ key: 'sr_owner', label: 'SR Owner', values: ownerCounts });
+    filterGroups.push({ key: 'sr_owner', label: typeof t === 'function' ? t('col.sr_owner', 'SR Owner') : 'SR Owner', values: ownerCounts });
 
     // Process Status filter
     const psCounts = {};
-    data.forEach(r => { const s = r.process_status_key || r.process_status || 'Unknown'; psCounts[s] = (psCounts[s] || 0) + 1; });
-    filterGroups.push({ key: 'process_status', label: 'Process Status', values: psCounts });
+    data.forEach(r => { const s = getNormalizedProcessStatus(r); psCounts[s] = (psCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'process_status', label: typeof t === 'function' ? t('col.process_status', 'Process Status') : 'Process Status', values: psCounts });
   }
 
   let html = '';
@@ -863,7 +886,7 @@ function applyDashboardFilters(viewKey) {
     const dateHeaderLabel = ['my_process_owner', 'my_task', 'my_approval'].includes(viewKey) ? (typeof t === 'function' ? t('col.submit_date', 'Submited Date') : 'Submited Date') : (typeof t === 'function' ? t('col.created_date', 'Created Date') : 'Created Date');
 
     if (paginatedData.length === 0) {
-      container.innerHTML = `<table class="data-table modern-table dv-table-container" style="width: 100%; border-collapse: collapse; background: #ffffff; font-family: 'Inter', sans-serif;"><tbody><tr><td colspan="${colspanVal}" style="padding:40px; text-align:center; color:var(--text-muted);"><div class="empty-state"><div class="empty-icon material-symbols-rounded">inbox</div><div class="empty-title">No requests found</div></div></td></tr></tbody></table>`;
+      container.innerHTML = `<table class="data-table modern-table dv-table-container" style="width: 100%; border-collapse: collapse; background: #ffffff; font-family: 'Inter', sans-serif;"><tbody><tr><td colspan="${colspanVal}" style="padding:40px; text-align:center; color:var(--text-muted);"><div class="empty-state"><div class="empty-icon material-symbols-rounded">inbox</div><div class="empty-title">${typeof t === 'function' ? t('table.no_records', 'No records found') : 'No records found'}</div></div></td></tr></tbody></table>`;
     } else {
       container.innerHTML = `
         <table class="data-table modern-table dv-table-container" style="width: 100%; border-collapse: collapse; background: #ffffff; font-family: 'Inter', sans-serif;">
@@ -891,8 +914,15 @@ function applyDashboardFilters(viewKey) {
   }
   container.scrollTop = 0;
 
-  // Update Status Cards dynamically based on filtered data
-  const statusCardsHTML = buildStatusCards(viewKey, filteredData);
+  // Update Status Cards dynamically based on filtered data (excluding active card's own filter key so counts don't zero out)
+  let activeCardFilterKey = 'sr_status';
+  if (viewKey === 'my_approval') activeCardFilterKey = 'approval_status';
+  else if (['my_process_owner', 'my_task', 'my_team'].includes(viewKey)) activeCardFilterKey = 'process_status';
+
+  const cardData = (typeof dashboardData !== 'undefined' && Array.isArray(dashboardData))
+    ? dashboardData.filter(r => rowMatchesDashboardFilters(viewKey, r, { searchQuery, excludeFilterKey: activeCardFilterKey }))
+    : filteredData;
+  const statusCardsHTML = buildStatusCards(viewKey, cardData);
   updateGlobalStatusCards(statusCardsHTML);
   const statusContainer = document.querySelector(`#view-${viewKey} .dv-status-cards-outer`);
   if (statusContainer) {
@@ -904,7 +934,9 @@ function applyDashboardFilters(viewKey) {
     if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(viewKey)) {
       let paginationHTML = `
         <div style="font-size:13px; font-weight: 500; color: #6B7280; font-family: 'Inter', sans-serif;">
-          Showing <strong style="color: #111827;">${start + 1}-${Math.min(start + DASHBOARD_PAGE_SIZE, total)}</strong> of <strong style="color: #111827;">${total}</strong> records
+          ${(typeof window.formatShowingRecords === 'function')
+            ? window.formatShowingRecords(start + 1, Math.min(start + DASHBOARD_PAGE_SIZE, total), total)
+            : `Showing <strong style="color: #111827;">${start + 1}-${Math.min(start + DASHBOARD_PAGE_SIZE, total)}</strong> of <strong style="color: #111827;">${total}</strong> records`}
         </div>
         <div style="display: flex; gap: 8px; align-items: center; height: 48px;">
           <button class="btn" onclick="changeDashboardPage('${viewKey}', ${currentDashboardPage - 1})" ${currentDashboardPage <= 1 ? 'disabled' : ''} style="height: 36px !important; padding: 6px 12px !important; font-size: 13px !important; border: 1px solid #E5E7EB !important; border-radius: 6px !important; background: #FFFFFF !important; color: #374151 !important; font-weight: 500 !important; cursor: pointer; transition: all 0.2s ease;">${t('table.prev', 'Prev')}</button>
@@ -933,12 +965,12 @@ function applyDashboardFilters(viewKey) {
     } else {
       pagination.innerHTML = `
         <div style="font-size:12px; color: var(--text-muted);">
-          Page <strong style="color: var(--text-primary);">${currentDashboardPage}</strong> of <strong>${totalPages}</strong>
-          <span style="margin: 0 8px;">|</span> Total <strong>${total}</strong> records
+          ${typeof t === 'function' ? t('table.page', 'Page') : 'Page'} <strong style="color: var(--text-primary);">${currentDashboardPage}</strong> ${typeof t === 'function' ? t('table.of', 'of') : 'of'} <strong>${totalPages}</strong>
+          <span style="margin: 0 8px;">|</span> ${typeof t === 'function' ? t('table.total', 'Total') : 'Total'} <strong>${total}</strong> ${typeof t === 'function' ? t('table.records', 'records') : 'records'}
         </div>
         <div style="display: flex; gap: 8px;">
-          <button class="btn btn-outline btn-sm" onclick="changeDashboardPage('${viewKey}', ${currentDashboardPage - 1})" ${currentDashboardPage <= 1 ? 'disabled' : ''}>Prev</button>
-          <button class="btn btn-outline btn-sm" onclick="changeDashboardPage('${viewKey}', ${currentDashboardPage + 1})" ${currentDashboardPage >= totalPages ? 'disabled' : ''}>Next</button>
+          <button class="btn btn-outline btn-sm" onclick="changeDashboardPage('${viewKey}', ${currentDashboardPage - 1})" ${currentDashboardPage <= 1 ? 'disabled' : ''}>${typeof t === 'function' ? t('table.prev', 'Prev') : 'Prev'}</button>
+          <button class="btn btn-outline btn-sm" onclick="changeDashboardPage('${viewKey}', ${currentDashboardPage + 1})" ${currentDashboardPage >= totalPages ? 'disabled' : ''}>${typeof t === 'function' ? t('table.next', 'Next') : 'Next'}</button>
         </div>
       `;
     }

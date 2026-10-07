@@ -464,7 +464,9 @@ window.initializeSearchableDropdowns = function (container = document) {
           const typeMatch = (opt.dataset.type || '').toLowerCase().includes(q);
           const nameMatch = (opt.dataset.name || '').toLowerCase().includes(q);
           const descMatch = (opt.dataset.desc || '').toLowerCase().includes(q);
-          return labelMatch || valueMatch || typeMatch || nameMatch || descMatch;
+          const amountMatch = (opt.dataset.amount || '').toLowerCase().includes(q);
+          const accountMatch = (opt.dataset.account || '').toLowerCase().includes(q);
+          return labelMatch || valueMatch || typeMatch || nameMatch || descMatch || amountMatch || accountMatch;
         });
 
         if (filtered.length === 0) {

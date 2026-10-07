@@ -7,22 +7,54 @@ const { validateTableData } = require('../helpers/validation');
 const { checkPermission } = require('../helpers/permissionHelper');
 const { getRecordAuditLogs } = require('../helpers/auditHelper');
 
+function formatCompanyLogo(logo) {
+  if (!logo) return null;
+  if (Buffer.isBuffer(logo)) {
+    const first4 = logo.slice(0, 4);
+    if (first4[0] === 0x89 && first4[1] === 0x50 && first4[2] === 0x4E && first4[3] === 0x47) {
+      return `data:image/png;base64,${logo.toString('base64')}`;
+    }
+    if (first4[0] === 0xFF && first4[1] === 0xD8) {
+      return `data:image/jpeg;base64,${logo.toString('base64')}`;
+    }
+    try {
+      const str = logo.toString('utf8');
+      if (str.startsWith('data:') || str.startsWith('http') || str.startsWith('/')) {
+        return str;
+      }
+    } catch (e) {}
+    return `data:image/png;base64,${logo.toString('base64')}`;
+  }
+  if (typeof logo === 'object' && (logo.type === 'Buffer' || Array.isArray(logo.data))) {
+    const buf = Buffer.isBuffer(logo) ? logo : Buffer.from(logo.data || []);
+    return formatCompanyLogo(buf);
+  }
+  if (Array.isArray(logo) && logo.length > 0) {
+    return formatCompanyLogo(logo[0]);
+  }
+  if (typeof logo === 'string') {
+    const trimmed = logo.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed) && parsed.length > 0) return formatCompanyLogo(parsed[0]);
+      } catch (e) {}
+    }
+    if (trimmed.startsWith('data:') || trimmed.startsWith('http') || trimmed.startsWith('/')) {
+      return trimmed;
+    }
+    if (/^[A-Za-z0-9+/=]+$/.test(trimmed.slice(0, 100)) && trimmed.length > 100) {
+      return `data:image/png;base64,${trimmed}`;
+    }
+    return trimmed;
+  }
+  return logo;
+}
+
 function normalizeCompanyRecord(rec) {
   if (!rec) return rec;
   if (rec.logo) {
-    if (Buffer.isBuffer(rec.logo)) {
-      rec.logo = rec.logo.toString('utf8');
-    } else if (typeof rec.logo === 'object' && rec.logo.type === 'Buffer' && Array.isArray(rec.logo.data)) {
-      rec.logo = Buffer.from(rec.logo.data).toString('utf8');
-    } else if (Array.isArray(rec.logo) && rec.logo.length > 0) {
-      rec.logo = rec.logo[0];
-    }
-    if (typeof rec.logo === 'string' && rec.logo.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(rec.logo);
-        if (Array.isArray(parsed) && parsed.length > 0) rec.logo = parsed[0];
-      } catch (e) {}
-    }
+    rec.logo = formatCompanyLogo(rec.logo);
   }
   return rec;
 }
