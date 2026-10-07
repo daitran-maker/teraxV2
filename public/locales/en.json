@@ -1259,6 +1259,7 @@
   "sw.step3_download_tpl": "Download Excel Template",
   "sw.step3_draft_saved": "Saved {{count}} employees to draft!",
   "sw.step3_drag_drop": "Drag & Drop Excel file here",
+  "sw.step3_select_dept": "Select Department",
   "sw.step3_emp_dept": "Department",
   "sw.step3_emp_dept_ph": "Dept Code / Name",
   "sw.step3_emp_direct_mgr": "Direct Manager",
@@ -1629,6 +1630,7 @@
   "val.view_setup": "Setup Wizard",
   "val.void": "Void",
   "val.yes": "Yes",
+  "my_company.placeholder.synced_from_signup": "Synced from registration",
   "wizard.tab_assign": "3. Assign task",
   "wizard.tab_detail": "2. Request detail",
   "wizard.tab_request": "1. Request"

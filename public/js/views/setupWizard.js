@@ -218,6 +218,7 @@ const SW_I18N_FALLBACK = {
     "sw.step3_download_tpl": "Download Excel Template",
     "sw.step3_draft_saved": "Saved {{count}} employees to draft!",
     "sw.step3_drag_drop": "Drag & Drop Excel file here",
+    "sw.step3_select_dept": "Select Department",
     "sw.step3_emp_dept": "Department",
     "sw.step3_emp_dept_ph": "Dept Code / Name",
     "sw.step3_emp_direct_mgr": "Direct Manager",
@@ -522,6 +523,7 @@ const SW_I18N_FALLBACK = {
     "sw.step3_download_tpl": "Tải file mẫu Excel",
     "sw.step3_draft_saved": "Đã lưu tạm {{count}} nhân viên vào bộ nhớ!",
     "sw.step3_drag_drop": "Kéo & Thả file Excel vào đây",
+    "sw.step3_select_dept": "Chọn phòng ban",
     "sw.step3_emp_dept": "Phòng ban",
     "sw.step3_emp_dept_ph": "Mã PB / Tên PB",
     "sw.step3_emp_direct_mgr": "Quản lý trực tiếp",
@@ -1969,9 +1971,16 @@ window.buildSetupDepartmentSelectOptions = function(selectedVal) {
   const norm = String(selectedVal || '').trim().toLowerCase();
   const depts = window.getSetupDepartmentList();
   const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
+  const defaultPrompt = isVi ? 'Chọn phòng ban' : 'Select Department';
+  let selectLabel = defaultPrompt;
+  if (typeof swT === 'function') {
+    const tVal = swT('sw.step3_select_dept', 'Chọn phòng ban', 'Select Department');
+    if (tVal && !tVal.includes('sw.step3_select_dept')) {
+      selectLabel = tVal;
+    }
+  }
   let options = [];
-
-  options.push({ value: '', label: `-- ${swT('sw.step3_select_dept', isVi ? 'Chọn phòng ban' : 'Select Department')} --` });
+  options.push({ value: '', label: `-- ${selectLabel} --` });
 
   let matched = false;
   depts.forEach(d => {
@@ -1991,9 +2000,13 @@ window.buildSetupDepartmentSelectOptions = function(selectedVal) {
     options.push({ value: selectedVal, label: selectedVal, code: selectedVal, name: selectedVal });
   }
 
+  const esc = (typeof escapeHTML === 'function')
+    ? escapeHTML
+    : (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
   return options.map(o => {
     const isSel = (norm && (o.value.toLowerCase() === norm || (o.code && o.code.toLowerCase() === norm) || (o.name && o.name.toLowerCase() === norm))) ? 'selected' : '';
-    return `<option value="${escapeHTML(o.value)}" ${isSel}>${escapeHTML(o.label)}</option>`;
+    return `<option value="${esc(o.value)}" ${isSel}>${esc(o.label)}</option>`;
   }).join('');
 };
 
@@ -2446,6 +2459,11 @@ window.getSetupAvailableEmployees = function() {
     window.setupParsedEmployees.forEach(addEmp);
   }
 
+  // 1b. From setupDraft.employees (Step 3 employees in draft)
+  if (Array.isArray(window.setupDraft?.employees)) {
+    window.setupDraft.employees.forEach(addEmp);
+  }
+
   // 2. From setupWizardData
   if (Array.isArray(window.setupWizardData?.employees)) {
     window.setupWizardData.employees.forEach(addEmp);
@@ -2500,6 +2518,95 @@ window.buildSetupEmployeeOptions = function(selectedVal, allowDirectManager = fa
   }
 
   if (selectedVal && !foundSelected && selectedVal !== 'Direct Manager' && selectedVal !== 'Auto') {
+    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
+  }
+
+  return opts;
+};
+
+window.getSetupAvailableCompanies = function() {
+  const list = [];
+  const seen = new Set();
+
+  const addComp = (c) => {
+    if (!c) return;
+    const shortName = String(c.company_shortname || c.short_name || c.name || '').trim();
+    const fullName = String(c.company_fullname || c.full_name || c.company_name || '').trim();
+    const id = String(c.my_company_id || c.company_id || c.id || '').trim();
+    const val = shortName || id || fullName;
+    if (!val) return;
+
+    const key = (id || shortName || fullName).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (shortName) seen.add(shortName.toLowerCase());
+    if (id) seen.add(id.toLowerCase());
+
+    const label = shortName && fullName && shortName !== fullName
+      ? `${shortName} - ${fullName}`
+      : (shortName || fullName || id);
+
+    list.push({
+      value: val,
+      short_name: shortName,
+      full_name: fullName,
+      id: id,
+      label: label
+    });
+  };
+
+  // 1. From setupParsedCompanies (Step 1 Excel parsed)
+  if (Array.isArray(window.setupParsedCompanies)) {
+    window.setupParsedCompanies.forEach(addComp);
+  }
+
+  // 2. From setupDraft.company (Step 1 Form or Excel)
+  if (window.setupDraft?.company) {
+    if (Array.isArray(window.setupDraft.company)) {
+      window.setupDraft.company.forEach(addComp);
+    } else if (typeof window.setupDraft.company === 'object') {
+      addComp(window.setupDraft.company);
+    }
+  }
+
+  // 3. From setupWizardData.company or companies
+  if (window.setupWizardData?.company) {
+    addComp(window.setupWizardData.company);
+  }
+  if (Array.isArray(window.setupWizardData?.companies)) {
+    window.setupWizardData.companies.forEach(addComp);
+  }
+
+  // 4. From selectCache / lookupCache if available
+  if (typeof selectCache !== 'undefined' && Array.isArray(selectCache['my_company'])) {
+    selectCache['my_company'].forEach(addComp);
+  }
+  if (Array.isArray(window._setupLookupCache?.['my_company'])) {
+    window._setupLookupCache['my_company'].forEach(addComp);
+  }
+
+  return list;
+};
+
+window.buildSetupCompanyOptions = function(selectedVal, placeholder = '') {
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  const companies = window.getSetupAvailableCompanies();
+  const ph = placeholder || (isVi ? 'Chọn pháp nhân' : 'Select Company Entity');
+  let opts = '<option value="">-- ' + escapeHTML(ph) + ' --</option>';
+
+  let foundSelected = false;
+  for (const comp of companies) {
+    const isSel = selectedVal && (
+      String(selectedVal).toLowerCase() === comp.value.toLowerCase() ||
+      String(selectedVal).toLowerCase() === (comp.short_name || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === (comp.id || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === (comp.full_name || '').toLowerCase()
+    );
+    if (isSel) foundSelected = true;
+    opts += '<option value="' + escapeHTML(comp.short_name || comp.value) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(comp.label) + '</option>';
+  }
+
+  if (selectedVal && !foundSelected) {
     opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
   }
 
@@ -2812,45 +2919,36 @@ function renderStep4HTML(counts){
         const leadDisplay = p.policy_lead_display || p.policy_lead || '–';
         const ownerDisplay = p.sr_owner_display || p.sr_owner || '–';
         const deptDisplay = p.department_id || '–';
-        const t1Warn = (!p.tier1_matched && p.tier1_approval && p.tier1_approval !== 'Direct Manager')
-          ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
-          : '';
-        const t2Warn = (!p.tier2_matched && p.tier2_approval)
-          ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
-          : '';
-        const t3Warn = (!p.tier3_matched && p.tier3_approval)
-          ? ' <span style="font-size:9.5px;color:#d97706;background:#FEF3C7;padding:1px 4px;border-radius:4px;font-weight:600;" title="' + swT('sw.emp_not_found_tip', 'Email chưa khớp với nhân viên nào') + '">' + swT('sw.emp_not_found', 'Chưa có NV') + '</span>'
-          : '';
 
         rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(p.policy_name) + '</td>'
+          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;">' + (i + 1) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_name) + '</td>'
           + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_type) + '</td>'
-          + '<td style="padding:7px 10px;color:#ea580c;font-weight:600;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;" title="' + escapeHTML(p.tier1_approval || '') + '">' + escapeHTML(t1Display) + t1Warn + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;" title="' + escapeHTML(p.tier2_approval || '') + '">' + escapeHTML(t2Display) + t2Warn + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;" title="' + escapeHTML(p.tier3_approval || '') + '">' + escapeHTML(t3Display) + t3Warn + '</td>'
-          + '<td style="padding:7px 10px;color:#059669;font-size:11.5px;" title="' + escapeHTML(p.policy_lead || '') + '">' + escapeHTML(leadDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#6366F1;font-size:11.5px;" title="' + escapeHTML(p.sr_owner || '') + '">' + escapeHTML(ownerDisplay) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier1_approval || '') + '">' + escapeHTML(t1Display) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier2_approval || '') + '">' + escapeHTML(t2Display) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier3_approval || '') + '">' + escapeHTML(t3Display) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.policy_lead || '') + '">' + escapeHTML(leadDisplay) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.sr_owner || '') + '">' + escapeHTML(ownerDisplay) + '</td>'
           + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(deptDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
-          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
-          + '<td style="padding:7px 10px;"><span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span></td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
+          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + swT('common.valid', 'Hợp lệ') + '</td>'
           + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
+          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">delete</span></button>'
           + '</td>'
           + '</tr>';
       }
-      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#F9FAFB;border:1px solid #E5E7EB;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
-        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">rule</span>'
-        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
-        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' (' + parsed.length + ' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        + '<span class="material-symbols-rounded" style="font-size:24px;color:#4B5563;">rule</span>'
+        + '<div><div style="font-size:12.5px;font-weight:600;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;align-items:center;">'
         + '<button onclick="saveStep4AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step4_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
-        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;color:#4B5563;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
         + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
@@ -3128,6 +3226,11 @@ window.renderStep5AccountRowHTML = function(idx, data = {}) {
   const comp = window.setupWizardData?.company || {};
   const cur = data.currency || comp.base_currency || 'VND';
   const defaultBank = data.bank_name || 'MBV';
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  const compOpts = window.buildSetupCompanyOptions(data.company_entity || '', isVi ? 'Chọn pháp nhân (Bước 1)' : 'Select Company (Step 1)');
+  const mgrOpts = window.buildSetupEmployeeOptions(data.transaction_managed_by || '', false, isVi ? 'Chọn người QL giao dịch (Bước 3)' : 'Select Trans. Manager (Step 3)');
+  const finOpts = window.buildSetupEmployeeOptions(data.finance_control || '', false, isVi ? 'Chọn kiểm soát tài chính (Bước 3)' : 'Select Fin. Control (Step 3)');
+
   return '<div class="step5-account-row" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:12px;position:relative;">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #F3F4F6;">'
     + '<div style="font-size:12.5px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:6px;">'
@@ -3151,9 +3254,21 @@ window.renderStep5AccountRowHTML = function(idx, data = {}) {
     + swLabel(swT('sw.step5_acct_num', 'Số tài khoản'), false)
     + '<input type="text" class="sw-input step5-acct-num" placeholder="' + swT('sw.step5_acct_num_ph', 'VD: 0011001234567') + '" value="' + escapeHTML(data.account_number || '') + '">'
     + '</div>'
-    + '<div style="grid-column:span 2;">'
+    + '<div>'
     + swLabel(swT('sw.step5_currency', 'Loại tiền tệ'), false)
     + '<input type="text" list="step5-currency-datalist" class="sw-input step5-currency" value="' + escapeHTML(cur) + '">'
+    + '</div>'
+    + '<div>'
+    + swLabel(swT('sw.account_entity', 'Pháp nhân công ty', 'Company Entity'), false)
+    + '<select class="sw-select step5-acct-comp">' + compOpts + '</select>'
+    + '</div>'
+    + '<div>'
+    + swLabel(swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), false)
+    + '<select class="sw-select step5-acct-trans">' + mgrOpts + '</select>'
+    + '</div>'
+    + '<div>'
+    + swLabel(swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), false)
+    + '<select class="sw-select step5-acct-fin">' + finOpts + '</select>'
     + '</div>'
     + '</div>'
     + '</div>';
@@ -3448,6 +3563,9 @@ window.saveStep5AndAdvance = async function() {
       const bn = r.querySelector('.step5-bank-name')?.value?.trim();
       const num = r.querySelector('.step5-acct-num')?.value?.trim();
       const cur = r.querySelector('.step5-currency')?.value?.trim() || 'VND';
+      const acomp = r.querySelector('.step5-acct-comp')?.value?.trim() || '';
+      const atrans = r.querySelector('.step5-acct-trans')?.value?.trim() || '';
+      const afin = r.querySelector('.step5-acct-fin')?.value?.trim() || '';
       if (an || bn || num) {
         accounts.push({
           account_id: '',
@@ -3456,7 +3574,10 @@ window.saveStep5AndAdvance = async function() {
           account_number: num,
           currency: cur,
           type: 'Bank Account',
-          account_status: 'active'
+          account_status: 'active',
+          company_entity: acomp,
+          transaction_managed_by: atrans,
+          finance_control: afin
         });
       }
     });
@@ -4155,6 +4276,10 @@ window.editSetupParsedItem = function(type, index) {
       + '</div>';
   } else if (type === 'account') {
     title = (isVi ? 'Sửa thông tin tài khoản #' : 'Edit Account #') + (index + 1);
+    const compOpts = window.buildSetupCompanyOptions(item.company_entity || '', isVi ? 'Chọn pháp nhân (từ Bước 1)' : 'Select Company Entity (Step 1)');
+    const mgrOpts = window.buildSetupEmployeeOptions(item.transaction_managed_by || '', false, isVi ? 'Chọn quản lý giao dịch (từ Bước 3)' : 'Select Trans. Manager (Step 3)');
+    const finOpts = window.buildSetupEmployeeOptions(item.finance_control || '', false, isVi ? 'Chọn kiểm soát tài chính (từ Bước 3)' : 'Select Fin. Control (Step 3)');
+
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       + '<div>' + swLabel('Account ID', false) + '<input type="text" id="sw-edit-acct-id" class="sw-input" value="' + escapeHTML(item.account_id || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step5_acct_name', 'Tên tài khoản'), true) + '<input type="text" id="sw-edit-acct-name" class="sw-input" value="' + escapeHTML(item.account_name || '') + '"></div>'
@@ -4164,9 +4289,9 @@ window.editSetupParsedItem = function(type, index) {
       + '<div>' + swLabel(swT('sw.step5_acct_num', 'Số tài khoản'), false) + '<input type="text" id="sw-edit-acct-num" class="sw-input" value="' + escapeHTML(item.account_number || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step5_bank', 'Ngân hàng'), false) + '<input type="text" id="sw-edit-acct-bank" class="sw-input" value="' + escapeHTML(item.bank_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate'), false) + '<input type="number" step="any" id="sw-edit-acct-rate" class="sw-input" value="' + escapeHTML(String(item.exchange_rate || 1)) + '"></div>'
-      + '<div>' + swLabel(swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), false) + '<input type="text" id="sw-edit-acct-trans" class="sw-input" value="' + escapeHTML(item.transaction_managed_by || '') + '"></div>'
-      + '<div>' + swLabel(swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), false) + '<input type="text" id="sw-edit-acct-fin" class="sw-input" value="' + escapeHTML(item.finance_control || '') + '"></div>'
-      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.account_entity', 'Pháp nhân công ty', 'Company Entity'), false) + '<input type="text" id="sw-edit-acct-comp" class="sw-input" value="' + escapeHTML(item.company_entity || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), false) + '<select id="sw-edit-acct-trans" class="sw-select">' + mgrOpts + '</select></div>'
+      + '<div>' + swLabel(swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), false) + '<select id="sw-edit-acct-fin" class="sw-select">' + finOpts + '</select></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.account_entity', 'Pháp nhân công ty', 'Company Entity'), false) + '<select id="sw-edit-acct-comp" class="sw-select">' + compOpts + '</select></div>'
       + '</div>';
   }
 

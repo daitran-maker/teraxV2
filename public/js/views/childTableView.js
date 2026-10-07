@@ -294,7 +294,7 @@ window.filterChildTableSearch = function (childKey, parentKey, parentPkVal, quer
   loadChildTable(childKey, parentKey, parentPkVal, filteredData);
 };
 
-const REQUEST_CHILD_RELOAD_MODULES = ['request', 'service', 'payment', 'expense', 'asset', 'comment', 'contract'];
+const REQUEST_CHILD_RELOAD_MODULES = ['request', 'service', 'payment', 'expense', 'asset', 'comment', 'contract', 'invoice'];
 
 function getActiveHashModule() {
   return (window.location.hash || '').replace('#', '').split('/')[0] || currentModule;
@@ -308,6 +308,8 @@ function getChildSortTime(row) {
   const candidates = [
     row.sr_created_date,
     row.created_date,
+    row.invoice_date,
+    row.request_date,
     row.comment_date,
     row.updated_date,
     row.payment_date,
@@ -341,7 +343,21 @@ function markReportPanesDirty(moduleKeys = []) {
 }
 
 function clearChildTableCache(childKey, parentKey, parentPkVal) {
-  if (!window.childTableRawData || !childKey || !parentPkVal) return;
+  if (!window.childTableRawData || !childKey) return;
+  if (parentPkVal) {
+    const strVal = String(parentPkVal);
+    Object.keys(window.childTableRawData).forEach(k => {
+      if (k.includes(strVal) && k.endsWith(`_${childKey}`)) {
+        delete window.childTableRawData[k];
+      }
+    });
+  } else {
+    Object.keys(window.childTableRawData).forEach(k => {
+      if (k.endsWith(`_${childKey}`)) {
+        delete window.childTableRawData[k];
+      }
+    });
+  }
   const keys = [
     `${parentKey}_${parentPkVal}_${childKey}`,
     `${normalizeRequestParentKey(parentKey)}_${parentPkVal}_${childKey}`,

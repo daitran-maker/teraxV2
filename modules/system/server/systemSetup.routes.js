@@ -556,12 +556,16 @@ router.post('/quick-account', async (req, res) => {
         if (aName || bName || aNum) {
           const bId = await generateSequentialId('account', client);
           const finalAccName = aName || `${bName || 'Ngân hàng'} (${aCur})`;
+          const aEntity = String(acc.company_entity || companyId).trim() || companyId;
+          const txMgr = acc.transaction_managed_by || null;
+          const finCtrl = acc.finance_control || null;
           await client.query(`
             INSERT INTO account (
               account_id, account_name, type, currency, exchange_rate,
-              account_number, bank_name, account_status, company_entity
-            ) VALUES ($1, $2, $3, $4, 1, $5, $6, 19, $7)
-          `, [bId, finalAccName, aType, aCur, aNum || null, bName || null, companyId]);
+              account_number, bank_name, account_status, company_entity,
+              transaction_managed_by, finance_control
+            ) VALUES ($1, $2, $3, $4, 1, $5, $6, 19, $7, $8, $9)
+          `, [bId, finalAccName, aType, aCur, aNum || null, bName || null, aEntity, txMgr, finCtrl]);
           created.push({ account_id: bId, account_name: finalAccName, type: aType });
         }
       }

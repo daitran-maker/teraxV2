@@ -669,5 +669,6 @@
   "sw.cat_sales": "အရောင်းနှင့် ဈေးကွက်",
   "sw.cat_other": "အခြား",
   "sw.tag_popular": "လူကြိုက်များသော",
-  "sw.tag_new": "အသစ်"
+  "sw.tag_new": "အသစ်",
+  "my_company.placeholder.synced_from_signup": "Synced from registration"
 }

@@ -179,6 +179,15 @@ async function openAddModal(moduleKey, initialData = null) {
     }
   }
 
+  if (moduleKey === 'my_company') {
+    if (!initialData.base_currency && typeof window.getActiveBaseCurrency === 'function') {
+      const activeBase = window.getActiveBaseCurrency();
+      if (activeBase && activeBase !== 'BASE CURRENCY') {
+        initialData.base_currency = activeBase;
+      }
+    }
+  }
+
   // Auto-inject my_company and currency defaults for payment module
   if (moduleKey === 'payment') {
     if (!initialData.my_company && authUser && authUser.company_id) {
@@ -707,7 +716,14 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         <input type="hidden" id="f-process_type_description" name="process_type_description" value="${escapeHTML(val || '')}" />
       `;
     } else {
-      html += `<textarea class="form-textarea" id="f-${field.key}" name="${field.key}" rows="3" ${disabledAttr}>${val}</textarea>`;
+      let placeholderText = '';
+      if (field.placeholderKey && typeof t === 'function') {
+        placeholderText = t(field.placeholderKey, field.placeholder || '');
+      } else if (field.placeholder) {
+        placeholderText = field.placeholder;
+      }
+      const placeholderAttr = placeholderText ? ` placeholder="${escapeHTML(placeholderText)}"` : '';
+      html += `<textarea class="form-textarea" id="f-${field.key}" name="${field.key}" rows="3"${placeholderAttr} ${disabledAttr}>${val}</textarea>`;
     }
   } else if (field.type === 'finance_mappings') {
     html += `
@@ -1454,8 +1470,14 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
       if (field.min !== undefined) extraAttrs += ` min="${field.min}"`;
       if (field.max !== undefined) extraAttrs += ` max="${field.max}"`;
     }
-    if (field.placeholder) {
-      extraAttrs += ` placeholder="${escapeHTML(field.placeholder)}"`;
+    let placeholderText = '';
+    if (field.placeholderKey && typeof t === 'function') {
+      placeholderText = t(field.placeholderKey, field.placeholder || '');
+    } else if (field.placeholder) {
+      placeholderText = field.placeholder;
+    }
+    if (placeholderText) {
+      extraAttrs += ` placeholder="${escapeHTML(placeholderText)}"`;
     }
     html += `<input class="form-input" type="${field.type || 'text'}" id="f-${field.key}" name="${field.key}" value="${val}" ${onChangeStr} ${onInputStr} ${disabledAttr}${extraAttrs} />`;
   }
@@ -2975,10 +2997,14 @@ async function submitAdd(moduleKey, extraData = {}) {
   const mod = MODULES[moduleKey];
   const data = { ...collectFormData(moduleKey), ...extraData };
   const activeHashModule = getActiveHashModule();
-  const isRequestChildAdd = REQUEST_CHILD_RELOAD_MODULES.includes(moduleKey) && currentView === 'detail' && currentModule && currentRecord;
+  const isRequestChildAdd = (REQUEST_CHILD_RELOAD_MODULES.includes(moduleKey) || ['payment', 'expense', 'invoice', 'service', 'asset', 'contract', 'assigned_task', 'target_table', 'comment'].includes(moduleKey)) && currentView === 'detail' && currentModule && currentRecord;
   const parentModuleKeyForAdd = isRequestChildAdd ? currentModule : null;
-  const parentPkFieldForAdd = parentModuleKeyForAdd && MODULES[parentModuleKeyForAdd] ? MODULES[parentModuleKeyForAdd].pk : null;
-  const parentPkValForAdd = parentPkFieldForAdd && currentRecord ? currentRecord[parentPkFieldForAdd] : null;
+  const parentModForAdd = parentModuleKeyForAdd ? (MODULES[parentModuleKeyForAdd] || (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentModuleKeyForAdd) ? MODULES['request'] : null)) : null;
+  const parentPkFieldForAdd = parentModForAdd ? parentModForAdd.pk : 'request_id';
+  let parentPkValForAdd = (currentRecord ? (currentRecord[parentPkFieldForAdd] || currentRecord.request_id || currentRecord.id) : null) || (window.currentDetailRecord ? (window.currentDetailRecord[parentPkFieldForAdd] || window.currentDetailRecord.request_id || window.currentDetailRecord.id) : null);
+  if (!parentPkValForAdd && (data.request || data.request_id || data.contract_id)) {
+    parentPkValForAdd = data.request || data.request_id || data.contract_id;
+  }
   const parentViewKeyForAdd = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(activeHashModule)
     ? activeHashModule
     : parentModuleKeyForAdd;
@@ -3159,14 +3185,23 @@ async function submitAdd(moduleKey, extraData = {}) {
 
     if (currentView === 'detail' && currentModule && moduleKey !== currentModule) {
       // Added a child record from parent detail: refresh parent detail view in-place
-      const parentPkField = MODULES[currentModule] ? MODULES[currentModule].pk : 'id';
-      const parentPkVal = (window.currentDetailRecord ? window.currentDetailRecord[parentPkField] : null) || (currentRecord ? currentRecord[parentPkField] : null);
+      const parentMod = MODULES[currentModule] || (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule) ? MODULES['request'] : null);
+      const parentPkField = parentMod ? parentMod.pk : 'id';
+      let parentPkVal = (window.currentDetailRecord ? (window.currentDetailRecord[parentPkField] || window.currentDetailRecord.request_id || window.currentDetailRecord.id) : null)
+        || (currentRecord ? (currentRecord[parentPkField] || currentRecord.request_id || currentRecord.id) : null);
+      if (!parentPkVal && (data.request || data.request_id || data.contract_id || parentPkValForAdd)) {
+        parentPkVal = data.request || data.request_id || data.contract_id || parentPkValForAdd;
+      }
       if (parentPkVal) {
         clearChildTableCache(moduleKey, currentModule, parentPkVal);
+        clearChildTableCache(moduleKey, 'request', parentPkVal);
         await openDetailInternal(currentModule, parentPkVal, true, true);
-        setTimeout(() => {
+        if (typeof window.switchTab === 'function') {
           window.switchTab(moduleKey);
-        }, 150);
+        }
+        if (typeof loadChildTable === 'function') {
+          loadChildTable(moduleKey, currentModule, parentPkVal);
+        }
       }
     } else {
       // Added a top-level record: navigate to it or refresh table / dashboard

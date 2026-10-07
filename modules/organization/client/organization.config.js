@@ -31,7 +31,7 @@
       { key: 'city', label: 'City', type: 'select', optionsFrom: 'cms_city', optionValue: 'name', optionLabel: 'name', filterByProvinceField: 'province' },
       { key: 'company_fullname', label: 'COMPANY FULL NAME', type: 'text' },
       { key: 'company_shortname', label: 'COMPANY SHORT NAME', type: 'text', required: true, oninput: "this.dataset.vietqrShortName = ''" },
-      { key: 'base_currency', label: 'Base Currency', labelKey: 'col.base_currency', type: 'text', createReadonly: true, editReadonly: true, placeholder: 'Được đồng bộ từ lúc đăng ký' },
+      { key: 'base_currency', label: 'Base Currency', labelKey: 'col.base_currency', type: 'text', createReadonly: true, editReadonly: true, placeholderKey: 'my_company.placeholder.synced_from_signup', placeholder: 'Synced from registration' },
       { key: 'company_label', label: 'COMPANY LABEL', type: 'text', createReadonly: true, editReadonly: true, virtual: true, full: true },
       { key: 'website', label: 'Website', type: 'text' },
       { key: 'address', label: 'Address', type: 'textarea', full: true },

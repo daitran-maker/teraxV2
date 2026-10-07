@@ -1259,6 +1259,7 @@
   "sw.step3_download_tpl": "Tải file mẫu Excel",
   "sw.step3_draft_saved": "Đã lưu tạm {{count}} nhân viên vào bộ nhớ!",
   "sw.step3_drag_drop": "Kéo & Thả file Excel vào đây",
+  "sw.step3_select_dept": "Chọn phòng ban",
   "sw.step3_emp_dept": "Phòng ban",
   "sw.step3_emp_dept_ph": "Mã PB / Tên PB",
   "sw.step3_emp_direct_mgr": "Quản lý trực tiếp",
@@ -1629,6 +1630,7 @@
   "val.view_setup": "Trình thiết lập",
   "val.void": "Vô hiệu",
   "val.yes": "Có",
+  "my_company.placeholder.synced_from_signup": "Được đồng bộ từ lúc đăng ký",
   "wizard.tab_assign": "3. Giao công việc",
   "wizard.tab_detail": "2. Chi tiết yêu cầu",
   "wizard.tab_request": "1. Yêu cầu"

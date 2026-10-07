@@ -662,5 +662,6 @@
   "sw.cat_sales": "អាជីវកម្ម",
   "sw.cat_other": "ផ្សេងៗ",
   "sw.tag_popular": "ពេញនិយម",
-  "sw.tag_new": "ថ្មី"
+  "sw.tag_new": "ថ្មី",
+  "my_company.placeholder.synced_from_signup": "Synced from registration"
 }
