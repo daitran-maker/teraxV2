@@ -76,7 +76,7 @@ router.get('/lookups/currencies', async (req, res) => {
       list = await cmsLookups.getCachedCurrencies();
     }
     if (!list || !list.length) {
-      const result = await cmsGet('/api/public/currencies?popular=true').catch(() => null);
+      const result = await cmsGet('/api/public/currencies').catch(() => null);
       list = (result && result.data) ? result.data : [];
     }
     if (list && list.length) {
@@ -91,15 +91,9 @@ router.get('/lookups/currencies', async (req, res) => {
         if (!aHas && bHas) return 1;
         return (a.code || '').localeCompare(b.code || '');
       });
-      return res.json({ data: list });
+      return res.json({ data: list.map(c => ({ code: c.code, label: c.code })) });
     }
-    return res.json({ data: [
-      {code:'VND', label:'VND', popular:true},
-      {code:'USD', label:'USD', popular:true},
-      {code:'EUR', label:'EUR', popular:true},
-      {code:'SGD', label:'SGD', popular:true},
-      {code:'JPY', label:'JPY', popular:true},
-    ]});
+    return res.json({ data: POPULAR_5_CURRENCIES.map(code => ({ code, label: code })) });
   } catch (err) {
     console.warn('[Setup] CMS currencies error:', err.message);
     return res.json({ data: [] });

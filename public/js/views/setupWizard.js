@@ -159,6 +159,7 @@ const SW_I18N_FALLBACK = {
     "sw.status_pending": "Not set up",
     "sw.step1_address": "Headquarters Address",
     "sw.step1_address_ph": "e.g. 5th Floor, Landmark Tower, Hanoi",
+    "sw.step1_company": "Company",
     "sw.step1_country": "Country",
     "sw.step1_currency": "Currency",
     "sw.step1_desc": "Build the foundational database for your business. Can be edited anytime.",
@@ -464,6 +465,7 @@ const SW_I18N_FALLBACK = {
     "sw.status_pending": "Chưa thiết lập",
     "sw.step1_address": "Địa chỉ trụ sở chính",
     "sw.step1_address_ph": "VD: Tầng 5, Tòa nhà Landmark, Hà Nội",
+    "sw.step1_company": "Công ty",
     "sw.step1_country": "Quốc gia",
     "sw.step1_currency": "Tiền tệ",
     "sw.step1_desc": "Tạo cơ sở dữ liệu nền tảng cho doanh nghiệp. Có thể chỉnh sửa sau.",
@@ -749,6 +751,9 @@ function injectSetupStyles() {
     .sw-table-scroll-container::-webkit-scrollbar-track { background:#f1f5f9; border-radius:4px; }
     .sw-table-scroll-container::-webkit-scrollbar-thumb { background:#94a3b8; border-radius:4px; }
     .sw-table-scroll-container::-webkit-scrollbar-thumb:hover { background:#64748b; }
+    .sw-grid-input, .sw-grid-select { width:100%; height:30px; padding:3px 8px; font-size:11.5px; border:1px solid #E2E8F0; border-radius:6px; background:#FFFFFF; color:#1E293B; font-family:inherit; box-sizing:border-box; transition:border-color 0.15s ease, box-shadow 0.15s ease; }
+    .sw-grid-input:hover, .sw-grid-select:hover { border-color:#94A3B8; }
+    .sw-grid-input:focus, .sw-grid-select:focus { border-color:#ea580c; outline:none; box-shadow:0 0 0 2px rgba(234,88,12,0.15); background:#FFFDF9; }
   `;
   document.head.appendChild(style);
 }
@@ -971,6 +976,114 @@ async function fetchLookup(key, apiPath) {
   }
   return window._setupLookupCache[key];
 }
+
+window.getSetupAvailableCompanies = function() {
+  const list = [];
+  const seen = new Set();
+
+  const addComp = (c) => {
+    if (!c) return;
+    const shortName = String(c.company_shortname || c.short_name || c.name || '').trim();
+    const fullName = String(c.company_fullname || c.full_name || c.company_name || '').trim();
+    const id = String(c.my_company_id || c.company_id || c.id || '').trim();
+    const val = id || shortName || fullName;
+    if (!val) return;
+
+    const key = (id || shortName || fullName).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (shortName) seen.add(shortName.toLowerCase());
+    if (id) seen.add(id.toLowerCase());
+
+    const label = shortName && fullName && shortName !== fullName
+      ? `${shortName} - ${fullName}`
+      : (shortName || fullName || id);
+
+    list.push({
+      value: val,
+      short_name: shortName,
+      full_name: fullName,
+      id: id,
+      label: label
+    });
+  };
+
+  // 1. From setupParsedCompanies (Step 1 Excel parsed)
+  if (Array.isArray(window.setupParsedCompanies)) {
+    window.setupParsedCompanies.forEach(addComp);
+  }
+
+  // 2. From setupDraft.company (Step 1 Form or Excel)
+  if (window.setupDraft?.company) {
+    if (Array.isArray(window.setupDraft.company)) {
+      window.setupDraft.company.forEach(addComp);
+    } else if (typeof window.setupDraft.company === 'object') {
+      addComp(window.setupDraft.company);
+    }
+  }
+
+  // 3. From setupWizardData.company or companies
+  if (window.setupWizardData?.company) {
+    addComp(window.setupWizardData.company);
+  }
+  if (Array.isArray(window.setupWizardData?.companies)) {
+    window.setupWizardData.companies.forEach(addComp);
+  }
+
+  // 4. From selectCache / lookupCache if available
+  if (typeof selectCache !== 'undefined' && Array.isArray(selectCache['my_company'])) {
+    selectCache['my_company'].forEach(addComp);
+  }
+  if (Array.isArray(window._setupLookupCache?.['my_company'])) {
+    window._setupLookupCache['my_company'].forEach(addComp);
+  }
+
+  // 5. From Step 1 DOM form inputs if filled
+  if (!list.length && typeof document !== 'undefined') {
+    const fn = document.getElementById('step1_fullname')?.value?.trim();
+    const sn = document.getElementById('step1_shortname')?.value?.trim();
+    if (fn || sn) {
+      addComp({ my_company_id: '1', company_shortname: sn || fn, company_fullname: fn || sn });
+    }
+  }
+
+  // 6. Fallback to authUser if still empty
+  if (!list.length && typeof window !== 'undefined' && window.authUser) {
+    const sn = window.authUser.company_shortname || '';
+    const fn = window.authUser.company_name || '';
+    if (sn || fn) {
+      addComp({ my_company_id: '1', company_shortname: sn, company_fullname: fn });
+    }
+  }
+
+  return list;
+};
+
+window.buildSetupCompanyOptions = function(selectedVal, placeholder = '') {
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  const companies = window.getSetupAvailableCompanies();
+  const ph = placeholder || (isVi ? 'Chọn công ty' : 'Select Company');
+  let opts = '<option value="">-- ' + escapeHTML(ph) + ' --</option>';
+
+  let foundSelected = false;
+  for (const comp of companies) {
+    const isSel = selectedVal && (
+      String(selectedVal).toLowerCase() === String(comp.value).toLowerCase() ||
+      String(selectedVal).toLowerCase() === String(comp.short_name || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === String(comp.id || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === String(comp.full_name || '').toLowerCase()
+    );
+    if (isSel) foundSelected = true;
+    const optVal = comp.id || comp.short_name || comp.value;
+    opts += '<option value="' + escapeHTML(optVal) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(comp.label) + '</option>';
+  }
+
+  if (selectedVal && !foundSelected) {
+    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
+  }
+
+  return opts;
+};
 
 // Setup searchable dropdown for country, currency & timezone
 window.swSearchOptions = {
@@ -1580,76 +1693,81 @@ function renderStep2HTML(counts){
   } else if(tab==='excel'){
     let prev = '';
     const parsed = window.setupParsedDepartments || [];
+    const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
     if (parsed.length > 0) {
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const d = parsed[i];
-        const isValid = Boolean(d.department_code && d.department_name);
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#4B5563;font-size:11.5px;">' + escapeHTML(d.company_id || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(d.department_code || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">' + escapeHTML(d.department_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(d.type || 'Operation') + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(d.manager_email || '–') + '</td>'
-          + '<td style="padding:7px 10px;">' + (isValid ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>' : '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Thiếu mã/tên') + '</span>') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const typeOpts = ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((d.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+          ? window.buildSetupCompanyOptions(d.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
+          : '<option value="' + escapeHTML(d.company_id || '1') + '">' + escapeHTML(d.company_id || '1') + '</option>';
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E0E7FF;background:#EEF2FF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4F46E5;">edit</span></button>'
           + '<button type="button" onclick="window.deleteSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'company_id\', this.value)" style="min-width:110px;">' + compOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_code || '') + '" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_code\', this.value)" style="min-width:90px;font-weight:700;color:#ea580c;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_name || '') + '" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'type\', this.value)" style="min-width:110px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="email" class="sw-grid-input" value="' + escapeHTML(d.manager_email || '') + '" placeholder="email@company.com" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'manager_email\', this.value)" style="min-width:140px;color:#2563EB;"></td>'
           + '</tr>';
       }
-      const validCount = parsed.filter(d => d.department_code && d.department_name).length;
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
         + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">domain</span>'
         + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step2_preview_title', 'Danh sách phòng ban tải lên') + '</div>'
-        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' (' + validCount + ' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;align-items:center;">'
         + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
         + '<button onclick="window.setupParsedDepartments=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:260px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Company ID</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:65px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'department\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
     }
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'department\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleDepartmentExcelUpload(event)"></label></div></div>' + prev;
   } else if(tab==='quick'){
     // Quick Add: Only 3 fields (Mã PB, Tên PB, Người quản lý tùy chọn) - No Operation/Finance dropdown
-    const r3=['','',''].map(()=>'<div style="display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;"><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button></div>').join('');
+    const r3=['','',''].map(()=>'<div style="display:grid;grid-template-columns:auto 120px 1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"></div>').join('');
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step2_desc', 'Tạo cơ cấu tổ chức. Chọn từ mẫu gợi ý hoặc nhập từ Excel.') + '</p><div id="quick-dept-rows">'+r3+'</div><button onclick="addQuickDeptRow()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:transparent;color:#374151;font-size:12px;cursor:pointer;margin-top:4px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button></div>';
   } else {
     const parsed = window.setupParsedDepartments || [];
+    const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
     if (parsed.length > 0) {
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const d = parsed[i];
-        const isValid = Boolean(d.department_code && d.department_name);
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#4B5563;font-size:11.5px;">' + escapeHTML(d.company_id || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(d.department_code || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">' + escapeHTML(d.department_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(d.type || 'Operation') + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(d.manager_email || '–') + '</td>'
-          + '<td style="padding:7px 10px;">' + (isValid ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>' : '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Thiếu mã/tên') + '</span>') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const typeOpts = ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((d.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+          ? window.buildSetupCompanyOptions(d.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
+          : '<option value="' + escapeHTML(d.company_id || '1') + '">' + escapeHTML(d.company_id || '1') + '</option>';
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E0E7FF;background:#EEF2FF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4F46E5;">edit</span></button>'
           + '<button type="button" onclick="window.deleteSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'company_id\', this.value)" style="min-width:110px;">' + compOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_code || '') + '" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_code\', this.value)" style="min-width:90px;font-weight:700;color:#ea580c;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_name || '') + '" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'type\', this.value)" style="min-width:110px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="email" class="sw-grid-input" value="' + escapeHTML(d.manager_email || '') + '" placeholder="email@company.com" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'manager_email\', this.value)" style="min-width:140px;color:#2563EB;"></td>'
           + '</tr>';
       }
       tc = '<div>'
@@ -1658,20 +1776,21 @@ function renderStep2HTML(counts){
         + '<div style="font-size:11.5px;color:#047857;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="overflow-x:auto;max-height:300px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Company ID</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:65px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'department\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>'
+        + '</div>';
     } else {
       tc='<div><div style="background:#F9FAFB;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="padding:10px 16px;background:#F3F4F6;font-size:12px;font-weight:700;color:#374151;">' + swT('sw.step2_header', 'Thiết lập phòng ban') + ': <strong style="color:#16a34a;">'+(counts.department||0)+'</strong> ' + swT('sw.step2_name', 'Phòng ban') + '</div>'+(counts.department>0?'<div style="padding:16px;font-size:12px;color:#6B7280;">' + swT('sw.step2_choose_desc', 'Chọn các phòng ban phù hợp với doanh nghiệp.') + '</div>':'<div style="padding:20px;text-align:center;font-size:12px;color:#9CA3AF;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div></div>';
     }
@@ -1686,8 +1805,8 @@ window.showCustomDeptForm=function(){const el=document.getElementById('custom-de
 window.addQuickDeptRow=function(){
   const c=document.getElementById('quick-dept-rows');if(!c)return;
   const d=document.createElement('div');
-  d.style.cssText='display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;';
-  d.innerHTML='<input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button>';
+  d.style.cssText='display:grid;grid-template-columns:auto 120px 1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;';
+  d.innerHTML='<button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '">';
   c.appendChild(d);
 };
 
@@ -1858,37 +1977,50 @@ function renderStep3HTML(counts){
     if(parsed.length>0){
       const vc=parsed.filter(e=>e.full_name&&e.email).length;
       let rows='';
+      const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
       for(let i=0;i<Math.min(parsed.length,50);i++){
-        const e=parsed[i],v=e.full_name&&e.email;
-        rows+='<tr style="border-bottom:1px solid #F1F5F9;">'
-          +'<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">'+(i+1)+'</td>'
-          +'<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">'+escapeHTML(e.full_name||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">'+escapeHTML(e.username||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.email||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.department_code||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.position||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.start_date||todayStr)+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.direct_manager||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.emergency_contact_name ? e.emergency_contact_name + (e.emergency_contact_phone ? ' (' + e.emergency_contact_phone + ')' : '') : '–')+'</td>'
-          +'<td style="padding:7px 10px;">'+(v?'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>':'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Lỗi') + '</span>')+'</td>'
-          +'<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          +'<button type="button" onclick="window.editSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const e=parsed[i];
+        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+          ? window.buildSetupCompanyOptions(e.company_id || e.company_entity || '', isVi ? 'Chọn công ty' : 'Select Company')
+          : '<option value="' + escapeHTML(e.company_id || '1') + '">' + escapeHTML(e.company_id || '1') + '</option>';
+        const deptOpts = (typeof window.buildSetupDepartmentSelectOptions === 'function')
+          ? window.buildSetupDepartmentSelectOptions(e.department_code || e.department_name || '')
+          : '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
+        const directOpts = (typeof window.buildSetupEmployeeOptions === 'function')
+          ? window.buildSetupEmployeeOptions(e.direct_manager || 'Super Admin', true)
+          : '<option value="Super Admin">Super Admin</option>';
+
+        rows+='<tr style="border-bottom:1px solid #E2E8F0;">'
+          +'<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">'+(i+1)+'</td>'
+          +'<td style="padding:4px 6px;text-align:center;white-space:nowrap;">'
+          +'<button type="button" onclick="window.editSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E0E7FF;background:#EEF2FF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4F46E5;">edit</span></button>'
           +'<button type="button" onclick="window.deleteSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           +'</td>'
+          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'company_id\', this.value)" style="min-width:110px;">'+compOpts+'</select></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.full_name||'')+'" placeholder="' + swT('sw.step3_emp_name', 'Họ và tên', 'Full Name') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'full_name\', this.value)" style="min-width:130px;font-weight:600;"></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.username||'')+'" placeholder="' + swT('sw.step3_emp_username', 'Username', 'Username') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'username\', this.value)" style="min-width:90px;color:#2563EB;"></td>'
+          +'<td style="padding:4px;"><input type="email" class="sw-grid-input" value="'+escapeHTML(e.email||'')+'" placeholder="' + swT('sw.step3_emp_email_ph', 'email@company.com', 'email@company.com') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'email\', this.value)" style="min-width:140px;"></td>'
+          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'department_code\', this.value)" style="min-width:120px;">'+deptOpts+'</select></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.position||'')+'" placeholder="' + swT('sw.step3_emp_position', 'Chức vụ', 'Position') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'position\', this.value)" style="min-width:100px;"></td>'
+          +'<td style="padding:4px;"><input type="date" class="sw-grid-input" value="'+escapeHTML(e.start_date||todayStr)+'" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'start_date\', this.value)" style="min-width:115px;"></td>'
+          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'direct_manager\', this.value)" style="min-width:125px;">'+directOpts+'</select></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.emergency_contact_name||'')+'" placeholder="' + swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp', 'Emergency Contact Name') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'emergency_contact_name\', this.value)" style="min-width:110px;"></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.emergency_contact_phone||'')+'" placeholder="' + swT('sw.step3_emp_emg_phone', 'SĐT', 'Phone') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'emergency_contact_phone\', this.value)" style="min-width:95px;"></td>'
           +'</tr>';
       }
       prev='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;">'
         +'<div style="display:flex;align-items:center;gap:10px;">'
         +'<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span>'
-        +'<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên') + '</div>'
-        +'<div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' ('+vc+' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        +'<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên', 'Employee File') + '</div>'
+        +'<div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu', 'rows of data') + '</div></div>'
         +'</div>'
         +'<div style="display:flex;gap:8px;align-items:center;">'
-        +'<button onclick="saveStep3AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step3_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
-        +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        +'<button onclick="saveStep3AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step3_confirm_import', 'Xác nhận lưu danh sách', 'Confirm & Save List') + '</button>'
+        +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file', 'Delete File') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         +'</div>'
         +'</div>'
-        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th><th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:360px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th><th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:65px;">' + swT('common.actions', 'Thao tác', 'Actions') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty', 'Company') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên', 'Full Name') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username', 'Username') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email', 'Email') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban', 'Department') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ', 'Position') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu', 'Start Date') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp', 'Direct Manager') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp', 'Emergency Contact') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_phone', 'SĐT', 'Phone') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
+        +'<button type="button" onclick="window.addParsedGridRow(\'employee\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
     }
     tc='<div><div class="sw-upload-zone" style="margin-bottom:16px;"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:14px;">(.xlsx, .xls, .csv)</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="downloadEmployeeTemplate()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleEmployeeExcelUpload(event)"></label></div></div>'+prev+'</div>';
   }
@@ -2012,8 +2144,14 @@ window.buildSetupDepartmentSelectOptions = function(selectedVal) {
 
 function renderQuickEmpCard(idx, data) {
   const d = data || {};
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
   const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
   const deptVal = d.dept || d.department_code || d.department_name || '';
+  const compVal = d.company_id || d.company_entity || '';
+  const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+    ? window.buildSetupCompanyOptions(compVal, isVi ? 'Chọn công ty' : 'Select Company')
+    : '<option value="">-- ' + (isVi ? 'Chọn công ty' : 'Select Company') + ' --</option>';
+
   return '<div class="sw-emp-card qemp-card" data-idx="'+idx+'">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F3F4F6;">'
     + '<div style="font-size:12px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:5px;"><span class="material-symbols-rounded" style="font-size:16px;">badge</span> ' + swT('sw.step3_name', 'Nhân viên') + ' #' + (idx+1) + '</div>'
@@ -2022,18 +2160,19 @@ function renderQuickEmpCard(idx, data) {
     // 4 inputs per row, orderly and cleanly aligned
     + '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;align-items:start;">'
     // Row 1 (4 inputs)
-    + '<div>'+swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name_ph', 'Họ và tên đầy đủ') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true)+'<input type="text" class="sw-input qemp-username" placeholder="' + swT('sw.step3_emp_username_ph', 'john.doe') + '" value="'+escapeHTML(d.username||'')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="' + swT('sw.step3_emp_email_ph', 'john@company.com') + '" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false)+'<select class="sw-input qemp-dept">'+(typeof window.buildSetupDepartmentSelectOptions === 'function' ? window.buildSetupDepartmentSelectOptions(deptVal) : '')+'</select></div>'
+    + '<div>'+swLabel(swT('sw.step1_company', 'Công ty', 'Company'), false)+'<select class="sw-input qemp-company">'+compOpts+'</select></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban', 'Department'), false)+'<select class="sw-input qemp-dept">'+(typeof window.buildSetupDepartmentSelectOptions === 'function' ? window.buildSetupDepartmentSelectOptions(deptVal) : '')+'</select></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_name', 'Họ và tên', 'Full Name'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name_ph', 'Họ và tên đầy đủ', 'Full Name') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập', 'Username'), true)+'<input type="text" class="sw-input qemp-username" placeholder="' + swT('sw.step3_emp_username_ph', 'john.doe', 'john.doe') + '" value="'+escapeHTML(d.username||'')+'"></div>'
     // Row 2 (4 inputs)
-    + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true)+'<select class="sw-input qemp-direct-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.direct_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), true)+'<select class="sw-input qemp-hr-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.hr_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
-    // Row 3 (2 inputs spanning 2 columns each)
-    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-name" placeholder="' + swT('sw.step3_emp_emg_name_ph', 'Tên người thân') + '" value="'+escapeHTML(d.emg_name||'')+'"></div>'
-    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="' + swT('sw.step3_emp_emg_phone_ph', '0901234567') + '" value="'+escapeHTML(d.emg_phone||'')+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_email', 'Email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="' + swT('sw.step3_emp_email_ph', 'john@company.com', 'john@company.com') + '" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ', 'Position'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh', 'Job Title') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu', 'Start Date'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp', 'Direct Manager'), true)+'<select class="sw-input qemp-direct-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.direct_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
+    // Row 3 (4 inputs)
+    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự', 'HR Manager'), true)+'<select class="sw-input qemp-hr-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.hr_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
+    + '<div>'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp', 'Emergency Contact Name'), true)+'<input type="text" class="sw-input qemp-emg-name" placeholder="' + swT('sw.step3_emp_emg_name_ph', 'Tên người thân', 'Contact Name / Relationship') + '" value="'+escapeHTML(d.emg_name||'')+'"></div>'
+    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp', 'Emergency Contact Phone'), true)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="' + swT('sw.step3_emp_emg_phone_ph', '0901234567', '0901234567') + '" value="'+escapeHTML(d.emg_phone||'')+'"></div>'
     + '</div>'
     + '</div>';
 }
@@ -2258,8 +2397,10 @@ window.saveStep3AndAdvance = async function(){
 
   if (tab === 'quick') {
     const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
+    const curCompId = window.setupDraft?.company?.my_company_id || window.setupDraft?.company?.company_shortname || '1';
     const cards = document.querySelectorAll('.qemp-card');
     cards.forEach(c => {
+      const comp = c.querySelector('.qemp-company')?.value?.trim();
       const fn = c.querySelector('.qemp-name')?.value?.trim();
       const em = c.querySelector('.qemp-email')?.value?.trim();
       const un = c.querySelector('.qemp-username')?.value?.trim() || (em ? em.split('@')[0] : '');
@@ -2285,6 +2426,7 @@ window.saveStep3AndAdvance = async function(){
         employeesToSave.push({
           employee_id: '',
           employee_code: '',
+          company_id: comp || curCompId,
           full_name: fn || un || em,
           username: un,
           email: em,
@@ -2518,95 +2660,6 @@ window.buildSetupEmployeeOptions = function(selectedVal, allowDirectManager = fa
   }
 
   if (selectedVal && !foundSelected && selectedVal !== 'Direct Manager' && selectedVal !== 'Auto') {
-    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
-  }
-
-  return opts;
-};
-
-window.getSetupAvailableCompanies = function() {
-  const list = [];
-  const seen = new Set();
-
-  const addComp = (c) => {
-    if (!c) return;
-    const shortName = String(c.company_shortname || c.short_name || c.name || '').trim();
-    const fullName = String(c.company_fullname || c.full_name || c.company_name || '').trim();
-    const id = String(c.my_company_id || c.company_id || c.id || '').trim();
-    const val = shortName || id || fullName;
-    if (!val) return;
-
-    const key = (id || shortName || fullName).toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    if (shortName) seen.add(shortName.toLowerCase());
-    if (id) seen.add(id.toLowerCase());
-
-    const label = shortName && fullName && shortName !== fullName
-      ? `${shortName} - ${fullName}`
-      : (shortName || fullName || id);
-
-    list.push({
-      value: val,
-      short_name: shortName,
-      full_name: fullName,
-      id: id,
-      label: label
-    });
-  };
-
-  // 1. From setupParsedCompanies (Step 1 Excel parsed)
-  if (Array.isArray(window.setupParsedCompanies)) {
-    window.setupParsedCompanies.forEach(addComp);
-  }
-
-  // 2. From setupDraft.company (Step 1 Form or Excel)
-  if (window.setupDraft?.company) {
-    if (Array.isArray(window.setupDraft.company)) {
-      window.setupDraft.company.forEach(addComp);
-    } else if (typeof window.setupDraft.company === 'object') {
-      addComp(window.setupDraft.company);
-    }
-  }
-
-  // 3. From setupWizardData.company or companies
-  if (window.setupWizardData?.company) {
-    addComp(window.setupWizardData.company);
-  }
-  if (Array.isArray(window.setupWizardData?.companies)) {
-    window.setupWizardData.companies.forEach(addComp);
-  }
-
-  // 4. From selectCache / lookupCache if available
-  if (typeof selectCache !== 'undefined' && Array.isArray(selectCache['my_company'])) {
-    selectCache['my_company'].forEach(addComp);
-  }
-  if (Array.isArray(window._setupLookupCache?.['my_company'])) {
-    window._setupLookupCache['my_company'].forEach(addComp);
-  }
-
-  return list;
-};
-
-window.buildSetupCompanyOptions = function(selectedVal, placeholder = '') {
-  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
-  const companies = window.getSetupAvailableCompanies();
-  const ph = placeholder || (isVi ? 'Chọn pháp nhân' : 'Select Company Entity');
-  let opts = '<option value="">-- ' + escapeHTML(ph) + ' --</option>';
-
-  let foundSelected = false;
-  for (const comp of companies) {
-    const isSel = selectedVal && (
-      String(selectedVal).toLowerCase() === comp.value.toLowerCase() ||
-      String(selectedVal).toLowerCase() === (comp.short_name || '').toLowerCase() ||
-      String(selectedVal).toLowerCase() === (comp.id || '').toLowerCase() ||
-      String(selectedVal).toLowerCase() === (comp.full_name || '').toLowerCase()
-    );
-    if (isSel) foundSelected = true;
-    opts += '<option value="' + escapeHTML(comp.short_name || comp.value) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(comp.label) + '</option>';
-  }
-
-  if (selectedVal && !foundSelected) {
     opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
   }
 
@@ -2910,67 +2963,83 @@ function renderStep4HTML(counts){
     let prev = '';
     const parsed = window.setupParsedPolicies || [];
     if (parsed.length > 0) {
+      const isVi = swIsVi();
+      const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
+        ? window.setupParsedDepartments
+        : (window.setupWizardData?.departments || []);
+
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const p = parsed[i];
-        const t1Display = p.tier1_display || p.tier1_approval || 'Direct Manager';
-        const t2Display = p.tier2_display || p.tier2_approval || '–';
-        const t3Display = p.tier3_display || p.tier3_approval || '–';
-        const leadDisplay = p.policy_lead_display || p.policy_lead || '–';
-        const ownerDisplay = p.sr_owner_display || p.sr_owner || '–';
-        const deptDisplay = p.department_id || '–';
+        const types = ['Operation', 'Finance', 'Technical', 'Sale and MKT', 'HR', 'Admin', 'Procurement', 'Legal'];
+        const typeOpts = types.map(t => '<option value="' + t + '" ' + ((p.policy_type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const levels = ['Tier 1', 'Tier 2', 'Tier 3'];
+        const levelOpts = levels.map(l => '<option value="' + l + '" ' + ((p.approval_level || 'Tier 1') === l ? 'selected' : '') + '>' + l + '</option>').join('');
 
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_name) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_type) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier1_approval || '') + '">' + escapeHTML(t1Display) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier2_approval || '') + '">' + escapeHTML(t2Display) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier3_approval || '') + '">' + escapeHTML(t3Display) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.policy_lead || '') + '">' + escapeHTML(leadDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.sr_owner || '') + '">' + escapeHTML(ownerDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(deptDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + swT('common.valid', 'Hợp lệ') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">delete</span></button>'
+        let deptOpts = '<option value="">-- ' + (isVi ? 'Phòng ban' : 'Dept') + ' --</option>';
+        for (const d of deptList) {
+          const code = d.department_code || d.code || '';
+          const dname = d.department_name || d.name || code;
+          const isSel = (p.department_id && (p.department_id === code || p.department_id === dname || p.department_id === d.department_id));
+          deptOpts += '<option value="' + escapeHTML(code || dname) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + dname) + '</option>';
+        }
+
+        const t1Opts = window.buildSetupEmployeeOptions(p.tier1_approval || 'Direct Manager', true);
+        const t2Opts = window.buildSetupEmployeeOptions(p.tier2_approval || '', false, isVi ? '-- Bậc 2 (tùy chọn) --' : '-- Tier 2 --');
+        const t3Opts = window.buildSetupEmployeeOptions(p.tier3_approval || '', false, isVi ? '-- Bậc 3 (tùy chọn) --' : '-- Tier 3 --');
+        const leadOpts = window.buildSetupEmployeeOptions(p.policy_lead || '', false, isVi ? '-- Policy Lead --' : '-- Policy Lead --');
+        const ownerOpts = window.buildSetupEmployeeOptions(p.sr_owner || '', false, isVi ? '-- SR Owner --' : '-- SR Owner --');
+
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E0E7FF;background:#EEF2FF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4F46E5;">edit</span></button>'
+          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(p.policy_name || '') + '" placeholder="' + swT('sw.step4_policy_name', 'Tên quy trình') + ' *" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_type\', this.value)" style="min-width:105px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'approval_level\', this.value)" style="min-width:85px;font-weight:600;">' + levelOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier1_approval\', this.value)" style="min-width:125px;">' + t1Opts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier2_approval\', this.value)" style="min-width:125px;">' + t2Opts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier3_approval\', this.value)" style="min-width:125px;">' + t3Opts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_lead\', this.value)" style="min-width:125px;">' + leadOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'sr_owner\', this.value)" style="min-width:125px;">' + ownerOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'department_id\', this.value)" style="min-width:120px;">' + deptOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="number" min="0.5" step="0.5" class="sw-grid-input" value="' + escapeHTML(String(p.sla || 3)) + '" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'sla\', parseFloat(this.value)||1)" style="min-width:55px;text-align:center;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(p.description || '') + '" placeholder="' + swT('common.description', 'Mô tả') + '" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'description\', this.value)" style="min-width:130px;"></td>'
           + '</tr>';
       }
-      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#F9FAFB;border:1px solid #E5E7EB;margin-top:16px;margin-bottom:14px;">'
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
-        + '<span class="material-symbols-rounded" style="font-size:24px;color:#4B5563;">rule</span>'
-        + '<div><div style="font-size:12.5px;font-weight:600;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
+        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">rule</span>'
+        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
         + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;align-items:center;">'
         + '<button onclick="saveStep4AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step4_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
-        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;color:#4B5563;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_policy_name', 'Tên quy trình') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier3', 'Bậc 3') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Policy Lead</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SR Owner</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SLA</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:70px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:65px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_policy_name', 'Tên quy trình') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier3', 'Bậc 3') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Policy Lead</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SR Owner</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SLA (' + swT('common.days', 'ngày') + ')</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'policy\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step4_add_process', 'Thêm quy trình') + '</button>';
     }
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;"><button onclick="downloadSetupTemplate(\'policy\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handlePolicyExcelUpload(event)"></label></div></div>' + prev;
   } else {
@@ -3371,7 +3440,10 @@ function renderStep5HTML(comp, counts) {
   for (const b of popularBanks) banksDatalist += '<option value="' + escapeHTML(b) + '">';
   banksDatalist += '</datalist>';
 
-  const currencyDatalist = '<datalist id="step5-currency-datalist"><option value="VND"><option value="USD"><option value="EUR"><option value="JPY"><option value="SGD"><option value="CNY"></datalist>';
+  const curOpts = (window.swSearchOptions?.currency && window.swSearchOptions.currency.length > 0)
+    ? window.swSearchOptions.currency.map(c => '<option value="' + escapeHTML(c.value || c.code || c) + '">').join('')
+    : '<option value="VND"><option value="USD"><option value="EUR"><option value="JPY"><option value="SGD"><option value="CNY"></option>';
+  const currencyDatalist = '<datalist id="step5-currency-datalist">' + curOpts + '</datalist>';
 
   let tabContent = '';
   if (tab === 'quick') {
@@ -3397,25 +3469,32 @@ function renderStep5HTML(comp, counts) {
     let prev = '';
     if (parsed.length > 0) {
       let rows = '';
+      const isVi = swIsVi();
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const a = parsed[i];
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(a.account_id || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(a.account_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(a.type || 'Bank Account') + '</td>'
-          + '<td style="padding:7px 10px;color:#059669;font-weight:600;font-size:11.5px;">' + escapeHTML(a.account_status || 'active') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.currency || 'VND') + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-weight:600;font-size:11.5px;">' + escapeHTML(a.account_number || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#111827;font-size:11.5px;">' + escapeHTML(a.bank_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(String(a.exchange_rate || 1)) + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.transaction_managed_by || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.finance_control || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.company_entity || '–') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const typeOpts = ['Bank Account', 'Cash', 'Credit Card', 'Loan', 'Other'].map(t => '<option value="' + t + '" ' + ((a.type || 'Bank Account') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const statusOpts = ['active', 'inactive'].map(s => '<option value="' + s + '" ' + ((a.account_status || 'active') === s ? 'selected' : '') + '>' + s + '</option>').join('');
+        const compOpts = window.buildSetupCompanyOptions(a.company_entity || '', isVi ? 'Chọn pháp nhân' : 'Select Company');
+        const mgrOpts = window.buildSetupEmployeeOptions(a.transaction_managed_by || '', false, isVi ? 'Chọn QL Giao dịch' : 'Select Manager');
+        const finOpts = window.buildSetupEmployeeOptions(a.finance_control || '', false, isVi ? 'Chọn kiểm soát TC' : 'Select Fin Control');
+
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E0E7FF;background:#EEF2FF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4F46E5;">edit</span></button>'
           + '<button type="button" onclick="window.deleteSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_id || '') + '" placeholder="ID" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_id\', this.value)" style="min-width:65px;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_name || '') + '" placeholder="' + swT('sw.step5_acct_name', 'Tên tài khoản') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_name\', this.value)" style="min-width:130px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'type\', this.value)" style="min-width:105px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'account_status\', this.value)" style="min-width:85px;color:#059669;font-weight:600;">' + statusOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="text" list="step5-currency-datalist" class="sw-grid-input" value="' + escapeHTML(a.currency || 'VND') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'currency\', this.value)" style="min-width:60px;text-transform:uppercase;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_number || '') + '" placeholder="0011..." oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_number\', this.value)" style="min-width:110px;color:#2563EB;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><input type="text" list="step5-banks-datalist" class="sw-grid-input" value="' + escapeHTML(a.bank_name || '') + '" placeholder="' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'bank_name\', this.value)" style="min-width:100px;"></td>'
+          + '<td style="padding:4px;"><input type="number" step="any" class="sw-grid-input" value="' + escapeHTML(String(a.exchange_rate || 1)) + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'exchange_rate\', parseFloat(this.value)||1)" style="min-width:65px;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'transaction_managed_by\', this.value)" style="min-width:125px;">' + mgrOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'finance_control\', this.value)" style="min-width:125px;">' + finOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'company_entity\', this.value)" style="min-width:130px;">' + compOpts + '</select></td>'
           + '</tr>';
       }
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
@@ -3424,27 +3503,31 @@ function renderStep5HTML(comp, counts) {
         + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step5_preview_title', 'Danh sách tài khoản đọc từ file Excel') + '</div>'
         + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;">'
+        + '<button onclick="saveStep5AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step5_imported_btn', 'Lưu {{count}} tài khoản').replace('{{count}}', parsed.length) + '</button>'
         + '<button onclick="window.setupParsedAccounts=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Account ID</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_name', 'Tên tài khoản', 'Account Name') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_type', 'Loại', 'Type') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_status', 'Trạng thái', 'Status') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_currency', 'Tiền tệ', 'Currency') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_num', 'Số tài khoản', 'Account Number') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_entity', 'Pháp nhân', 'Company Entity') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:70px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:65px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Account ID</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_name', 'Tên tài khoản', 'Account Name') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_type', 'Loại', 'Type') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_status', 'Trạng thái', 'Status') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_currency', 'Tiền tệ', 'Currency') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_num', 'Số tài khoản', 'Account Number') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_entity', 'Pháp nhân', 'Company Entity') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'account\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
     }
     tabContent = '<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'account\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleAccountExcelUpload(event)"></label></div></div>'
       + prev
@@ -4134,6 +4217,100 @@ window.deleteSetupParsedItem = function(type, index) {
   }
 };
 
+window.updateParsedGridCell = function(type, index, field, value) {
+  let list = null;
+  if (type === 'department') list = window.setupParsedDepartments;
+  else if (type === 'employee') list = window.setupParsedEmployees;
+  else if (type === 'policy') list = window.setupParsedPolicies;
+  else if (type === 'account') list = window.setupParsedAccounts;
+  if (!list || !list[index]) return;
+  list[index][field] = value;
+  if (type === 'department') {
+    if (window.setupDraft) window.setupDraft.departments = list;
+  } else if (type === 'employee') {
+    if (window.setupDraft) window.setupDraft.employees = list;
+  } else if (type === 'policy') {
+    if (window.setupDraft) window.setupDraft.policies = list;
+  } else if (type === 'account') {
+    if (window.setupDraft) window.setupDraft.accounts = list;
+  }
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
+  }
+};
+
+window.addParsedGridRow = function(type) {
+  if (type === 'department') {
+    if (!window.setupParsedDepartments) window.setupParsedDepartments = [];
+    const curCompId = window.setupDraft?.company?.my_company_id || '1';
+    window.setupParsedDepartments.push({
+      department_id: '',
+      company_id: curCompId,
+      department_code: 'DEPT-' + (window.setupParsedDepartments.length + 1),
+      department_name: '',
+      type: 'Operation',
+      manager_email: ''
+    });
+    if (window.setupDraft) window.setupDraft.departments = window.setupParsedDepartments;
+  } else if (type === 'employee') {
+    if (!window.setupParsedEmployees) window.setupParsedEmployees = [];
+    const curCompId = window.setupDraft?.company?.my_company_id || (window.getSetupAvailableCompanies ? (window.getSetupAvailableCompanies()[0]?.id || '') : '');
+    window.setupParsedEmployees.push({
+      company_id: curCompId,
+      full_name: '',
+      username: '',
+      email: '',
+      department_code: '',
+      position: '',
+      start_date: new Date().toISOString().split('T')[0],
+      direct_manager: 'Super Admin',
+      hr_manager: 'Super Admin',
+      emergency_contact_name: '',
+      emergency_contact_phone: ''
+    });
+    if (window.setupDraft) window.setupDraft.employees = window.setupParsedEmployees;
+  } else if (type === 'policy') {
+    if (!window.setupParsedPolicies) window.setupParsedPolicies = [];
+    window.setupParsedPolicies.push({
+      policy_name: '',
+      policy_type: 'Operation',
+      approval_level: 'Tier 1',
+      tier1_approval: 'Direct Manager',
+      tier2_approval: '',
+      tier3_approval: '',
+      policy_lead: '',
+      sr_owner: '',
+      department_id: '',
+      sla: 3,
+      description: ''
+    });
+    if (window.setupDraft) window.setupDraft.policies = window.setupParsedPolicies;
+  } else if (type === 'account') {
+    if (!window.setupParsedAccounts) window.setupParsedAccounts = [];
+    const cur = (window.setupDraft?.company?.base_currency) || 'VND';
+    window.setupParsedAccounts.push({
+      account_id: '',
+      account_name: '',
+      bank_name: 'MBV',
+      account_number: '',
+      currency: cur,
+      type: 'Bank Account',
+      account_status: 'active',
+      exchange_rate: 1,
+      company_entity: '',
+      transaction_managed_by: '',
+      finance_control: ''
+    });
+    if (window.setupDraft) window.setupDraft.accounts = window.setupParsedAccounts;
+  }
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
+  }
+  if (typeof renderSetupContent === 'function') {
+    renderSetupContent();
+  }
+};
+
 window.editSetupParsedItem = function(type, index) {
   let item = null;
   if (type === 'department') {
@@ -4158,14 +4335,13 @@ window.editSetupParsedItem = function(type, index) {
     const types = ['Operation', 'Finance', 'Technical', 'Sale and MKT'];
     const typeOpts = types.map(t => '<option value="' + t + '" ' + ((item.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
     const comp = window.setupWizardData?.company || {};
-    const compShort = comp.company_shortname || window.authUser?.company_shortname || '';
-    const compFull = comp.company_fullname || window.authUser?.company_name || '';
-    const compDisplay = (compShort && compFull) ? `${compShort} - ${compFull}` : (compShort || compFull || (item.company_id ? `ID: ${item.company_id}` : (isVi ? 'Công ty mặc định' : 'Default Company')));
+    const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+      ? window.buildSetupCompanyOptions(item.company_id || comp.my_company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
+      : '<option value="' + escapeHTML(item.company_id || comp.my_company_id || '1') + '">' + escapeHTML(item.company_id || comp.my_company_id || '1') + '</option>';
 
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      + '<input type="hidden" id="sw-edit-comp-id" value="' + escapeHTML(item.company_id || comp.my_company_id || '') + '">'
-      + '<div style="grid-column:span 2;">' + swLabel(isVi ? 'Công ty' : 'Company', false)
-      + '<div style="padding:9px 12px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:10px;font-size:12.5px;font-weight:600;color:#1F2937;display:flex;align-items:center;gap:6px;"><span class="material-symbols-rounded" style="font-size:18px;color:#EA580C;">business</span>' + escapeHTML(compDisplay) + '</div></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step1_company', 'Công ty', 'Company'), false)
+      + '<select id="sw-edit-comp-id" class="sw-select">' + compOpts + '</select></div>'
       + '<div>' + swLabel(swT('sw.step2_dept_code', 'Mã phòng ban'), true) + '<input type="text" id="sw-edit-dept-code" class="sw-input" value="' + escapeHTML(item.department_code || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step2_dept_name', 'Tên phòng ban'), true) + '<input type="text" id="sw-edit-dept-name" class="sw-input" value="' + escapeHTML(item.department_name || '') + '"></div>'
       + '<div>' + swLabel(swT('common.type', 'Loại'), false) + '<select id="sw-edit-dept-type" class="sw-select">' + typeOpts + '</select></div>'
@@ -4173,6 +4349,11 @@ window.editSetupParsedItem = function(type, index) {
       + '</div>';
   } else if (type === 'employee') {
     title = (isVi ? 'Sửa thông tin nhân viên #' : 'Edit Employee #') + (index + 1);
+
+    // Build Company options
+    const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+      ? window.buildSetupCompanyOptions(item.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
+      : '<option value="' + escapeHTML(item.company_id || '') + '">' + escapeHTML(item.company_id || '') + '</option>';
 
     // Build Department dropdown options from Process 2
     const deptOpts = (typeof window.buildSetupDepartmentSelectOptions === 'function')
@@ -4203,6 +4384,7 @@ window.editSetupParsedItem = function(type, index) {
     const hrOpts = buildMgrOpts(item.hr_manager || 'Super Admin');
 
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step1_company', 'Công ty', 'Company'), false) + '<select id="sw-edit-emp-company" class="sw-select">' + compOpts + '</select></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true) + '<input type="text" id="sw-edit-emp-name" class="sw-input" value="' + escapeHTML(item.full_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true) + '<input type="text" id="sw-edit-emp-user" class="sw-input" value="' + escapeHTML(item.username || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_email', 'Email'), true) + '<input type="email" id="sw-edit-emp-email" class="sw-input" value="' + escapeHTML(item.email || '') + '"></div>'
@@ -4211,8 +4393,8 @@ window.editSetupParsedItem = function(type, index) {
       + '<div>' + swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true) + '<input type="date" id="sw-edit-emp-start" class="sw-input" value="' + escapeHTML(item.start_date || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true) + '<select id="sw-edit-emp-direct" class="sw-select">' + directOpts + '</select></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), false) + '<select id="sw-edit-emp-hr" class="sw-select">' + hrOpts + '</select></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), false) + '<input type="text" id="sw-edit-emp-emg-name" class="sw-input" value="' + escapeHTML(item.emergency_contact_name || '') + '"></div>'
-      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), false) + '<input type="text" id="sw-edit-emp-emg-phone" class="sw-input" value="' + escapeHTML(item.emergency_contact_phone || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp', 'Emergency Contact Name'), false) + '<input type="text" id="sw-edit-emp-emg-name" class="sw-input" value="' + escapeHTML(item.emergency_contact_name || '') + '"></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp', 'Emergency Contact Phone'), false) + '<input type="text" id="sw-edit-emp-emg-phone" class="sw-input" value="' + escapeHTML(item.emergency_contact_phone || '') + '"></div>'
       + '</div>';
   } else if (type === 'policy') {
     title = (isVi ? 'Sửa thông tin quy trình #' : 'Edit Process #') + (index + 1);
@@ -4365,6 +4547,7 @@ window.saveSwParsedEditModal = function(type, index) {
       renderSetupContent();
     }
   } else if (type === 'employee') {
+    const compId = document.getElementById('sw-edit-emp-company')?.value?.trim() || '';
     const fullName = document.getElementById('sw-edit-emp-name')?.value?.trim();
     const username = document.getElementById('sw-edit-emp-user')?.value?.trim();
     const email = document.getElementById('sw-edit-emp-email')?.value?.trim();
@@ -4393,6 +4576,7 @@ window.saveSwParsedEditModal = function(type, index) {
 
       window.setupParsedEmployees[index] = {
         ...window.setupParsedEmployees[index],
+        company_id: compId,
         full_name: fullName,
         username: username,
         email: email,
