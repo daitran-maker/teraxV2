@@ -3757,6 +3757,12 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
       return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle}">${filesHtml}</td>`;
     }
 
+    if (k === 'payment_description' || (moduleKey === 'payment' && k.includes('description'))) {
+      const strVal = String(val);
+      const shortDesc = strVal.length > 35 ? strVal.substring(0, 35) + '....' : strVal;
+      return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" title="${escapeHTML(strVal)}" style="${tdStyle} max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(shortDesc)}</td>`;
+    }
+
     return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" title="${escapeHTML(String(val))}" style="${tdStyle}">${escapeHTML(String(val))}</td>`;
   });
 

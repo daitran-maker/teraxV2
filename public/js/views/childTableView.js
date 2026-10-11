@@ -1731,7 +1731,13 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   }
                   cellContentHTML = escapeHTML(translatedVal);
                 } else {
-                  const display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
+                  const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description');
+                  let display;
+                  if (isDescCol) {
+                    display = displayVal.length > 35 ? displayVal.substring(0, 35) + '....' : displayVal;
+                  } else {
+                    display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
+                  }
                   cellContentHTML = escapeHTML(display);
                 }
 
@@ -1743,7 +1749,12 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   ? escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim())
                   : escapeHTML(displayVal);
 
-                return `<td style="padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;" title="${titleAttr}">${cellContentHTML}</td>`;
+                const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description');
+                const cellStyle = isDescCol
+                  ? 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis;'
+                  : 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;';
+
+                return `<td style="${cellStyle}" title="${titleAttr}">${cellContentHTML}</td>`;
               }).join('')}
                            </tr>
                          `;
@@ -1953,8 +1964,17 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;">${escapeHTML(translatedVal)}</td>`;
                 }
 
-                const display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
-                return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;" title="${escapeHTML(displayVal)}">${escapeHTML(display)}</td>`;
+                const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description');
+                let display;
+                if (isDescCol) {
+                  display = displayVal.length > 35 ? displayVal.substring(0, 35) + '....' : displayVal;
+                } else {
+                  display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
+                }
+                const cellStyle = isDescCol
+                  ? 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis;'
+                  : 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;';
+                return `<td style="${cellStyle}" title="${escapeHTML(displayVal)}">${escapeHTML(display)}</td>`;
               }).join('')}
                              </tr>
                            `;
