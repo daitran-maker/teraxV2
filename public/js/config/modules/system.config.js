@@ -16,7 +16,7 @@
       { key: 'policy_name', label: 'Process Name' },
       { key: 'policy_type', label: 'Process Type' },
       { key: 'description', label: 'Description' },
-      { key: 'sla', label: 'SLA (Days)', labelKey: 'col.sla' },
+      { key: 'sla', label: 'SLA (days)', labelKey: 'col.sla' },
       { key: 'request_count', label: 'NO OF REQUEST', type: 'child_count', display: 'number' },
       { key: 'policy_lead', label: 'Policy Lead', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
       { key: 'sr_owner', label: 'SR Owner', type: 'multiselect', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
@@ -33,7 +33,7 @@
     fields: [
       { key: 'policy_name', label: 'Process Name', type: 'text', required: true },
       { key: 'policy_type', label: 'Process Type', type: 'select', optionsFrom: 'department', optionValue: 'type', optionLabel: 'type', required: true },
-      { key: 'sla', label: 'SLA (DAYS)', labelKey: 'col.sla', type: 'number', step: '0.01', min: '0', placeholder: '0.00' },
+      { key: 'sla', label: 'SLA (days)', labelKey: 'col.sla', type: 'number', step: '0.01', min: '0', placeholder: '0.00' },
       { key: 'approval_level', label: 'Approval Level', type: 'select', options: ['Tier 0', 'Tier 1', 'Tier 2', 'Tier 3'], defaultValue: 'Tier 3' },
       { key: 'tier1_approval', label: 'Tier 1 Approval', type: 'select', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name', staticOptions: [{ value: 'Direct Manager', label: '👥 Direct Manager' }], required: true },
       { key: 'tier2_approval', label: 'Tier 2 Approval', type: 'select', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
@@ -72,7 +72,7 @@
       { key: 'tier3_approval', label: 'TIER 3 APPROVAL', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
       { key: 'policy_lead', label: 'POLICY LEAD', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
       { key: 'sr_owner', label: 'SR OWNER', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
-      { key: 'sla', label: 'SLA (DAYS)', labelKey: 'col.sla' },
+      { key: 'sla', label: 'SLA (days)', labelKey: 'col.sla' },
 
       { section: 'process documentation' },
       { key: 'procedure_link', label: 'PROCEDURE LINK', full: true },

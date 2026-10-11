@@ -159,6 +159,7 @@ const SW_I18N_FALLBACK = {
     "sw.status_pending": "Not set up",
     "sw.step1_address": "Headquarters Address",
     "sw.step1_address_ph": "e.g. 5th Floor, Landmark Tower, Hanoi",
+    "sw.step1_company": "Company",
     "sw.step1_country": "Country",
     "sw.step1_currency": "Currency",
     "sw.step1_desc": "Build the foundational database for your business. Can be edited anytime.",
@@ -464,6 +465,7 @@ const SW_I18N_FALLBACK = {
     "sw.status_pending": "Chưa thiết lập",
     "sw.step1_address": "Địa chỉ trụ sở chính",
     "sw.step1_address_ph": "VD: Tầng 5, Tòa nhà Landmark, Hà Nội",
+    "sw.step1_company": "Công ty",
     "sw.step1_country": "Quốc gia",
     "sw.step1_currency": "Tiền tệ",
     "sw.step1_desc": "Tạo cơ sở dữ liệu nền tảng cho doanh nghiệp. Có thể chỉnh sửa sau.",
@@ -583,7 +585,7 @@ const SW_I18N_FALLBACK = {
     "sw.step4_remove_tier": "Xóa cấp duyệt này",
     "sw.step4_save_btn": "Tạo các quy trình đã chọn",
     "sw.step4_search_ph": "Tìm kiếm quy trình...",
-    "sw.step4_sla": "SLA (ngày)",
+    "sw.step4_sla": "SLA (days)",
     "sw.step4_tab_create": "Tạo quy trình mới",
     "sw.step4_tab_excel": "Nhập từ Excel",
     "sw.step4_tab_library": "Chọn từ thư viện mẫu",
@@ -734,21 +736,24 @@ function injectSetupStyles() {
     .sw-mode-card { cursor:pointer; display:flex; align-items:flex-start; gap:10px; padding:14px; border-radius:12px; border:2px solid #E5E7EB; background:#FFFFFF; transition:var(--transition); }
     .sw-mode-card.active { border-color:#f97316; background:#FFF7ED; }
     .sw-info-box { padding:12px 14px; border-radius:10px; background:#EFF6FF; border:1px solid #BFDBFE; font-size:12px; color:#1E40AF; }
-    .sw-search-dropdown { position:relative; width:100%; }
-    .sw-search-display { width:100%; padding:10px 14px; background:#ffffff; border:1px solid #E5E7EB; border-radius:10px; color:#111827; font-size:13px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; box-sizing:border-box; }
+    .sw-search-dropdown { position:relative; width:100%; min-width:0; box-sizing:border-box; }
+    .sw-search-display { width:100%; min-width:0; padding:10px 14px; background:#ffffff; border:1px solid #E5E7EB; border-radius:10px; color:#111827; font-size:13px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; box-sizing:border-box; }
     .sw-search-display:focus, .sw-search-display.open { border-color:#ea580c; box-shadow:0 0 0 3px rgba(234,88,12,0.1); }
-    .sw-search-menu { position:absolute; top:calc(100% + 4px); left:0; width:100%; max-height:240px; overflow-y:auto; background:#ffffff; border:1px solid #E5E7EB; border-radius:10px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05); z-index:999; display:none; }
+    .sw-search-menu { position:absolute; top:calc(100% + 4px); left:0; width:100%; max-height:240px; overflow-y:auto; background:#ffffff; border:1px solid #E5E7EB; border-radius:10px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05); z-index:999; display:none; box-sizing:border-box; }
     .sw-search-input { width:100%; padding:8px 12px; border:none; border-bottom:1px solid #F3F4F6; font-size:12.5px; outline:none; font-family:inherit; box-sizing:border-box; }
-    .sw-search-item { padding:9px 14px; font-size:12.5px; color:#1F2937; cursor:pointer; transition:background 0.15s; }
+    .sw-search-item { padding:9px 14px; font-size:12.5px; color:#1F2937; cursor:pointer; transition:background 0.15s; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .sw-search-item:hover, .sw-search-item.highlighted { background:#FFF7ED; color:#EA580C; }
     .sw-search-item.selected { font-weight:700; background:#FFF7ED; color:#EA580C; }
-    .sw-emp-card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:14px; margin-bottom:12px; transition:box-shadow 0.2s; }
+    .sw-emp-card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; padding:16px; margin-bottom:12px; transition:box-shadow 0.2s; box-sizing:border-box; width:100%; max-width:100%; }
     .sw-emp-card:hover { box-shadow:0 2px 10px rgba(0,0,0,0.04); }
     .sw-table-scroll-container { scrollbar-width:thin; scrollbar-color:#94a3b8 #f1f5f9; }
     .sw-table-scroll-container::-webkit-scrollbar { width:8px; height:8px; }
     .sw-table-scroll-container::-webkit-scrollbar-track { background:#f1f5f9; border-radius:4px; }
     .sw-table-scroll-container::-webkit-scrollbar-thumb { background:#94a3b8; border-radius:4px; }
     .sw-table-scroll-container::-webkit-scrollbar-thumb:hover { background:#64748b; }
+    .sw-grid-input, .sw-grid-select { width:100%; height:30px; padding:3px 8px; font-size:11.5px; border:1px solid #E2E8F0; border-radius:6px; background:#FFFFFF; color:#1E293B; font-family:inherit; box-sizing:border-box; transition:border-color 0.15s ease, box-shadow 0.15s ease; }
+    .sw-grid-input:hover, .sw-grid-select:hover { border-color:#94A3B8; }
+    .sw-grid-input:focus, .sw-grid-select:focus { border-color:#ea580c; outline:none; box-shadow:0 0 0 2px rgba(234,88,12,0.15); background:#FFFDF9; }
   `;
   document.head.appendChild(style);
 }
@@ -972,11 +977,286 @@ async function fetchLookup(key, apiPath) {
   return window._setupLookupCache[key];
 }
 
+window.getSetupAvailableCompanies = function() {
+  const list = [];
+  const seen = new Set();
+
+  const addComp = (c) => {
+    if (!c) return;
+    const shortName = String(c.company_shortname || c.short_name || c.name || '').trim();
+    const fullName = String(c.company_fullname || c.full_name || c.company_name || '').trim();
+    const id = String(c.my_company_id || c.company_id || c.id || '').trim();
+    const val = id || shortName || fullName;
+    if (!val) return;
+
+    const key = (id || shortName || fullName).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (shortName) seen.add(shortName.toLowerCase());
+    if (id) seen.add(id.toLowerCase());
+
+    const label = shortName && fullName && shortName !== fullName
+      ? `${shortName} - ${fullName}`
+      : (shortName || fullName || id);
+
+    list.push({
+      value: val,
+      short_name: shortName,
+      full_name: fullName,
+      id: id,
+      label: label
+    });
+  };
+
+  // 1. From setupParsedCompanies (Step 1 Excel parsed)
+  if (Array.isArray(window.setupParsedCompanies)) {
+    window.setupParsedCompanies.forEach(addComp);
+  }
+
+  // 2. From setupDraft.company (Step 1 Form or Excel)
+  if (window.setupDraft?.company) {
+    if (Array.isArray(window.setupDraft.company)) {
+      window.setupDraft.company.forEach(addComp);
+    } else if (typeof window.setupDraft.company === 'object') {
+      addComp(window.setupDraft.company);
+    }
+  }
+
+  // 3. From setupWizardData.company or companies
+  if (window.setupWizardData?.company) {
+    addComp(window.setupWizardData.company);
+  }
+  if (Array.isArray(window.setupWizardData?.companies)) {
+    window.setupWizardData.companies.forEach(addComp);
+  }
+
+  // 4. From selectCache / lookupCache if available
+  if (typeof selectCache !== 'undefined' && Array.isArray(selectCache['my_company'])) {
+    selectCache['my_company'].forEach(addComp);
+  }
+  if (Array.isArray(window._setupLookupCache?.['my_company'])) {
+    window._setupLookupCache['my_company'].forEach(addComp);
+  }
+
+  // 5. From Step 1 DOM form inputs if filled
+  if (!list.length && typeof document !== 'undefined') {
+    const fn = document.getElementById('step1_fullname')?.value?.trim();
+    const sn = document.getElementById('step1_shortname')?.value?.trim();
+    if (fn || sn) {
+      addComp({ my_company_id: '1', company_shortname: sn || fn, company_fullname: fn || sn });
+    }
+  }
+
+  // 6. Fallback to authUser if still empty
+  if (!list.length && typeof window !== 'undefined' && window.authUser) {
+    const sn = window.authUser.company_shortname || '';
+    const fn = window.authUser.company_name || '';
+    if (sn || fn) {
+      addComp({ my_company_id: '1', company_shortname: sn, company_fullname: fn });
+    }
+  }
+
+  return list;
+};
+
+window.buildSetupCompanyOptions = function(selectedVal, placeholder = '') {
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  const companies = window.getSetupAvailableCompanies();
+  const ph = placeholder || (isVi ? 'Chọn công ty' : 'Select Company');
+  let opts = '<option value="">-- ' + escapeHTML(ph) + ' --</option>';
+
+  let foundSelected = false;
+  for (const comp of companies) {
+    const isSel = selectedVal && (
+      String(selectedVal).toLowerCase() === String(comp.value).toLowerCase() ||
+      String(selectedVal).toLowerCase() === String(comp.short_name || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === String(comp.id || '').toLowerCase() ||
+      String(selectedVal).toLowerCase() === String(comp.full_name || '').toLowerCase()
+    );
+    if (isSel) foundSelected = true;
+    const optVal = comp.id || comp.short_name || comp.value;
+    opts += '<option value="' + escapeHTML(optVal) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(comp.label) + '</option>';
+  }
+
+  if (selectedVal && !foundSelected) {
+    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
+  }
+
+  return opts;
+};
+
 // Setup searchable dropdown for country, currency & timezone
 window.swSearchOptions = {
   country: [],
   currency: [],
   timezone: []
+};
+
+window.ensureSwCurrenciesLoaded = async function() {
+  if (window.swSearchOptions?.currency && window.swSearchOptions.currency.length > 0) {
+    return window.swSearchOptions.currency;
+  }
+  try {
+    const cus = await fetchLookup('currencies', '/system-setup/lookups/currencies');
+    if (cus && cus.length > 0) {
+      window.swSearchOptions.currency = cus.map(c => ({
+        value: c.code,
+        label: c.code + (c.name ? ' - ' + c.name : ''),
+        searchLabel: (c.code || '') + ' ' + (c.name || '') + ' ' + (c.display_name || '')
+      }));
+    }
+  } catch (e) {
+    console.error('Failed to load currencies lookup:', e);
+  }
+  if (!window.swSearchOptions.currency || window.swSearchOptions.currency.length === 0) {
+    window.swSearchOptions.currency = [
+      { value: 'VND', label: 'VND - Việt Nam Đồng', searchLabel: 'vnd viet nam dong' },
+      { value: 'USD', label: 'USD - US Dollar', searchLabel: 'usd dollar' },
+      { value: 'EUR', label: 'EUR - Euro', searchLabel: 'eur euro' },
+      { value: 'JPY', label: 'JPY - Japanese Yen', searchLabel: 'jpy yen' },
+      { value: 'SGD', label: 'SGD - Singapore Dollar', searchLabel: 'sgd dollar' },
+      { value: 'CNY', label: 'CNY - Chinese Yuan', searchLabel: 'cny yuan renminbi' },
+      { value: 'KRW', label: 'KRW - South Korean Won', searchLabel: 'krw won' },
+      { value: 'GBP', label: 'GBP - British Pound', searchLabel: 'gbp pound' },
+      { value: 'AUD', label: 'AUD - Australian Dollar', searchLabel: 'aud dollar' },
+      { value: 'CAD', label: 'CAD - Canadian Dollar', searchLabel: 'cad dollar' },
+      { value: 'THB', label: 'THB - Thai Baht', searchLabel: 'thb baht' }
+    ];
+  }
+  return window.swSearchOptions.currency;
+};
+
+window.buildSetupCurrencyOptions = function(selectedVal) {
+  const currencies = (window.swSearchOptions?.currency && window.swSearchOptions.currency.length > 0)
+    ? window.swSearchOptions.currency
+    : [
+      { value: 'VND', label: 'VND' },
+      { value: 'USD', label: 'USD' },
+      { value: 'EUR', label: 'EUR' },
+      { value: 'JPY', label: 'JPY' },
+      { value: 'SGD', label: 'SGD' },
+      { value: 'CNY', label: 'CNY' },
+      { value: 'KRW', label: 'KRW' },
+      { value: 'GBP', label: 'GBP' }
+    ];
+  let opts = '';
+  let found = false;
+  for (const c of currencies) {
+    const val = c.value || c.code;
+    const isSel = selectedVal && String(selectedVal).toUpperCase() === String(val).toUpperCase();
+    if (isSel) found = true;
+    opts += '<option value="' + escapeHTML(val) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(val) + '</option>';
+  }
+  if (selectedVal && !found) {
+    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
+  }
+  return opts;
+};
+
+window.getSwCategoryOptions = function(category) {
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  if (category === 'company') {
+    const comps = (typeof window.getSetupAvailableCompanies === 'function') ? window.getSetupAvailableCompanies() : [];
+    return comps.map(c => ({
+      value: c.id || c.short_name || c.value,
+      label: c.label || c.full_name || c.short_name || c.value,
+      searchLabel: `${c.id || ''} ${c.short_name || ''} ${c.full_name || ''} ${c.label || ''}`
+    }));
+  }
+  if (category === 'department') {
+    const depts = (typeof window.getSetupDepartmentList === 'function') ? window.getSetupDepartmentList() : [];
+    return depts.map(d => {
+      const code = d.department_code || d.code || '';
+      const name = d.department_name || d.name || '';
+      const val = code || name;
+      const lbl = (code && name && code !== name) ? `${code} - ${name}` : (name || code);
+      return {
+        value: val,
+        code: code,
+        name: name,
+        label: lbl,
+        searchLabel: `${code} ${name}`
+      };
+    });
+  }
+  if (category === 'employee' || category === 'employee_with_dm') {
+    const emps = (typeof window.getSetupAvailableEmployees === 'function') ? window.getSetupAvailableEmployees() : [];
+    const list = [];
+    if (category === 'employee_with_dm') {
+      list.push({
+        value: 'Direct Manager',
+        label: isVi ? 'Direct Manager (Quản lý trực tiếp)' : 'Direct Manager',
+        searchLabel: 'direct manager quan ly truc tiep'
+      });
+    }
+    emps.forEach(e => {
+      list.push({
+        value: e.value,
+        email: e.email,
+        username: e.username,
+        full_name: e.full_name,
+        employee_id: e.employee_id,
+        label: e.label,
+        searchLabel: `${e.full_name || ''} ${e.email || ''} ${e.username || ''} ${e.employee_id || ''}`
+      });
+    });
+    return list;
+  }
+  if (category === 'currency') {
+    return window.swSearchOptions?.currency || [];
+  }
+  if (category === 'country') {
+    return window.swSearchOptions?.country || [];
+  }
+  if (category === 'timezone') {
+    return window.swSearchOptions?.timezone || [];
+  }
+  return window.swSearchOptions?.[category] || [];
+};
+
+window.renderSwSearchableSelect = function({
+  id,
+  category,
+  value = '',
+  placeholder = '',
+  searchPlaceholder = '',
+  extraClass = '',
+  inputClass = '',
+  style = '',
+  onchange = ''
+}) {
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
+  const ph = placeholder || (isVi ? '-- Chọn --' : '-- Select --');
+  const sph = searchPlaceholder || (isVi ? 'Tìm kiếm...' : 'Search...');
+
+  let displayLabel = ph;
+  if (value) {
+    const opts = window.getSwCategoryOptions(category);
+    const found = opts.find(o => String(o.value).toLowerCase() === String(value).toLowerCase()
+      || (o.code && String(o.code).toLowerCase() === String(value).toLowerCase())
+      || (o.email && String(o.email).toLowerCase() === String(value).toLowerCase())
+      || (o.employee_id && String(o.employee_id).toLowerCase() === String(value).toLowerCase())
+      || (o.username && String(o.username).toLowerCase() === String(value).toLowerCase())
+      || (o.full_name && String(o.full_name).toLowerCase() === String(value).toLowerCase()));
+    if (found) displayLabel = found.label;
+    else displayLabel = value;
+  }
+
+  const esc = (typeof escapeHTML === 'function')
+    ? escapeHTML
+    : (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  return '<div class="sw-search-dropdown ' + (extraClass || '') + '" style="' + (style || '') + 'position:relative;">'
+    + '<input type="hidden" class="' + (inputClass || '') + '" id="' + esc(id) + '" data-category="' + esc(category) + '" value="' + esc(value || '') + '" ' + (onchange ? ('onchange="' + esc(onchange) + '"') : '') + '>'
+    + '<div class="sw-search-display" id="sw_search_display_' + esc(id) + '" onclick="window.toggleSwSearchDropdown(\'' + esc(id) + '\')">'
+    + '<span id="sw_search_label_' + esc(id) + '" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 24px);">' + esc(displayLabel) + '</span>'
+    + '<span class="material-symbols-rounded" style="font-size:18px;color:#9CA3AF;flex-shrink:0;">expand_more</span>'
+    + '</div>'
+    + '<div class="sw-search-menu" id="sw_search_menu_' + esc(id) + '">'
+    + '<input type="text" class="sw-search-input" id="sw_search_input_' + esc(id) + '" placeholder="' + esc(sph) + '" oninput="window.filterSwSearchOptions(\'' + esc(id) + '\', this.value)" onclick="event.stopPropagation()">'
+    + '<div id="sw_search_list_' + esc(id) + '"></div>'
+    + '</div>'
+    + '</div>';
 };
 
 window.toggleSwSearchDropdown = function(type, forceOpen) {
@@ -993,10 +1273,20 @@ window.toggleSwSearchDropdown = function(type, forceOpen) {
   document.querySelectorAll('.sw-search-display').forEach(d => {
     if (d !== display) d.classList.remove('open');
   });
+  document.querySelectorAll('.step5-account-row, .qemp-card, .step4-policy-row').forEach(r => {
+    if (r.style.zIndex === '35' || r.style.zIndex === '99') r.style.zIndex = '';
+  });
+  document.querySelectorAll('.sw-search-dropdown').forEach(d => {
+    if (d.style.zIndex === '100') d.style.zIndex = '';
+  });
 
   if (shouldOpen) {
     menu.style.display = 'block';
     display.classList.add('open');
+    const parentRow = display.closest('.step5-account-row, .qemp-card, .step4-policy-row');
+    if (parentRow) parentRow.style.zIndex = '99';
+    const parentDd = display.closest('.sw-search-dropdown');
+    if (parentDd) parentDd.style.zIndex = '100';
     const input = document.getElementById('sw_search_input_' + type);
     if (input) {
       input.value = '';
@@ -1006,22 +1296,39 @@ window.toggleSwSearchDropdown = function(type, forceOpen) {
   } else {
     menu.style.display = 'none';
     display.classList.remove('open');
+    const parentRow = display.closest('.step5-account-row, .qemp-card, .step4-policy-row');
+    if (parentRow) parentRow.style.zIndex = '';
+    const parentDd = display.closest('.sw-search-dropdown');
+    if (parentDd) parentDd.style.zIndex = '';
   }
 };
 
 window.filterSwSearchOptions = function(type, term) {
   const listEl = document.getElementById('sw_search_list_' + type);
   if (!listEl) return;
-  const options = window.swSearchOptions[type] || [];
+  const hiddenInput = document.getElementById(type) || document.getElementById('step1_' + type);
+  const isStep5Curr = type.startsWith('step5_currency_');
+  let category = hiddenInput?.dataset?.category;
+  if (!category) {
+    if (isStep5Curr) category = 'currency';
+    else if (type.includes('_comp') || type.includes('company')) category = 'company';
+    else if (type.includes('_dept') || type.includes('department')) category = 'department';
+    else if (type.includes('_mgr') || type.includes('_emp') || type.includes('employee') || type.includes('approval') || type.includes('lead') || type.includes('owner') || type.includes('control') || type.includes('managed')) {
+      category = type.includes('t1') || type.includes('tier1') ? 'employee_with_dm' : 'employee';
+    } else {
+      category = type;
+    }
+  }
+
+  const options = window.getSwCategoryOptions ? window.getSwCategoryOptions(category) : (window.swSearchOptions[category] || []);
   const q = String(term || '').trim().toLowerCase();
-  const currentVal = document.getElementById('step1_' + type)?.value || '';
+  const currentVal = hiddenInput?.value || '';
 
   let filtered = [];
   if (q) {
-    filtered = options.filter(o => o.searchLabel.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+    filtered = options.filter(o => (o.searchLabel || o.label || o.value).toLowerCase().includes(q) || (o.value || '').toLowerCase().includes(q));
   } else {
-    // Top popular values only by default (12 for timezone, 5 for country/currency)
-    const topCount = type === 'timezone' ? 12 : 5;
+    const topCount = (category === 'country' || category === 'timezone') ? 12 : 50;
     filtered = options.slice(0, topCount);
     if (currentVal && !filtered.some(o => String(o.value).toLowerCase() === String(currentVal).toLowerCase())) {
       const selectedOpt = options.find(o => String(o.value).toLowerCase() === String(currentVal).toLowerCase());
@@ -1034,16 +1341,29 @@ window.filterSwSearchOptions = function(type, term) {
     return;
   }
 
-  listEl.innerHTML = filtered.map(o => {
+  const esc = (typeof escapeHTML === 'function') ? escapeHTML : s => s;
+  let itemsHtml = '';
+  if (!q && (category === 'department' || category === 'employee' || category === 'employee_with_dm')) {
+    const isSelected = !currentVal;
+    itemsHtml += '<div class="sw-search-item ' + (isSelected ? 'selected' : '') + '" style="color:#9CA3AF;font-style:italic;" data-val="" data-label="-- ' + (swIsVi() ? 'Không chọn' : 'None') + ' --" onclick="window.selectSwSearchOption(\'' + esc(type) + '\', \'\', \'-- ' + (swIsVi() ? 'Không chọn' : 'None') + ' --\')">-- ' + (swIsVi() ? 'Không chọn' : 'None') + ' --</div>';
+  }
+  itemsHtml += filtered.map(o => {
     const isSelected = String(o.value).toLowerCase() === String(currentVal).toLowerCase();
-    return '<div class="sw-search-item ' + (isSelected ? 'selected' : '') + '" onclick="window.selectSwSearchOption(\'' + type + '\', \'' + escapeHTML(o.value).replace(/'/g, "\\'") + '\', \'' + escapeHTML(o.label).replace(/'/g, "\\'") + '\')">' + escapeHTML(o.label) + '</div>';
+    return '<div class="sw-search-item ' + (isSelected ? 'selected' : '') + '" data-val="' + esc(o.value || '') + '" data-label="' + esc(o.label || '') + '" onclick="window.selectSwSearchOption(\'' + esc(type) + '\', this.getAttribute(\'data-val\'), this.getAttribute(\'data-label\'))">' + esc(o.label) + '</div>';
   }).join('');
+  listEl.innerHTML = itemsHtml;
 };
 
 window.selectSwSearchOption = function(type, val, label) {
-  const hiddenInput = document.getElementById('step1_' + type);
+  const hiddenInput = document.getElementById(type) || document.getElementById('step1_' + type);
   const labelEl = document.getElementById('sw_search_label_' + type);
-  if (hiddenInput) hiddenInput.value = val;
+  if (hiddenInput) {
+    hiddenInput.value = val;
+    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    if (hiddenInput.getAttribute('onchange')) {
+      try { eval(hiddenInput.getAttribute('onchange')); } catch(e){}
+    }
+  }
   if (labelEl) labelEl.textContent = label;
   window.toggleSwSearchDropdown(type, false);
 };
@@ -1053,6 +1373,7 @@ document.addEventListener('click', function(e) {
   if (!e.target.closest('.sw-search-dropdown')) {
     document.querySelectorAll('.sw-search-menu').forEach(m => m.style.display = 'none');
     document.querySelectorAll('.sw-search-display').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.step5-account-row, .qemp-card, .step4-policy-row').forEach(r => r.style.zIndex = '');
   }
 });
 
@@ -1256,9 +1577,9 @@ function renderStep1HTML(compRaw) {
     if (tzLabelEl && matchedTz) tzLabelEl.textContent = matchedTz.label;
     window.filterSwSearchOptions('timezone', '');
 
-    const [cts, cus] = await Promise.all([
+    const [cts] = await Promise.all([
       fetchLookup('countries', '/system-setup/lookups/countries'),
-      fetchLookup('currencies', '/system-setup/lookups/currencies')
+      window.ensureSwCurrenciesLoaded()
     ]);
 
     window.swSearchOptions.country = cts.map(c => {
@@ -1271,12 +1592,6 @@ function renderStep1HTML(compRaw) {
         searchLabel: (c.code ? c.code + ' ' : '') + (c.name || '') + ' ' + (c.display_name || '') + ' ' + cVal + ' ' + cDisplay
       };
     });
-
-    window.swSearchOptions.currency = cus.map(c => ({
-      value: c.code,
-      label: c.code,
-      searchLabel: c.code + ' ' + (c.label || '')
-    }));
 
     const matchedCountry = window.swSearchOptions.country.find(c =>
       c.value.toLowerCase() === defaultCountry.toLowerCase() ||
@@ -1580,76 +1895,81 @@ function renderStep2HTML(counts){
   } else if(tab==='excel'){
     let prev = '';
     const parsed = window.setupParsedDepartments || [];
+    const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
     if (parsed.length > 0) {
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const d = parsed[i];
-        const isValid = Boolean(d.department_code && d.department_name);
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#4B5563;font-size:11.5px;">' + escapeHTML(d.company_id || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(d.department_code || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">' + escapeHTML(d.department_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(d.type || 'Operation') + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(d.manager_email || '–') + '</td>'
-          + '<td style="padding:7px 10px;">' + (isValid ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>' : '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Thiếu mã/tên') + '</span>') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const typeOpts = ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((d.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+          ? window.buildSetupCompanyOptions(d.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
+          : '<option value="' + escapeHTML(d.company_id || '1') + '">' + escapeHTML(d.company_id || '1') + '</option>';
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
           + '<button type="button" onclick="window.deleteSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'company_id\', this.value)" style="min-width:110px;">' + compOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_code || '') + '" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_code\', this.value)" style="min-width:90px;font-weight:700;color:#ea580c;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_name || '') + '" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'type\', this.value)" style="min-width:110px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="email" class="sw-grid-input" value="' + escapeHTML(d.manager_email || '') + '" placeholder="email@company.com" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'manager_email\', this.value)" style="min-width:140px;color:#2563EB;"></td>'
           + '</tr>';
       }
-      const validCount = parsed.filter(d => d.department_code && d.department_name).length;
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
         + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">domain</span>'
         + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step2_preview_title', 'Danh sách phòng ban tải lên') + '</div>'
-        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' (' + validCount + ' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;align-items:center;">'
         + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
         + '<button onclick="window.setupParsedDepartments=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:260px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Company ID</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'department\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
     }
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'department\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleDepartmentExcelUpload(event)"></label></div></div>' + prev;
   } else if(tab==='quick'){
     // Quick Add: Only 3 fields (Mã PB, Tên PB, Người quản lý tùy chọn) - No Operation/Finance dropdown
-    const r3=['','',''].map(()=>'<div style="display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;"><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button></div>').join('');
+    const r3=['','',''].map(()=>'<div style="display:grid;grid-template-columns:auto 120px 1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"></div>').join('');
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step2_desc', 'Tạo cơ cấu tổ chức. Chọn từ mẫu gợi ý hoặc nhập từ Excel.') + '</p><div id="quick-dept-rows">'+r3+'</div><button onclick="addQuickDeptRow()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:transparent;color:#374151;font-size:12px;cursor:pointer;margin-top:4px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button></div>';
   } else {
     const parsed = window.setupParsedDepartments || [];
+    const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
     if (parsed.length > 0) {
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const d = parsed[i];
-        const isValid = Boolean(d.department_code && d.department_name);
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#4B5563;font-size:11.5px;">' + escapeHTML(d.company_id || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(d.department_code || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">' + escapeHTML(d.department_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(d.type || 'Operation') + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">' + escapeHTML(d.manager_email || '–') + '</td>'
-          + '<td style="padding:7px 10px;">' + (isValid ? '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>' : '<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Thiếu mã/tên') + '</span>') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const typeOpts = ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((d.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+          ? window.buildSetupCompanyOptions(d.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
+          : '<option value="' + escapeHTML(d.company_id || '1') + '">' + escapeHTML(d.company_id || '1') + '</option>';
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
           + '<button type="button" onclick="window.deleteSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'company_id\', this.value)" style="min-width:110px;">' + compOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_code || '') + '" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_code\', this.value)" style="min-width:90px;font-weight:700;color:#ea580c;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_name || '') + '" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'type\', this.value)" style="min-width:110px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="email" class="sw-grid-input" value="' + escapeHTML(d.manager_email || '') + '" placeholder="email@company.com" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'manager_email\', this.value)" style="min-width:140px;color:#2563EB;"></td>'
           + '</tr>';
       }
       tc = '<div>'
@@ -1658,20 +1978,21 @@ function renderStep2HTML(counts){
         + '<div style="font-size:11.5px;color:#047857;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="overflow-x:auto;max-height:300px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Company ID</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'department\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>'
+        + '</div>';
     } else {
       tc='<div><div style="background:#F9FAFB;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="padding:10px 16px;background:#F3F4F6;font-size:12px;font-weight:700;color:#374151;">' + swT('sw.step2_header', 'Thiết lập phòng ban') + ': <strong style="color:#16a34a;">'+(counts.department||0)+'</strong> ' + swT('sw.step2_name', 'Phòng ban') + '</div>'+(counts.department>0?'<div style="padding:16px;font-size:12px;color:#6B7280;">' + swT('sw.step2_choose_desc', 'Chọn các phòng ban phù hợp với doanh nghiệp.') + '</div>':'<div style="padding:20px;text-align:center;font-size:12px;color:#9CA3AF;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div></div>';
     }
@@ -1686,8 +2007,8 @@ window.showCustomDeptForm=function(){const el=document.getElementById('custom-de
 window.addQuickDeptRow=function(){
   const c=document.getElementById('quick-dept-rows');if(!c)return;
   const d=document.createElement('div');
-  d.style.cssText='display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;';
-  d.innerHTML='<input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '"><button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button>';
+  d.style.cssText='display:grid;grid-template-columns:auto 120px 1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;';
+  d.innerHTML='<button onclick="this.closest(\'div\').remove()" style="width:32px;height:32px;border-radius:8px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:16px;">close</span></button><input type="text" class="sw-input qdept-code" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *"><input type="text" class="sw-input qdept-name" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *"><input type="text" class="sw-input qdept-manager" placeholder="' + swT('sw.step2_dept_manager', 'Người quản lý (tùy chọn)') + '">';
   c.appendChild(d);
 };
 
@@ -1858,37 +2179,52 @@ function renderStep3HTML(counts){
     if(parsed.length>0){
       const vc=parsed.filter(e=>e.full_name&&e.email).length;
       let rows='';
+      const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
       for(let i=0;i<Math.min(parsed.length,50);i++){
-        const e=parsed[i],v=e.full_name&&e.email;
-        rows+='<tr style="border-bottom:1px solid #F1F5F9;">'
-          +'<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">'+(i+1)+'</td>'
-          +'<td style="padding:7px 10px;font-weight:600;color:#111827;font-size:11.5px;">'+escapeHTML(e.full_name||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#2563EB;font-size:11.5px;">'+escapeHTML(e.username||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.email||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.department_code||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.position||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.start_date||todayStr)+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.direct_manager||'–')+'</td>'
-          +'<td style="padding:7px 10px;color:#374151;font-size:11.5px;">'+escapeHTML(e.emergency_contact_name ? e.emergency_contact_name + (e.emergency_contact_phone ? ' (' + e.emergency_contact_phone + ')' : '') : '–')+'</td>'
-          +'<td style="padding:7px 10px;">'+(v?'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#DCFCE7;color:#16a34a;font-weight:600;">' + swT('common.valid', 'Hợp lệ') + '</span>':'<span style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:#FEE2E2;color:#EF4444;font-weight:600;">' + swT('common.invalid', 'Lỗi') + '</span>')+'</td>'
-          +'<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          +'<button type="button" onclick="window.editSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const e=parsed[i];
+        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
+          ? window.buildSetupCompanyOptions(e.company_id || e.company_entity || '', isVi ? 'Chọn công ty' : 'Select Company')
+          : '<option value="' + escapeHTML(e.company_id || '1') + '">' + escapeHTML(e.company_id || '1') + '</option>';
+        const deptOpts = (typeof window.buildSetupDepartmentSelectOptions === 'function')
+          ? window.buildSetupDepartmentSelectOptions(e.department_code || e.department_name || '')
+          : '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
+        const directOpts = (typeof window.buildSetupEmployeeOptions === 'function')
+          ? window.buildSetupEmployeeOptions(e.direct_manager || 'Super Admin', true)
+          : '<option value="Super Admin">Super Admin</option>';
+
+        rows+='<tr style="border-bottom:1px solid #E2E8F0;">'
+          +'<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">'+(i+1)+'</td>'
+          +'<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
+          +'<button type="button" onclick="window.editSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
           +'<button type="button" onclick="window.deleteSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           +'</td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.employee_code||'')+'" placeholder="' + swT('sw.step3_emp_code', 'Mã NV') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'employee_code\', this.value)" style="min-width:85px;font-weight:700;color:#ea580c;"></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.nick_name||'')+'" placeholder="' + swT('sw.step3_emp_nick', 'Biệt danh') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'nick_name\', this.value)" style="min-width:85px;"></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.username||'')+'" placeholder="' + swT('sw.step3_emp_username', 'Username', 'Username') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'username\', this.value)" style="min-width:90px;color:#2563EB;"></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.password||'')+'" placeholder="' + swT('common.password', 'Mật khẩu', 'Password') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'password\', this.value)" style="min-width:90px;font-family:monospace;"></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.full_name||'')+'" placeholder="' + swT('sw.step3_emp_name', 'Họ và tên', 'Full Name') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'full_name\', this.value)" style="min-width:130px;font-weight:600;"></td>'
+          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'company_id\', this.value)" style="min-width:110px;">'+compOpts+'</select></td>'
+          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'department_code\', this.value)" style="min-width:120px;">'+deptOpts+'</select></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.position||'')+'" placeholder="' + swT('sw.step3_emp_position', 'Chức vụ', 'Position') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'position\', this.value)" style="min-width:100px;"></td>'
+          +'<td style="padding:4px;"><input type="email" class="sw-grid-input" value="'+escapeHTML(e.email||'')+'" placeholder="' + swT('sw.step3_emp_email_ph', 'email@company.com', 'email@company.com') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'email\', this.value)" style="min-width:140px;"></td>'
+          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'direct_manager\', this.value)" style="min-width:125px;">'+directOpts+'</select></td>'
+          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.phone||e.emergency_contact_phone||'')+'" placeholder="' + swT('sw.step3_emp_phone', 'SĐT', 'Phone') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'phone\', this.value)" style="min-width:95px;"></td>'
+          +'<td style="padding:4px;"><input type="date" class="sw-grid-input" value="'+escapeHTML(e.start_date||todayStr)+'" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'start_date\', this.value)" style="min-width:115px;"></td>'
           +'</tr>';
       }
       prev='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;">'
         +'<div style="display:flex;align-items:center;gap:10px;">'
         +'<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span>'
-        +'<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên') + '</div>'
-        +'<div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu') + ' ('+vc+' ' + swT('sw.step3_valid', 'hợp lệ') + ')</div></div>'
+        +'<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step3_file_title', 'File nhân viên', 'Employee File') + '</div>'
+        +'<div style="font-size:11px;color:#6B7280;">'+parsed.length+' ' + swT('sw.step3_rows', 'dòng dữ liệu', 'rows of data') + '</div></div>'
         +'</div>'
         +'<div style="display:flex;gap:8px;align-items:center;">'
-        +'<button onclick="saveStep3AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step3_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
-        +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        +'<button onclick="saveStep3AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step3_confirm_import', 'Xác nhận lưu danh sách', 'Confirm & Save List') + '</button>'
+        +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file', 'Delete File') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         +'</div>'
         +'</div>'
-        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_emg_name', 'Liên hệ khẩn cấp') + '</th><th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th><th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.actions', 'Thao tác') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:360px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th><th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:55px;">' + swT('common.actions', 'Thao tác', 'Actions') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_code', 'Mã NV', 'Emp Code') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_nick', 'Biệt danh', 'Nick Name') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username', 'Username') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.password', 'Mật khẩu', 'Password') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên', 'Full Name') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty', 'Company') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban', 'Department') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ', 'Position') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email', 'Email') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp', 'Direct Manager') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_phone', 'SĐT', 'Phone') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu', 'Start Date') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
+        +'<button type="button" onclick="window.addParsedGridRow(\'employee\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
     }
     tc='<div><div class="sw-upload-zone" style="margin-bottom:16px;"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:14px;">(.xlsx, .xls, .csv)</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="downloadEmployeeTemplate()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleEmployeeExcelUpload(event)"></label></div></div>'+prev+'</div>';
   }
@@ -2012,28 +2348,75 @@ window.buildSetupDepartmentSelectOptions = function(selectedVal) {
 
 function renderQuickEmpCard(idx, data) {
   const d = data || {};
+  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
   const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
   const deptVal = d.dept || d.department_code || d.department_name || '';
-  return '<div class="sw-emp-card qemp-card" data-idx="'+idx+'">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F3F4F6;">'
-    + '<div style="font-size:12px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:5px;"><span class="material-symbols-rounded" style="font-size:16px;">badge</span> ' + swT('sw.step3_name', 'Nhân viên') + ' #' + (idx+1) + '</div>'
-    + '<button onclick="this.closest(\'.sw-emp-card\').remove()" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:14px;">close</span></button>'
+  const compVal = d.company_id || d.company_entity || (window.setupDraft?.company?.my_company_id || '1');
+  const cardUid = 'card_' + idx + '_' + Math.random().toString(36).substring(2, 7);
+
+  const compSelect = window.renderSwSearchableSelect({
+    id: 'qemp_comp_' + cardUid,
+    category: 'company',
+    value: compVal,
+    inputClass: 'qemp-company',
+    placeholder: isVi ? 'Chọn công ty (Bước 1)' : 'Select Company (Step 1)',
+    searchPlaceholder: isVi ? 'Tìm công ty...' : 'Search company...'
+  });
+
+  const deptSelect = window.renderSwSearchableSelect({
+    id: 'qemp_dept_' + cardUid,
+    category: 'department',
+    value: deptVal,
+    inputClass: 'qemp-dept',
+    placeholder: isVi ? 'Chọn phòng ban (Bước 2)' : 'Select Department (Step 2)',
+    searchPlaceholder: isVi ? 'Tìm phòng ban...' : 'Search department...'
+  });
+
+  const directSelect = window.renderSwSearchableSelect({
+    id: 'qemp_direct_' + cardUid,
+    category: 'employee',
+    value: d.direct_mgr || 'Super Admin',
+    inputClass: 'qemp-direct-mgr',
+    placeholder: isVi ? 'Quản lý trực tiếp' : 'Direct Manager',
+    searchPlaceholder: isVi ? 'Tìm quản lý...' : 'Search manager...'
+  });
+
+  const hrSelect = window.renderSwSearchableSelect({
+    id: 'qemp_hr_' + cardUid,
+    category: 'employee',
+    value: d.hr_mgr || 'Super Admin',
+    inputClass: 'qemp-hr-mgr',
+    placeholder: isVi ? 'Quản lý nhân sự' : 'HR Manager',
+    searchPlaceholder: isVi ? 'Tìm quản lý...' : 'Search manager...'
+  });
+
+  return '<div class="sw-emp-card qemp-card" data-idx="'+idx+'" style="box-sizing:border-box;width:100%;max-width:100%;">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #F3F4F6;">'
+    + '<div style="font-size:12.5px;font-weight:700;color:#EA580C;display:flex;align-items:center;gap:6px;"><span class="material-symbols-rounded" style="font-size:16px;">badge</span> ' + swT('sw.step3_name', 'Nhân viên') + ' #' + (idx+1) + '</div>'
+    + '<button type="button" onclick="this.closest(\'.sw-emp-card\').remove()" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:14px;">close</span></button>'
     + '</div>'
-    // 4 inputs per row, orderly and cleanly aligned
-    + '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;align-items:start;">'
-    // Row 1 (4 inputs)
-    + '<div>'+swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name_ph', 'Họ và tên đầy đủ') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true)+'<input type="text" class="sw-input qemp-username" placeholder="' + swT('sw.step3_emp_username_ph', 'john.doe') + '" value="'+escapeHTML(d.username||'')+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="' + swT('sw.step3_emp_email_ph', 'john@company.com') + '" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false)+'<select class="sw-input qemp-dept">'+(typeof window.buildSetupDepartmentSelectOptions === 'function' ? window.buildSetupDepartmentSelectOptions(deptVal) : '')+'</select></div>'
-    // Row 2 (4 inputs)
-    + '<div>'+swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true)+'<select class="sw-input qemp-direct-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.direct_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
-    + '<div>'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), true)+'<select class="sw-input qemp-hr-mgr">'+(typeof window.buildManagerSelectOptions === 'function' ? window.buildManagerSelectOptions(d.hr_mgr||'Super Admin') : '<option value="Super Admin">Super Admin</option>')+'</select></div>'
-    // Row 3 (2 inputs spanning 2 columns each)
-    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-name" placeholder="' + swT('sw.step3_emp_emg_name_ph', 'Tên người thân') + '" value="'+escapeHTML(d.emg_name||'')+'"></div>'
-    + '<div style="grid-column:span 2;">'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), true)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="' + swT('sw.step3_emp_emg_phone_ph', '0901234567') + '" value="'+escapeHTML(d.emg_phone||'')+'"></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;align-items:start;width:100%;box-sizing:border-box;">'
+    // Row 1: Company & Department
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step1_company', 'Công ty', 'Company'), false)+compSelect+'</div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_dept', 'Phòng ban', 'Department'), false)+deptSelect+'</div>'
+    // Row 2: Code & Nickname
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_code', 'Mã nhân viên', 'Employee Code'), false)+'<input type="text" class="sw-input qemp-code" placeholder="' + swT('sw.step3_emp_code_ph', 'VD: NV001') + '" value="'+escapeHTML(d.employee_code||'')+'"></div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_nick', 'Biệt danh', 'Nick Name'), false)+'<input type="text" class="sw-input qemp-nick" placeholder="' + swT('sw.step3_emp_nick_ph', 'VD: Andy, John') + '" value="'+escapeHTML(d.nick_name||'')+'"></div>'
+    // Row 3: Name & Username
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_name', 'Họ và tên', 'Full Name'), true)+'<input type="text" class="sw-input qemp-name" placeholder="' + swT('sw.step3_emp_name_ph', 'Họ và tên đầy đủ', 'Full Name') + '" value="'+escapeHTML(d.full_name||'')+'" oninput="window.autoFillEmpUsername(this)"></div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập', 'Username'), true)+'<input type="text" class="sw-input qemp-username" placeholder="' + swT('sw.step3_emp_username_ph', 'john.doe', 'john.doe') + '" value="'+escapeHTML(d.username||'')+'"></div>'
+    // Row 4: Password & Email
+    + '<div style="min-width:0;">'+swLabel(swT('common.password', 'Mật khẩu', 'Password'), false)+'<input type="text" class="sw-input qemp-pass" placeholder="' + swT('common.password_ph', 'Mật khẩu ban đầu') + '" style="font-family:monospace;" value="'+escapeHTML(d.password||'Password@123')+'"></div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_email', 'Email', 'Email'), true)+'<input type="email" class="sw-input qemp-email" placeholder="' + swT('sw.step3_emp_email_ph', 'john@company.com', 'john@company.com') + '" value="'+escapeHTML(d.email||'')+'" oninput="window.autoFillEmpUsernameFromEmail(this)"></div>'
+    // Row 5: Position & Start Date
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_position', 'Chức vụ', 'Position'), false)+'<input type="text" class="sw-input qemp-pos" placeholder="' + swT('sw.step3_emp_pos_ph', 'Chức danh', 'Job Title') + '" value="'+escapeHTML(d.pos||defaultPos)+'"></div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu', 'Start Date'), true)+'<input type="date" class="sw-input qemp-start-date" value="'+(d.start_date||new Date().toISOString().split('T')[0])+'"></div>'
+    // Row 6: Direct Manager & HR Manager
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp', 'Direct Manager'), true)+directSelect+'</div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự', 'HR Manager'), true)+hrSelect+'</div>'
+    // Row 7: Emergency Contact
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp', 'Emergency Contact Name'), false)+'<input type="text" class="sw-input qemp-emg-name" placeholder="' + swT('sw.step3_emp_emg_name_ph', 'Tên người thân', 'Contact Name / Relationship') + '" value="'+escapeHTML(d.emg_name||'')+'"></div>'
+    + '<div style="min-width:0;">'+swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp', 'Emergency Contact Phone'), false)+'<input type="text" class="sw-input qemp-emg-phone" placeholder="' + swT('sw.step3_emp_emg_phone_ph', '0901234567', '0901234567') + '" value="'+escapeHTML(d.emg_phone||'')+'"></div>'
     + '</div>'
     + '</div>';
 }
@@ -2099,6 +2482,7 @@ window.downloadEmployeeTemplate = async function(){
     'employee_code',
     'nick_name',
     'user_name',
+    'password',
     'full_name',
     'gen',
     'position',
@@ -2115,41 +2499,43 @@ window.downloadEmployeeTemplate = async function(){
   ];
   const sampleData = isVi ? [
     {
-      employee_id: 1,
-      employee_code: 'NV001',
-      nick_name: '',
-      user_name: 'dung.pham',
-      full_name: 'Phạm Văn Dũng',
+      employee_id: '',
+      employee_code: 'NV002',
+      nick_name: 'TuanNV',
+      user_name: 'tuan.nguyen',
+      password: 'Password@123',
+      full_name: 'Nguyễn Văn Tuấn',
       gen: 'Nam',
-      position: 'Tổng Giám đốc',
+      position: 'Trưởng phòng Kỹ thuật',
       company_id: 1,
       department_id: 1,
       status: 17,
-      direct_manager: 1,
-      role: 'Super Admin',
+      direct_manager: 'Super Admin',
+      role: 'Staff',
       location_base: 'Hà Nội',
-      email: 'dung.pham@company.com',
-      phone: '0982363845',
+      email: 'tuan.nguyen@company.com',
+      phone: '0912345678',
       address: 'Trần Phú, Hà Nội',
       start_date: new Date().toISOString().split('T')[0]
     }
   ] : [
     {
-      employee_id: 1,
-      employee_code: 'EMP001',
-      nick_name: '',
-      user_name: 'john.doe',
-      full_name: 'John Doe',
+      employee_id: '',
+      employee_code: 'EMP002',
+      nick_name: 'JohnS',
+      user_name: 'john.smith',
+      password: 'Password@123',
+      full_name: 'John Smith',
       gen: 'Male',
-      position: 'Managing Director',
+      position: 'Technical Manager',
       company_id: 1,
       department_id: 1,
       status: 17,
-      direct_manager: 1,
-      role: 'Super Admin',
+      direct_manager: 'Super Admin',
+      role: 'Staff',
       location_base: 'Hanoi',
-      email: 'john.doe@company.com',
-      phone: '0982363845',
+      email: 'john.smith@company.com',
+      phone: '0912345678',
       address: 'Tran Phu, Hanoi',
       start_date: new Date().toISOString().split('T')[0]
     }
@@ -2188,10 +2574,11 @@ window.handleEmployeeExcelUpload = async function(event){
       const curCompId = window.setupDraft?.company?.my_company_id || '1';
       for (const row of rows) {
         const k = Object.keys(row);
-        const eidK = k.find(x => /employee_id|^id$/i.test(x));
+        const eidK = k.find(x => /employee_id|^emp_id$/i.test(x));
         const codeK = k.find(x => /employee_code|emp_code|mã nhân viên|mã nv/i.test(x));
         const nickK = k.find(x => /nick_name|nickname|biệt danh/i.test(x));
         const unK = k.find(x => /user_name|username|tên đăng nhập/i.test(x));
+        const passK = k.find(x => /password|mật khẩu|^pass$/i.test(x));
         const fnK = k.find(x => /full_name|họ và tên|họ tên|tên/i.test(x) && !/khẩn|emergency|quản lý|manager/i.test(x));
         const genK = k.find(x => /^gen$|gender|giới tính/i.test(x));
         const posK = k.find(x => /position|chức vụ|vị trí|chức danh/i.test(x));
@@ -2210,6 +2597,7 @@ window.handleEmployeeExcelUpload = async function(event){
         const fn = fnK ? String(row[fnK]).trim() : '';
         const un = unK ? String(row[unK]).trim() : '';
         const em = emailK ? String(row[emailK]).trim() : '';
+        const pass = passK && row[passK] != null ? String(row[passK]).trim() : '';
         let phone = phoneK && row[phoneK] != null ? String(row[phoneK]).trim() : '';
         if (phone && phone.length === 9) phone = '0' + phone;
 
@@ -2219,14 +2607,16 @@ window.handleEmployeeExcelUpload = async function(event){
             employee_code: codeK && row[codeK] != null ? String(row[codeK]).trim() : '',
             nick_name: nickK && row[nickK] != null ? String(row[nickK]).trim() : '',
             username: un || (em ? em.split('@')[0] : (fn ? fn.toLowerCase().replace(/\s+/g, '.') : '')),
+            password: pass,
             full_name: fn || un || em,
             gen: genK && row[genK] != null ? String(row[genK]).trim() : '',
             position: posK && row[posK] != null ? String(row[posK]).trim() : (swIsVi() ? 'Nhân viên' : 'Employee'),
             company_id: compK && row[compK] != null ? String(row[compK]).trim() : curCompId,
             department_id: deptIdK && row[deptIdK] != null ? String(row[deptIdK]).trim() : '',
             department_name: deptNameK && row[deptNameK] != null ? String(row[deptNameK]).trim() : '',
+            department_code: deptIdK && row[deptIdK] != null ? String(row[deptIdK]).trim() : '',
             status: statusK && row[statusK] != null && row[statusK] !== '' ? row[statusK] : 17,
-            direct_manager: mgrK && row[mgrK] != null ? String(row[mgrK]).trim() : '',
+            direct_manager: mgrK && row[mgrK] != null ? String(row[mgrK]).trim() : 'Super Admin',
             role: roleK && row[roleK] != null ? String(row[roleK]).trim() : 'Staff',
             location_base: locK && row[locK] != null ? String(row[locK]).trim() : '',
             email: em,
@@ -2258,8 +2648,13 @@ window.saveStep3AndAdvance = async function(){
 
   if (tab === 'quick') {
     const defaultPos = swT('sw.step3_emp_pos_default', 'Nhân viên');
+    const curCompId = window.setupDraft?.company?.my_company_id || window.setupDraft?.company?.company_shortname || '1';
     const cards = document.querySelectorAll('.qemp-card');
     cards.forEach(c => {
+      const comp = c.querySelector('.qemp-company')?.value?.trim();
+      const code = c.querySelector('.qemp-code')?.value?.trim() || '';
+      const nick = c.querySelector('.qemp-nick')?.value?.trim() || '';
+      const pass = c.querySelector('.qemp-pass')?.value?.trim() || 'Password@123';
       const fn = c.querySelector('.qemp-name')?.value?.trim();
       const em = c.querySelector('.qemp-email')?.value?.trim();
       const un = c.querySelector('.qemp-username')?.value?.trim() || (em ? em.split('@')[0] : '');
@@ -2281,11 +2676,14 @@ window.saveStep3AndAdvance = async function(){
       const deptCode = matchedDept ? (matchedDept.code || matchedDept.department_code || dp) : dp;
       const deptName = matchedDept ? (matchedDept.name || matchedDept.department_name || deptCode) : dp;
 
-      if (fn || un || em) {
+      if (fn || un || em || code) {
         employeesToSave.push({
           employee_id: '',
-          employee_code: '',
-          full_name: fn || un || em,
+          employee_code: code,
+          nick_name: nick,
+          password: pass,
+          company_id: comp || curCompId,
+          full_name: fn || un || em || code,
           username: un,
           email: em,
           department_code: deptCode,
@@ -2524,95 +2922,6 @@ window.buildSetupEmployeeOptions = function(selectedVal, allowDirectManager = fa
   return opts;
 };
 
-window.getSetupAvailableCompanies = function() {
-  const list = [];
-  const seen = new Set();
-
-  const addComp = (c) => {
-    if (!c) return;
-    const shortName = String(c.company_shortname || c.short_name || c.name || '').trim();
-    const fullName = String(c.company_fullname || c.full_name || c.company_name || '').trim();
-    const id = String(c.my_company_id || c.company_id || c.id || '').trim();
-    const val = shortName || id || fullName;
-    if (!val) return;
-
-    const key = (id || shortName || fullName).toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    if (shortName) seen.add(shortName.toLowerCase());
-    if (id) seen.add(id.toLowerCase());
-
-    const label = shortName && fullName && shortName !== fullName
-      ? `${shortName} - ${fullName}`
-      : (shortName || fullName || id);
-
-    list.push({
-      value: val,
-      short_name: shortName,
-      full_name: fullName,
-      id: id,
-      label: label
-    });
-  };
-
-  // 1. From setupParsedCompanies (Step 1 Excel parsed)
-  if (Array.isArray(window.setupParsedCompanies)) {
-    window.setupParsedCompanies.forEach(addComp);
-  }
-
-  // 2. From setupDraft.company (Step 1 Form or Excel)
-  if (window.setupDraft?.company) {
-    if (Array.isArray(window.setupDraft.company)) {
-      window.setupDraft.company.forEach(addComp);
-    } else if (typeof window.setupDraft.company === 'object') {
-      addComp(window.setupDraft.company);
-    }
-  }
-
-  // 3. From setupWizardData.company or companies
-  if (window.setupWizardData?.company) {
-    addComp(window.setupWizardData.company);
-  }
-  if (Array.isArray(window.setupWizardData?.companies)) {
-    window.setupWizardData.companies.forEach(addComp);
-  }
-
-  // 4. From selectCache / lookupCache if available
-  if (typeof selectCache !== 'undefined' && Array.isArray(selectCache['my_company'])) {
-    selectCache['my_company'].forEach(addComp);
-  }
-  if (Array.isArray(window._setupLookupCache?.['my_company'])) {
-    window._setupLookupCache['my_company'].forEach(addComp);
-  }
-
-  return list;
-};
-
-window.buildSetupCompanyOptions = function(selectedVal, placeholder = '') {
-  const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
-  const companies = window.getSetupAvailableCompanies();
-  const ph = placeholder || (isVi ? 'Chọn pháp nhân' : 'Select Company Entity');
-  let opts = '<option value="">-- ' + escapeHTML(ph) + ' --</option>';
-
-  let foundSelected = false;
-  for (const comp of companies) {
-    const isSel = selectedVal && (
-      String(selectedVal).toLowerCase() === comp.value.toLowerCase() ||
-      String(selectedVal).toLowerCase() === (comp.short_name || '').toLowerCase() ||
-      String(selectedVal).toLowerCase() === (comp.id || '').toLowerCase() ||
-      String(selectedVal).toLowerCase() === (comp.full_name || '').toLowerCase()
-    );
-    if (isSel) foundSelected = true;
-    opts += '<option value="' + escapeHTML(comp.short_name || comp.value) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(comp.label) + '</option>';
-  }
-
-  if (selectedVal && !foundSelected) {
-    opts += '<option value="' + escapeHTML(selectedVal) + '" selected>' + escapeHTML(selectedVal) + '</option>';
-  }
-
-  return opts;
-};
-
 window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
   const lvl = data.approval_level || 'Tier 1';
   const name = data.policy_name || '';
@@ -2634,22 +2943,61 @@ window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
   ).join('');
 
   const isVi = swIsVi();
-  const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
-    ? window.setupParsedDepartments
-    : (window.setupWizardData?.departments || []);
-  let deptOpts = '<option value="">-- ' + (isVi ? 'Chọn phòng ban (tùy chọn)' : 'Select Department (Optional)') + ' --</option>';
-  for (const d of deptList) {
-    const code = d.department_code || d.code || '';
-    const dname = d.department_name || d.name || code;
-    const isSel = (data.department_id && (data.department_id === code || data.department_id === dname || data.department_id === d.department_id));
-    deptOpts += '<option value="' + escapeHTML(code || dname) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + dname) + '</option>';
-  }
+  const rowUid = (data.policy_name ? ('pol_' + String(data.policy_name).replace(/[^a-zA-Z0-9_-]/g, '')) : ('row_' + idx + '_' + Math.random().toString(36).substring(2, 7)));
 
-  const t1Opts = window.buildSetupEmployeeOptions(t1, true);
-  const t2Opts = window.buildSetupEmployeeOptions(t2, false, isVi ? 'Chọn người duyệt Bậc 2' : 'Select Tier 2 Approver');
-  const t3Opts = window.buildSetupEmployeeOptions(t3, false, isVi ? 'Chọn người duyệt Bậc 3' : 'Select Tier 3 Approver');
-  const leadOpts = window.buildSetupEmployeeOptions(data.policy_lead || '', false, isVi ? 'Chọn Policy Lead (tùy chọn)' : 'Select Policy Lead (Optional)');
-  const ownerOpts = window.buildSetupEmployeeOptions(data.sr_owner || '', false, isVi ? 'Chọn SR Owner (tùy chọn)' : 'Select SR Owner (Optional)');
+  const leadSelect = window.renderSwSearchableSelect({
+    id: 'step4_pol_lead_' + rowUid,
+    category: 'employee',
+    value: data.policy_lead || '',
+    inputClass: 'step4-pol-lead',
+    placeholder: isVi ? 'Chọn Policy Lead (tùy chọn)' : 'Select Policy Lead (Optional)',
+    searchPlaceholder: isVi ? 'Tìm nhân viên...' : 'Search employee...'
+  });
+
+  const ownerSelect = window.renderSwSearchableSelect({
+    id: 'step4_pol_owner_' + rowUid,
+    category: 'employee',
+    value: data.sr_owner || '',
+    inputClass: 'step4-pol-owner',
+    placeholder: isVi ? 'Chọn SR Owner (tùy chọn)' : 'Select SR Owner (Optional)',
+    searchPlaceholder: isVi ? 'Tìm nhân viên...' : 'Search employee...'
+  });
+
+  const deptSelect = window.renderSwSearchableSelect({
+    id: 'step4_pol_dept_' + rowUid,
+    category: 'department',
+    value: data.department_id || '',
+    inputClass: 'step4-pol-dept',
+    placeholder: isVi ? 'Chọn phòng ban (từ Bước 2)' : 'Select Department (Step 2)',
+    searchPlaceholder: isVi ? 'Tìm phòng ban...' : 'Search department...'
+  });
+
+  const t1Select = window.renderSwSearchableSelect({
+    id: 'step4_pol_t1_' + rowUid,
+    category: 'employee_with_dm',
+    value: t1 || 'Direct Manager',
+    inputClass: 'step4-pol-t1',
+    placeholder: isVi ? 'Chọn người duyệt Bậc 1' : 'Select Tier 1 Approver',
+    searchPlaceholder: isVi ? 'Tìm người duyệt...' : 'Search approver...'
+  });
+
+  const t2Select = window.renderSwSearchableSelect({
+    id: 'step4_pol_t2_' + rowUid,
+    category: 'employee',
+    value: t2 || '',
+    inputClass: 'step4-pol-t2',
+    placeholder: isVi ? 'Chọn người duyệt Bậc 2' : 'Select Tier 2 Approver',
+    searchPlaceholder: isVi ? 'Tìm người duyệt...' : 'Search approver...'
+  });
+
+  const t3Select = window.renderSwSearchableSelect({
+    id: 'step4_pol_t3_' + rowUid,
+    category: 'employee',
+    value: t3 || '',
+    inputClass: 'step4-pol-t3',
+    placeholder: isVi ? 'Chọn người duyệt Bậc 3' : 'Select Tier 3 Approver',
+    searchPlaceholder: isVi ? 'Tìm người duyệt...' : 'Search approver...'
+  });
 
   return '<div class="step4-policy-row" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:14px;position:relative;">'
     + '<input type="hidden" class="step4-pol-level" value="' + escapeHTML(lvl) + '">'
@@ -2672,20 +3020,20 @@ window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
     + '<select class="sw-select step4-pol-type">' + topts + '</select>'
     + '</div>'
     + '<div>'
-    + swLabel(swT('sw.step4_sla', 'SLA (ngày)'), false)
+    + swLabel(swT('sw.step4_sla', 'SLA (days)'), false)
     + '<input type="number" min="1" class="sw-input step4-pol-sla" value="' + escapeHTML(String(sla)) + '">'
     + '</div>'
     + '<div>'
     + swLabel(isVi ? 'Policy Lead (Trưởng QT)' : 'Policy Lead', false)
-    + '<select class="sw-select step4-pol-lead">' + leadOpts + '</select>'
+    + leadSelect
     + '</div>'
     + '<div>'
     + swLabel(isVi ? 'SR Owner (Người xử lý)' : 'SR Owner', false)
-    + '<select class="sw-select step4-pol-owner">' + ownerOpts + '</select>'
+    + ownerSelect
     + '</div>'
     + '<div style="grid-column:span 2;">'
     + swLabel(swT('sw.step3_emp_dept', 'Phòng ban phụ trách'), false)
-    + '<select class="sw-select step4-pol-dept">' + deptOpts + '</select>'
+    + deptSelect
     + '</div>'
     + '<div style="grid-column:span 2;">'
     + swLabel(swT('sw.step4_desc_field', 'Mô tả'), false)
@@ -2702,15 +3050,15 @@ window.renderStep4CustomPolicyCardHTML = function(idx, data = {}) {
     + '</div>'
     + '<div class="step4-tier1-container" style="margin-top:8px;display:' + (lvl === 'Tier 0' ? 'none' : 'block') + ';">'
     + swLabel(swT('sw.step4_tier1', 'Bậc 1 (Tier 1)'), true)
-    + '<select class="sw-select step4-pol-t1">' + t1Opts + '</select>'
+    + t1Select
     + '</div>'
     + '<div class="step4-tier2-container" style="margin-top:8px;display:' + (lvl === 'Tier 2' || lvl === 'Tier 3' ? 'block' : 'none') + ';">'
     + swLabel(swT('sw.step4_tier2', 'Bậc 2 (Tier 2)'), true)
-    + '<select class="sw-select step4-pol-t2">' + t2Opts + '</select>'
+    + t2Select
     + '</div>'
     + '<div class="step4-tier3-container" style="margin-top:8px;display:' + (lvl === 'Tier 3' ? 'block' : 'none') + ';">'
     + swLabel(swT('sw.step4_tier3', 'Bậc 3 (Tier 3)'), true)
-    + '<select class="sw-select step4-pol-t3">' + t3Opts + '</select>'
+    + t3Select
     + '</div>'
     + '<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">* ' + (isVi ? 'Duy nhất Bậc 1 hỗ trợ Direct Manager. Các bậc khác và người phụ trách chọn trực tiếp từ nhân viên.' : 'Only Tier 1 supports Direct Manager. Other tiers and leads are selected from employees.') + '</div>'
     + '</div>'
@@ -2815,7 +3163,7 @@ function renderStep4HTML(counts){
       const pDesc = isVi ? p.descVi : (p.descEn || p.descVi);
       const searchMeta = swRemoveAccents(pName + ' ' + (p.nameEn||'') + ' ' + pDesc + ' ' + (p.descEn||'') + ' ' + p.cat).toLowerCase();
       const isVisible = (cat === 'all' || p.cat === cat) && (!searchClean || searchMeta.includes(searchClean));
-      pCards+='<label class="sw-policy-card sw-policy-card-item '+(p.checked?'checked':'')+'" data-cat="'+p.cat+'" data-search="'+escapeHTML(searchMeta)+'" style="display:'+(isVisible?'flex':'none')+';flex-direction:column;"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;"><div style="width:32px;height:32px;border-radius:9px;background:'+catBg+';display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:17px;color:'+catColor+'">'+(P_CAT_ICONS[p.cat]||'policy')+'</span></div><input type="checkbox" name="preset_policy" value="'+p.id+'" '+(p.checked?'checked':'')+' style="accent-color:#f97316;width:16px;height:16px;flex-shrink:0;" onchange="this.closest(\'.sw-policy-card\').classList.toggle(\'checked\', this.checked); window.togglePresetPolicy(\''+p.id+'\', this.checked);"></div><div style="font-size:12.5px;font-weight:700;color:#111827;margin-bottom:4px;">'+escapeHTML(pName)+'</div><div style="font-size:11px;color:#6B7280;line-height:1.4;flex:1;margin-bottom:8px;">'+escapeHTML(pDesc)+'</div><div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;gap:4px;">'+tgs+'</div><span style="font-size:10.5px;color:#9CA3AF;">SLA: '+p.sla+'d</span></div></label>';
+      pCards+='<label class="sw-policy-card sw-policy-card-item '+(p.checked?'checked':'')+'" data-cat="'+p.cat+'" data-search="'+escapeHTML(searchMeta)+'" style="display:'+(isVisible?'flex':'none')+';flex-direction:column;"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;"><div style="width:32px;height:32px;border-radius:9px;background:'+catBg+';display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded" style="font-size:17px;color:'+catColor+'">'+(P_CAT_ICONS[p.cat]||'policy')+'</span></div><input type="checkbox" name="preset_policy" value="'+p.id+'" '+(p.checked?'checked':'')+' style="accent-color:#f97316;width:16px;height:16px;flex-shrink:0;" onchange="this.closest(\'.sw-policy-card\').classList.toggle(\'checked\', this.checked); window.togglePresetPolicy(\''+p.id+'\', this.checked);"></div><div style="font-size:12.5px;font-weight:700;color:#111827;margin-bottom:4px;">'+escapeHTML(pName)+'</div><div style="font-size:11px;color:#6B7280;line-height:1.4;flex:1;margin-bottom:8px;">'+escapeHTML(pDesc)+'</div><div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;gap:4px;">'+tgs+'</div><span style="font-size:10.5px;color:#9CA3AF;">SLA (days): '+p.sla+'</span></div></label>';
     }
 
     let policyDatalist = '<datalist id="sw-step4-search-datalist">';
@@ -2910,67 +3258,83 @@ function renderStep4HTML(counts){
     let prev = '';
     const parsed = window.setupParsedPolicies || [];
     if (parsed.length > 0) {
+      const isVi = swIsVi();
+      const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
+        ? window.setupParsedDepartments
+        : (window.setupWizardData?.departments || []);
+
       let rows = '';
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const p = parsed[i];
-        const t1Display = p.tier1_display || p.tier1_approval || 'Direct Manager';
-        const t2Display = p.tier2_display || p.tier2_approval || '–';
-        const t3Display = p.tier3_display || p.tier3_approval || '–';
-        const leadDisplay = p.policy_lead_display || p.policy_lead || '–';
-        const ownerDisplay = p.sr_owner_display || p.sr_owner || '–';
-        const deptDisplay = p.department_id || '–';
+        const types = ['Operation', 'Finance', 'Technical', 'Sale and MKT', 'HR', 'Admin', 'Procurement', 'Legal'];
+        const typeOpts = types.map(t => '<option value="' + t + '" ' + ((p.policy_type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const levels = ['Tier 1', 'Tier 2', 'Tier 3'];
+        const levelOpts = levels.map(l => '<option value="' + l + '" ' + ((p.approval_level || 'Tier 1') === l ? 'selected' : '') + '>' + l + '</option>').join('');
 
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#6B7280;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_name) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.policy_type) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(p.approval_level) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier1_approval || '') + '">' + escapeHTML(t1Display) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier2_approval || '') + '">' + escapeHTML(t2Display) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.tier3_approval || '') + '">' + escapeHTML(t3Display) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.policy_lead || '') + '">' + escapeHTML(leadDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;" title="' + escapeHTML(p.sr_owner || '') + '">' + escapeHTML(ownerDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(deptDisplay) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + (p.sla || 3) + ' ' + swT('common.days', 'ngày') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(p.description || p.policy_name) + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + swT('common.valid', 'Hợp lệ') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">delete</span></button>'
+        let deptOpts = '<option value="">-- ' + (isVi ? 'Phòng ban' : 'Dept') + ' --</option>';
+        for (const d of deptList) {
+          const code = d.department_code || d.code || '';
+          const dname = d.department_name || d.name || code;
+          const isSel = (p.department_id && (p.department_id === code || p.department_id === dname || p.department_id === d.department_id));
+          deptOpts += '<option value="' + escapeHTML(code || dname) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + dname) + '</option>';
+        }
+
+        const t1Opts = window.buildSetupEmployeeOptions(p.tier1_approval || 'Direct Manager', true);
+        const t2Opts = window.buildSetupEmployeeOptions(p.tier2_approval || '', false, isVi ? '-- Bậc 2 (tùy chọn) --' : '-- Tier 2 --');
+        const t3Opts = window.buildSetupEmployeeOptions(p.tier3_approval || '', false, isVi ? '-- Bậc 3 (tùy chọn) --' : '-- Tier 3 --');
+        const leadOpts = window.buildSetupEmployeeOptions(p.policy_lead || '', false, isVi ? '-- Policy Lead --' : '-- Policy Lead --');
+        const ownerOpts = window.buildSetupEmployeeOptions(p.sr_owner || '', false, isVi ? '-- SR Owner --' : '-- SR Owner --');
+
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
+          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(p.policy_name || '') + '" placeholder="' + swT('sw.step4_policy_name', 'Tên quy trình') + ' *" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_type\', this.value)" style="min-width:105px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'approval_level\', this.value)" style="min-width:85px;font-weight:600;">' + levelOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier1_approval\', this.value)" style="min-width:125px;">' + t1Opts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier2_approval\', this.value)" style="min-width:125px;">' + t2Opts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier3_approval\', this.value)" style="min-width:125px;">' + t3Opts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_lead\', this.value)" style="min-width:125px;">' + leadOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'sr_owner\', this.value)" style="min-width:125px;">' + ownerOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'department_id\', this.value)" style="min-width:120px;">' + deptOpts + '</select></td>'
+          + '<td style="padding:4px;"><input type="number" min="0.5" step="0.5" class="sw-grid-input" value="' + escapeHTML(String(p.sla || 3)) + '" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'sla\', parseFloat(this.value)||1)" style="min-width:55px;text-align:center;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(p.description || '') + '" placeholder="' + swT('common.description', 'Mô tả') + '" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'description\', this.value)" style="min-width:130px;"></td>'
           + '</tr>';
       }
-      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#F9FAFB;border:1px solid #E5E7EB;margin-top:16px;margin-bottom:14px;">'
+      prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
-        + '<span class="material-symbols-rounded" style="font-size:24px;color:#4B5563;">rule</span>'
-        + '<div><div style="font-size:12.5px;font-weight:600;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
+        + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">rule</span>'
+        + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step4_preview_title', 'Danh sách quy trình tải lên') + '</div>'
         + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
         + '<div style="display:flex;gap:8px;align-items:center;">'
         + '<button onclick="saveStep4AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step4_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
-        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;color:#4B5563;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
+        + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_policy_name', 'Tên quy trình') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier3', 'Bậc 3') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Policy Lead</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SR Owner</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SLA</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.status', 'Trạng thái') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:70px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_policy_name', 'Tên quy trình') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier3', 'Bậc 3') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Policy Lead</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SR Owner</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_sla', 'SLA (days)') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'policy\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step4_add_process', 'Thêm quy trình') + '</button>';
     }
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;"><button onclick="downloadSetupTemplate(\'policy\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handlePolicyExcelUpload(event)"></label></div></div>' + prev;
   } else {
@@ -3227,9 +3591,37 @@ window.renderStep5AccountRowHTML = function(idx, data = {}) {
   const cur = data.currency || comp.base_currency || 'VND';
   const defaultBank = data.bank_name || 'MBV';
   const isVi = typeof swIsVi === 'function' ? swIsVi() : true;
-  const compOpts = window.buildSetupCompanyOptions(data.company_entity || '', isVi ? 'Chọn pháp nhân (Bước 1)' : 'Select Company (Step 1)');
-  const mgrOpts = window.buildSetupEmployeeOptions(data.transaction_managed_by || '', false, isVi ? 'Chọn người QL giao dịch (Bước 3)' : 'Select Trans. Manager (Step 3)');
-  const finOpts = window.buildSetupEmployeeOptions(data.finance_control || '', false, isVi ? 'Chọn kiểm soát tài chính (Bước 3)' : 'Select Fin. Control (Step 3)');
+
+  const rowUid = (data.account_id ? ('id_' + String(data.account_id).replace(/[^a-zA-Z0-9_-]/g, '')) : ('row_' + idx + '_' + Math.random().toString(36).substring(2, 7)));
+  const curItem = (window.swSearchOptions?.currency || []).find(c => String(c.value).toUpperCase() === String(cur).toUpperCase());
+  const curLabel = curItem ? curItem.label : cur;
+
+  const compSelect = window.renderSwSearchableSelect({
+    id: 'step5_acct_comp_' + rowUid,
+    category: 'company',
+    value: data.company_entity || '',
+    inputClass: 'step5-acct-comp',
+    placeholder: isVi ? 'Chọn pháp nhân (Bước 1)' : 'Select Company (Step 1)',
+    searchPlaceholder: isVi ? 'Tìm pháp nhân...' : 'Search company...'
+  });
+
+  const transSelect = window.renderSwSearchableSelect({
+    id: 'step5_acct_trans_' + rowUid,
+    category: 'employee',
+    value: data.transaction_managed_by || '',
+    inputClass: 'step5-acct-trans',
+    placeholder: isVi ? 'Chọn QL Giao dịch (Bước 3)' : 'Select Trans. Manager (Step 3)',
+    searchPlaceholder: isVi ? 'Tìm nhân viên...' : 'Search employee...'
+  });
+
+  const finSelect = window.renderSwSearchableSelect({
+    id: 'step5_acct_fin_' + rowUid,
+    category: 'employee',
+    value: data.finance_control || '',
+    inputClass: 'step5-acct-fin',
+    placeholder: isVi ? 'Chọn Kiểm soát TC (Bước 3)' : 'Select Fin. Control (Step 3)',
+    searchPlaceholder: isVi ? 'Tìm nhân viên...' : 'Search employee...'
+  });
 
   return '<div class="step5-account-row" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:12px;position:relative;">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #F3F4F6;">'
@@ -3255,20 +3647,28 @@ window.renderStep5AccountRowHTML = function(idx, data = {}) {
     + '<input type="text" class="sw-input step5-acct-num" placeholder="' + swT('sw.step5_acct_num_ph', 'VD: 0011001234567') + '" value="' + escapeHTML(data.account_number || '') + '">'
     + '</div>'
     + '<div>'
-    + swLabel(swT('sw.step5_currency', 'Loại tiền tệ'), false)
-    + '<input type="text" list="step5-currency-datalist" class="sw-input step5-currency" value="' + escapeHTML(cur) + '">'
+    + swLabel(swT('sw.step5_currency', 'Loại tiền tệ'), true)
+    + '<div class="sw-search-dropdown">'
+    + '<input type="hidden" class="step5-currency" id="step5_currency_' + rowUid + '" value="' + escapeHTML(cur) + '">'
+    + '<div class="sw-search-display" id="sw_search_display_step5_currency_' + rowUid + '" onclick="window.toggleSwSearchDropdown(\'step5_currency_' + rowUid + '\')">'
+    + '<span id="sw_search_label_step5_currency_' + rowUid + '">' + escapeHTML(curLabel) + '</span>'
+    + '<span class="material-symbols-rounded" style="font-size:18px;color:#6B7280;">arrow_drop_down</span>'
     + '</div>'
+    + '<div class="sw-search-menu" id="sw_search_menu_step5_currency_' + rowUid + '">'
+    + '<input type="text" class="sw-search-input" id="sw_search_input_step5_currency_' + rowUid + '" placeholder="' + swT('sw.step1_search_currency', 'Tìm kiếm loại tiền tệ...') + '" oninput="window.filterSwSearchOptions(\'step5_currency_' + rowUid + '\', this.value)" onclick="event.stopPropagation()">'
+    + '<div id="sw_search_list_step5_currency_' + rowUid + '"></div>'
+    + '</div></div></div>'
     + '<div>'
     + swLabel(swT('sw.account_entity', 'Pháp nhân công ty', 'Company Entity'), false)
-    + '<select class="sw-select step5-acct-comp">' + compOpts + '</select>'
+    + compSelect
     + '</div>'
     + '<div>'
     + swLabel(swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), false)
-    + '<select class="sw-select step5-acct-trans">' + mgrOpts + '</select>'
+    + transSelect
     + '</div>'
     + '<div>'
     + swLabel(swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), false)
-    + '<select class="sw-select step5-acct-fin">' + finOpts + '</select>'
+    + finSelect
     + '</div>'
     + '</div>'
     + '</div>';
@@ -3280,7 +3680,17 @@ window.addStep5AccountRow = function(data = {}) {
   const count = container.querySelectorAll('.step5-account-row').length;
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = window.renderStep5AccountRowHTML(count, data);
-  container.appendChild(tempDiv.firstElementChild);
+  const newRow = tempDiv.firstElementChild;
+  container.appendChild(newRow);
+  const hid = newRow.querySelector('.step5-currency');
+  if (hid && hid.id) {
+    const rowType = hid.id;
+    const cVal = hid.value;
+    const curItem = (window.swSearchOptions?.currency || []).find(c => String(c.value).toUpperCase() === String(cVal).toUpperCase());
+    const labelEl = document.getElementById('sw_search_label_' + rowType);
+    if (labelEl && curItem) labelEl.textContent = curItem.label;
+    window.filterSwSearchOptions(rowType, '');
+  }
 };
 
 window.removeStep5AccountRow = function(btn) {
@@ -3314,11 +3724,17 @@ function renderStep5HTML(comp, counts) {
 
   const acctInfo = acctCount > 0 ? '<div style="padding:12px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:16px;font-size:12px;color:#374151;"><span class="material-symbols-rounded" style="font-size:14px;color:#059669;vertical-align:middle;">check_circle</span> ' + swT('sw.step5_existing_count', 'Hiện có {{count}} tài khoản đã thiết lập.').replace('{{count}}', acctCount) + '</div>' : '';
 
-  const initialRowHTML = window.renderStep5AccountRowHTML(0, {
-    account_name: '',
-    bank_name: 'MBV',
-    account_number: '',
-    currency: cur
+  const existingAccts = (window.setupDraft?.accounts && window.setupDraft.accounts.length > 0)
+    ? window.setupDraft.accounts
+    : [{
+        account_name: '',
+        bank_name: 'MBV',
+        account_number: '',
+        currency: cur
+      }];
+  let initialRowsHTML = '';
+  existingAccts.forEach((a, i) => {
+    initialRowsHTML += window.renderStep5AccountRowHTML(i, a);
   });
 
   const isVi = swIsVi();
@@ -3371,14 +3787,32 @@ function renderStep5HTML(comp, counts) {
   for (const b of popularBanks) banksDatalist += '<option value="' + escapeHTML(b) + '">';
   banksDatalist += '</datalist>';
 
-  const currencyDatalist = '<datalist id="step5-currency-datalist"><option value="VND"><option value="USD"><option value="EUR"><option value="JPY"><option value="SGD"><option value="CNY"></datalist>';
+  const curOpts = (window.swSearchOptions?.currency && window.swSearchOptions.currency.length > 0)
+    ? window.swSearchOptions.currency.map(c => '<option value="' + escapeHTML(c.value || c.code || c) + '">').join('')
+    : '<option value="VND"><option value="USD"><option value="EUR"><option value="JPY"><option value="SGD"><option value="CNY"></option>';
+  const currencyDatalist = '<datalist id="step5-currency-datalist">' + curOpts + '</datalist>';
+
+  setTimeout(async () => {
+    await window.ensureSwCurrenciesLoaded();
+    document.querySelectorAll('.step5-account-row').forEach(row => {
+      const hid = row.querySelector('.step5-currency');
+      if (hid && hid.id) {
+        const rowType = hid.id;
+        const cVal = hid.value;
+        const curItem = (window.swSearchOptions?.currency || []).find(c => String(c.value).toUpperCase() === String(cVal).toUpperCase());
+        const labelEl = document.getElementById('sw_search_label_' + rowType);
+        if (labelEl && curItem) labelEl.textContent = curItem.label;
+        window.filterSwSearchOptions(rowType, '');
+      }
+    });
+  }, 0);
 
   let tabContent = '';
   if (tab === 'quick') {
     tabContent = '<form id="form-step5" onsubmit="event.preventDefault();saveStep5AndAdvance();">'
       + '<p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step5_multi_desc', 'Bạn có thể nhập một hoặc nhiều tài khoản ngân hàng của doanh nghiệp.') + '</p>'
       + '<div id="step5-accounts-container">'
-      + initialRowHTML
+      + initialRowsHTML
       + '</div>'
       + '<button type="button" onclick="window.addStep5AccountRow()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:1px dashed #D1D5DB;background:#F9FAFB;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:16px;">'
       + '<span class="material-symbols-rounded" style="font-size:16px;">add</span> '
@@ -3386,7 +3820,7 @@ function renderStep5HTML(comp, counts) {
       + '</button>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:16px;border-top:1px solid #F3F4F6;">'
       + '<button type="button" class="sw-btn-back" onclick="window.setSetupStep(4)"><span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span> ' + swT('sw.btn_back', 'Quay lại') + '</button>'
-      + '<div style="display:flex;gap:10px;align-items:center;">'
+      + '<div style="display:gap:10px;align-items:center;">'
       + '<button type="button" class="sw-btn-ghost" onclick="window.setSetupStep(6)">' + swT('sw.btn_skip', 'Bỏ qua bước này') + '</button>'
       + '<button type="submit" class="sw-btn-primary"><span>' + swT('sw.btn_save_summary', 'Lưu và xem tổng kết') + '</span><span class="material-symbols-rounded" style="font-size:17px;">arrow_forward</span></button>'
       + '</div>'
@@ -3397,25 +3831,32 @@ function renderStep5HTML(comp, counts) {
     let prev = '';
     if (parsed.length > 0) {
       let rows = '';
+      const isVi = swIsVi();
       for (let i = 0; i < Math.min(parsed.length, 50); i++) {
         const a = parsed[i];
-        rows += '<tr style="border-bottom:1px solid #F1F5F9;">'
-          + '<td style="padding:7px 10px;color:#9CA3AF;font-size:11.5px;">' + (i + 1) + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#ea580c;font-size:11.5px;">' + escapeHTML(a.account_id || '–') + '</td>'
-          + '<td style="padding:7px 10px;font-weight:700;color:#111827;font-size:11.5px;">' + escapeHTML(a.account_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#374151;font-size:11.5px;">' + escapeHTML(a.type || 'Bank Account') + '</td>'
-          + '<td style="padding:7px 10px;color:#059669;font-weight:600;font-size:11.5px;">' + escapeHTML(a.account_status || 'active') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.currency || 'VND') + '</td>'
-          + '<td style="padding:7px 10px;color:#2563EB;font-weight:600;font-size:11.5px;">' + escapeHTML(a.account_number || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#111827;font-size:11.5px;">' + escapeHTML(a.bank_name || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(String(a.exchange_rate || 1)) + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.transaction_managed_by || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.finance_control || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:#4B5563;font-size:11.5px;">' + escapeHTML(a.company_entity || '–') + '</td>'
-          + '<td style="padding:5px 8px;text-align:center;white-space:nowrap;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #D1D5DB;background:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:4px;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#2563EB;">edit</span></button>'
+        const typeOpts = ['Bank Account', 'Cash', 'Credit Card', 'Loan', 'Other'].map(t => '<option value="' + t + '" ' + ((a.type || 'Bank Account') === t ? 'selected' : '') + '>' + t + '</option>').join('');
+        const statusOpts = ['active', 'inactive'].map(s => '<option value="' + s + '" ' + ((a.account_status || 'active') === s ? 'selected' : '') + '>' + s + '</option>').join('');
+        const compOpts = window.buildSetupCompanyOptions(a.company_entity || '', isVi ? 'Chọn pháp nhân' : 'Select Company');
+        const mgrOpts = window.buildSetupEmployeeOptions(a.transaction_managed_by || '', false, isVi ? 'Chọn QL Giao dịch' : 'Select Manager');
+        const finOpts = window.buildSetupEmployeeOptions(a.finance_control || '', false, isVi ? 'Chọn kiểm soát TC' : 'Select Fin Control');
+
+        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
+          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
+          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
+          + '<button type="button" onclick="window.editSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
           + '<button type="button" onclick="window.deleteSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
           + '</td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_id || '') + '" placeholder="ID" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_id\', this.value)" style="min-width:65px;"></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_name || '') + '" placeholder="' + swT('sw.step5_acct_name', 'Tên tài khoản') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_name\', this.value)" style="min-width:130px;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'type\', this.value)" style="min-width:105px;">' + typeOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'account_status\', this.value)" style="min-width:85px;color:#059669;font-weight:600;">' + statusOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'currency\', this.value)" style="min-width:75px;font-weight:600;">' + window.buildSetupCurrencyOptions(a.currency || 'VND') + '</select></td>'
+          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_number || '') + '" placeholder="0011..." oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_number\', this.value)" style="min-width:110px;color:#2563EB;font-weight:600;"></td>'
+          + '<td style="padding:4px;"><input type="text" list="step5-banks-datalist" class="sw-grid-input" value="' + escapeHTML(a.bank_name || '') + '" placeholder="' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'bank_name\', this.value)" style="min-width:100px;"></td>'
+          + '<td style="padding:4px;"><input type="number" step="any" class="sw-grid-input" value="' + escapeHTML(String(a.exchange_rate || 1)) + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'exchange_rate\', parseFloat(this.value)||1)" style="min-width:65px;"></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'transaction_managed_by\', this.value)" style="min-width:125px;">' + mgrOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'finance_control\', this.value)" style="min-width:125px;">' + finOpts + '</select></td>'
+          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'company_entity\', this.value)" style="min-width:130px;">' + compOpts + '</select></td>'
           + '</tr>';
       }
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
@@ -3424,27 +3865,31 @@ function renderStep5HTML(comp, counts) {
         + '<div><div style="font-size:12.5px;font-weight:700;color:#111827;">' + swT('sw.step5_preview_title', 'Danh sách tài khoản đọc từ file Excel') + '</div>'
         + '<div style="font-size:11px;color:#6B7280;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;">'
+        + '<button onclick="saveStep5AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step5_imported_btn', 'Lưu {{count}} tài khoản').replace('{{count}}', parsed.length) + '</button>'
         + '<button onclick="window.setupParsedAccounts=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:280px;overflow-y:auto;">'
+        + '</div>'
+        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
         + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
         + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">#</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Account ID</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_name', 'Tên tài khoản', 'Account Name') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_type', 'Loại', 'Type') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_status', 'Trạng thái', 'Status') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_currency', 'Tiền tệ', 'Currency') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_num', 'Số tài khoản', 'Account Number') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control') + '</th>'
-        + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_entity', 'Pháp nhân', 'Company Entity') + '</th>'
-        + '<th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:70px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
+        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Account ID</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_name', 'Tên tài khoản', 'Account Name') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_type', 'Loại', 'Type') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_status', 'Trạng thái', 'Status') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_currency', 'Tiền tệ', 'Currency') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_num', 'Số tài khoản', 'Account Number') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control') + '</th>'
+        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_entity', 'Pháp nhân', 'Company Entity') + '</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>';
+        + '</table></div></div>'
+        + '<button type="button" onclick="window.addParsedGridRow(\'account\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
     }
     tabContent = '<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'account\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleAccountExcelUpload(event)"></label></div></div>'
       + prev
@@ -4134,6 +4579,103 @@ window.deleteSetupParsedItem = function(type, index) {
   }
 };
 
+window.updateParsedGridCell = function(type, index, field, value) {
+  let list = null;
+  if (type === 'department') list = window.setupParsedDepartments;
+  else if (type === 'employee') list = window.setupParsedEmployees;
+  else if (type === 'policy') list = window.setupParsedPolicies;
+  else if (type === 'account') list = window.setupParsedAccounts;
+  if (!list || !list[index]) return;
+  list[index][field] = value;
+  if (type === 'department') {
+    if (window.setupDraft) window.setupDraft.departments = list;
+  } else if (type === 'employee') {
+    if (window.setupDraft) window.setupDraft.employees = list;
+  } else if (type === 'policy') {
+    if (window.setupDraft) window.setupDraft.policies = list;
+  } else if (type === 'account') {
+    if (window.setupDraft) window.setupDraft.accounts = list;
+  }
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
+  }
+};
+
+window.addParsedGridRow = function(type) {
+  if (type === 'department') {
+    if (!window.setupParsedDepartments) window.setupParsedDepartments = [];
+    const curCompId = window.setupDraft?.company?.my_company_id || '1';
+    window.setupParsedDepartments.push({
+      department_id: '',
+      company_id: curCompId,
+      department_code: 'DEPT-' + (window.setupParsedDepartments.length + 1),
+      department_name: '',
+      type: 'Operation',
+      manager_email: ''
+    });
+    if (window.setupDraft) window.setupDraft.departments = window.setupParsedDepartments;
+  } else if (type === 'employee') {
+    if (!window.setupParsedEmployees) window.setupParsedEmployees = [];
+    const curCompId = window.setupDraft?.company?.my_company_id || (window.getSetupAvailableCompanies ? (window.getSetupAvailableCompanies()[0]?.id || '') : '');
+    const nextIdx = window.setupParsedEmployees.length + 1;
+    window.setupParsedEmployees.push({
+      employee_id: '',
+      employee_code: 'NV' + String(nextIdx).padStart(3, '0'),
+      nick_name: '',
+      company_id: curCompId,
+      full_name: '',
+      username: '',
+      password: 'Password@123',
+      email: '',
+      department_code: '',
+      position: '',
+      start_date: new Date().toISOString().split('T')[0],
+      direct_manager: 'Super Admin',
+      phone: ''
+    });
+    if (window.setupDraft) window.setupDraft.employees = window.setupParsedEmployees;
+  } else if (type === 'policy') {
+    if (!window.setupParsedPolicies) window.setupParsedPolicies = [];
+    window.setupParsedPolicies.push({
+      policy_name: '',
+      policy_type: 'Operation',
+      approval_level: 'Tier 1',
+      tier1_approval: 'Direct Manager',
+      tier2_approval: '',
+      tier3_approval: '',
+      policy_lead: '',
+      sr_owner: '',
+      department_id: '',
+      sla: 3,
+      description: ''
+    });
+    if (window.setupDraft) window.setupDraft.policies = window.setupParsedPolicies;
+  } else if (type === 'account') {
+    if (!window.setupParsedAccounts) window.setupParsedAccounts = [];
+    const cur = (window.setupDraft?.company?.base_currency) || 'VND';
+    window.setupParsedAccounts.push({
+      account_id: '',
+      account_name: '',
+      bank_name: 'MBV',
+      account_number: '',
+      currency: cur,
+      type: 'Bank Account',
+      account_status: 'active',
+      exchange_rate: 1,
+      company_entity: '',
+      transaction_managed_by: '',
+      finance_control: ''
+    });
+    if (window.setupDraft) window.setupDraft.accounts = window.setupParsedAccounts;
+  }
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
+  }
+  if (typeof renderSetupContent === 'function') {
+    renderSetupContent();
+  }
+};
+
 window.editSetupParsedItem = function(type, index) {
   let item = null;
   if (type === 'department') {
@@ -4158,14 +4700,16 @@ window.editSetupParsedItem = function(type, index) {
     const types = ['Operation', 'Finance', 'Technical', 'Sale and MKT'];
     const typeOpts = types.map(t => '<option value="' + t + '" ' + ((item.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
     const comp = window.setupWizardData?.company || {};
-    const compShort = comp.company_shortname || window.authUser?.company_shortname || '';
-    const compFull = comp.company_fullname || window.authUser?.company_name || '';
-    const compDisplay = (compShort && compFull) ? `${compShort} - ${compFull}` : (compShort || compFull || (item.company_id ? `ID: ${item.company_id}` : (isVi ? 'Công ty mặc định' : 'Default Company')));
+    const compSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-comp-id',
+      category: 'company',
+      value: item.company_id || comp.my_company_id || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn công ty' : 'Select Company'
+    });
 
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      + '<input type="hidden" id="sw-edit-comp-id" value="' + escapeHTML(item.company_id || comp.my_company_id || '') + '">'
-      + '<div style="grid-column:span 2;">' + swLabel(isVi ? 'Công ty' : 'Company', false)
-      + '<div style="padding:9px 12px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:10px;font-size:12.5px;font-weight:600;color:#1F2937;display:flex;align-items:center;gap:6px;"><span class="material-symbols-rounded" style="font-size:18px;color:#EA580C;">business</span>' + escapeHTML(compDisplay) + '</div></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step1_company', 'Công ty', 'Company'), false) + compSelect + '</div>'
       + '<div>' + swLabel(swT('sw.step2_dept_code', 'Mã phòng ban'), true) + '<input type="text" id="sw-edit-dept-code" class="sw-input" value="' + escapeHTML(item.department_code || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step2_dept_name', 'Tên phòng ban'), true) + '<input type="text" id="sw-edit-dept-name" class="sw-input" value="' + escapeHTML(item.department_name || '') + '"></div>'
       + '<div>' + swLabel(swT('common.type', 'Loại'), false) + '<select id="sw-edit-dept-type" class="sw-select">' + typeOpts + '</select></div>'
@@ -4174,45 +4718,53 @@ window.editSetupParsedItem = function(type, index) {
   } else if (type === 'employee') {
     title = (isVi ? 'Sửa thông tin nhân viên #' : 'Edit Employee #') + (index + 1);
 
-    // Build Department dropdown options from Process 2
-    const deptOpts = (typeof window.buildSetupDepartmentSelectOptions === 'function')
-      ? window.buildSetupDepartmentSelectOptions(item.department_code || item.department_name || '')
-      : '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
+    const compSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-emp-company',
+      category: 'company',
+      value: item.company_id || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn công ty' : 'Select Company'
+    });
 
-    // Build Manager dropdown options (Direct & HR)
-    const empList = (window.setupParsedEmployees && window.setupParsedEmployees.length > 0)
-      ? window.setupParsedEmployees
-      : (window.setupWizardData?.employees || []);
-    const buildMgrOpts = (curVal) => {
-      let opts = '<option value="Super Admin" ' + (curVal === 'Super Admin' || !curVal ? 'selected' : '') + '>Super Admin</option>';
-      let matched = (curVal === 'Super Admin' || !curVal);
-      for (const e of empList) {
-        if (!e.full_name && !e.email) continue;
-        const val = e.email || e.full_name || e.username;
-        const isSel = (curVal && (curVal === val || curVal === e.full_name || curVal === e.email));
-        if (isSel) matched = true;
-        opts += '<option value="' + escapeHTML(val) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML(e.full_name + (e.email ? ' (' + e.email + ')' : '')) + '</option>';
-      }
-      if (curVal && !matched) {
-        opts += '<option value="' + escapeHTML(curVal) + '" selected>' + escapeHTML(curVal) + '</option>';
-      }
-      return opts;
-    };
+    const deptSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-emp-dept',
+      category: 'department',
+      value: item.department_code || item.department_name || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn phòng ban' : 'Select Department'
+    });
 
-    const directOpts = buildMgrOpts(item.direct_manager || 'Super Admin');
-    const hrOpts = buildMgrOpts(item.hr_manager || 'Super Admin');
+    const directSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-emp-direct',
+      category: 'employee',
+      value: item.direct_manager || 'Super Admin',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Quản lý trực tiếp' : 'Direct Manager'
+    });
+
+    const hrSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-emp-hr',
+      category: 'employee',
+      value: item.hr_manager || 'Super Admin',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Quản lý nhân sự' : 'HR Manager'
+    });
 
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step1_company', 'Công ty', 'Company'), false) + compSelect + '</div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_code', 'Mã nhân viên', 'Employee Code'), false) + '<input type="text" id="sw-edit-emp-code" class="sw-input" value="' + escapeHTML(item.employee_code || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_nick', 'Biệt danh', 'Nick Name'), false) + '<input type="text" id="sw-edit-emp-nick" class="sw-input" value="' + escapeHTML(item.nick_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_name', 'Họ và tên'), true) + '<input type="text" id="sw-edit-emp-name" class="sw-input" value="' + escapeHTML(item.full_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_username', 'Tên đăng nhập'), true) + '<input type="text" id="sw-edit-emp-user" class="sw-input" value="' + escapeHTML(item.username || '') + '"></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('common.password', 'Mật khẩu', 'Password'), false) + '<input type="text" id="sw-edit-emp-pass" class="sw-input" style="font-family:monospace;" value="' + escapeHTML(item.password || '') + '"></div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_email', 'Email'), true) + '<input type="email" id="sw-edit-emp-email" class="sw-input" value="' + escapeHTML(item.email || '') + '"></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false) + '<select id="sw-edit-emp-dept" class="sw-select">' + deptOpts + '</select></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban'), false) + deptSelect + '</div>'
       + '<div>' + swLabel(swT('sw.step3_emp_position', 'Chức vụ'), false) + '<input type="text" id="sw-edit-emp-pos" class="sw-input" value="' + escapeHTML(item.position || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), true) + '<input type="date" id="sw-edit-emp-start" class="sw-input" value="' + escapeHTML(item.start_date || '') + '"></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true) + '<select id="sw-edit-emp-direct" class="sw-select">' + directOpts + '</select></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), false) + '<select id="sw-edit-emp-hr" class="sw-select">' + hrOpts + '</select></div>'
-      + '<div>' + swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp'), false) + '<input type="text" id="sw-edit-emp-emg-name" class="sw-input" value="' + escapeHTML(item.emergency_contact_name || '') + '"></div>'
-      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp'), false) + '<input type="text" id="sw-edit-emp-emg-phone" class="sw-input" value="' + escapeHTML(item.emergency_contact_phone || '') + '"></div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), true) + directSelect + '</div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_hr_mgr', 'Quản lý nhân sự'), false) + hrSelect + '</div>'
+      + '<div>' + swLabel(swT('sw.step3_emp_emg_name', 'Tên LH khẩn cấp', 'Emergency Contact Name'), false) + '<input type="text" id="sw-edit-emp-emg-name" class="sw-input" value="' + escapeHTML(item.emergency_contact_name || '') + '"></div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_emg_phone', 'SĐT LH khẩn cấp', 'Emergency Contact Phone'), false) + '<input type="text" id="sw-edit-emp-emg-phone" class="sw-input" value="' + escapeHTML(item.emergency_contact_phone || '') + '"></div>'
       + '</div>';
   } else if (type === 'policy') {
     title = (isVi ? 'Sửa thông tin quy trình #' : 'Edit Process #') + (index + 1);
@@ -4223,32 +4775,62 @@ window.editSetupParsedItem = function(type, index) {
       '<button type="button" class="sw-modal-tier-btn" data-lvl="' + l + '" onclick="window.handleEditPolLevelChange(\'' + l + '\')" style="padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid ' + (lvl === l ? '#ea580c' : '#D1D5DB') + ';background:' + (lvl === l ? '#ea580c' : '#FFFFFF') + ';color:' + (lvl === l ? '#FFFFFF' : '#374151') + ';">' + l + '</button>'
     ).join('');
 
-    // Department options for policy
-    const deptList = (window.setupParsedDepartments && window.setupParsedDepartments.length > 0)
-      ? window.setupParsedDepartments
-      : (window.setupWizardData?.departments || []);
-    let deptOpts = '<option value="">-- ' + (isVi ? 'Chọn phòng ban (tùy chọn)' : 'Select Department (Optional)') + ' --</option>';
-    for (const d of deptList) {
-      const code = d.department_code || d.code || '';
-      const name = d.department_name || d.name || code;
-      const isSel = (item.department_id && (item.department_id === code || item.department_id === name || item.department_id === d.department_id));
-      deptOpts += '<option value="' + escapeHTML(code || name) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + name) + '</option>';
-    }
+    const leadSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-pol-lead',
+      category: 'employee',
+      value: item.policy_lead || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn Policy Lead (tùy chọn)' : 'Select Policy Lead'
+    });
 
-    const t1Opts = window.buildSetupEmployeeOptions(item.tier1_approval || 'Direct Manager', true);
-    const t2Opts = window.buildSetupEmployeeOptions(item.tier2_approval || '', false, isVi ? 'Chọn người duyệt Bậc 2' : 'Select Tier 2 Approver');
-    const t3Opts = window.buildSetupEmployeeOptions(item.tier3_approval || '', false, isVi ? 'Chọn người duyệt Bậc 3' : 'Select Tier 3 Approver');
-    const leadOpts = window.buildSetupEmployeeOptions(item.policy_lead || '', false, isVi ? 'Chọn Policy Lead (tùy chọn)' : 'Select Policy Lead (Optional)');
-    const ownerOpts = window.buildSetupEmployeeOptions(item.sr_owner || '', false, isVi ? 'Chọn SR Owner (tùy chọn)' : 'Select SR Owner (Optional)');
+    const ownerSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-pol-owner',
+      category: 'employee',
+      value: item.sr_owner || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn SR Owner (tùy chọn)' : 'Select SR Owner'
+    });
+
+    const deptSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-pol-dept',
+      category: 'department',
+      value: item.department_id || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn phòng ban (tùy chọn)' : 'Select Department'
+    });
+
+    const t1Select = window.renderSwSearchableSelect({
+      id: 'sw-edit-pol-t1',
+      category: 'employee_with_dm',
+      value: item.tier1_approval || 'Direct Manager',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn người duyệt Bậc 1' : 'Select Tier 1 Approver'
+    });
+
+    const t2Select = window.renderSwSearchableSelect({
+      id: 'sw-edit-pol-t2',
+      category: 'employee',
+      value: item.tier2_approval || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn người duyệt Bậc 2' : 'Select Tier 2 Approver'
+    });
+
+    const t3Select = window.renderSwSearchableSelect({
+      id: 'sw-edit-pol-t3',
+      category: 'employee',
+      value: item.tier3_approval || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn người duyệt Bậc 3' : 'Select Tier 3 Approver'
+    });
 
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       + '<input type="hidden" id="sw-edit-pol-level" value="' + escapeHTML(lvl) + '">'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step4_policy_name', 'Tên quy trình'), true) + '<input type="text" id="sw-edit-pol-name" class="sw-input" value="' + escapeHTML(item.policy_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step4_policy_type', 'Loại'), false) + '<select id="sw-edit-pol-type" class="sw-select">' + typeOpts + '</select></div>'
-      + '<div>' + swLabel(swT('sw.step4_sla', 'SLA (ngày)'), false) + '<input type="number" min="1" id="sw-edit-pol-sla" class="sw-input" value="' + escapeHTML(String(item.sla || 3)) + '"></div>'
-      + '<div>' + swLabel(isVi ? 'Policy Lead (Trưởng QT)' : 'Policy Lead', false) + '<select id="sw-edit-pol-lead" class="sw-select">' + leadOpts + '</select></div>'
-      + '<div>' + swLabel(isVi ? 'SR Owner (Người xử lý)' : 'SR Owner', false) + '<select id="sw-edit-pol-owner" class="sw-select">' + ownerOpts + '</select></div>'
-      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban phụ trách'), false) + '<select id="sw-edit-pol-dept" class="sw-select">' + deptOpts + '</select></div>'
+      + '<div>' + swLabel(swT('sw.step4_sla', 'SLA (days)'), false) + '<input type="number" min="1" id="sw-edit-pol-sla" class="sw-input" value="' + escapeHTML(String(item.sla || 3)) + '"></div>'
+      + '<div>' + swLabel(isVi ? 'Policy Lead (Trưởng QT)' : 'Policy Lead', false) + leadSelect + '</div>'
+      + '<div>' + swLabel(isVi ? 'SR Owner (Người xử lý)' : 'SR Owner', false) + ownerSelect + '</div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step3_emp_dept', 'Phòng ban phụ trách'), false) + deptSelect + '</div>'
       + '<div style="grid-column:span 2;">' + swLabel(swT('sw.step4_desc_field', 'Mô tả'), false) + '<textarea id="sw-edit-pol-desc" class="sw-input" rows="2" style="resize:vertical;">' + escapeHTML(item.description || '') + '</textarea></div>'
       + '<div style="grid-column:span 2;padding:12px;border:1px solid #E5E7EB;border-radius:10px;background:#F9FAFB;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
@@ -4261,24 +4843,45 @@ window.editSetupParsedItem = function(type, index) {
       + '</div>'
       + '<div id="sw-edit-pol-t1-cont" style="margin-top:8px;display:' + (lvl === 'Tier 0' ? 'none' : 'block') + ';">'
       + swLabel(swT('sw.step4_tier1', 'Bậc 1 (Tier 1)'), true)
-      + '<select id="sw-edit-pol-t1" class="sw-select">' + t1Opts + '</select>'
+      + t1Select
       + '</div>'
       + '<div id="sw-edit-pol-t2-cont" style="margin-top:8px;display:' + (lvl === 'Tier 2' || lvl === 'Tier 3' ? 'block' : 'none') + ';">'
       + swLabel(swT('sw.step4_tier2', 'Bậc 2 (Tier 2)'), true)
-      + '<select id="sw-edit-pol-t2" class="sw-select">' + t2Opts + '</select>'
+      + t2Select
       + '</div>'
       + '<div id="sw-edit-pol-t3-cont" style="margin-top:8px;display:' + (lvl === 'Tier 3' ? 'block' : 'none') + ';">'
       + swLabel(swT('sw.step4_tier3', 'Bậc 3 (Tier 3)'), true)
-      + '<select id="sw-edit-pol-t3" class="sw-select">' + t3Opts + '</select>'
+      + t3Select
       + '</div>'
       + '<div style="font-size:11px;color:#6B7280;margin-top:8px;line-height:1.5;">* ' + (isVi ? 'Duy nhất Bậc 1 hỗ trợ Direct Manager. Các bậc khác và người phụ trách chọn trực tiếp từ nhân viên.' : 'Only Tier 1 supports Direct Manager. Other tiers and leads are selected from employees.') + '</div>'
       + '</div>'
       + '</div>';
   } else if (type === 'account') {
     title = (isVi ? 'Sửa thông tin tài khoản #' : 'Edit Account #') + (index + 1);
-    const compOpts = window.buildSetupCompanyOptions(item.company_entity || '', isVi ? 'Chọn pháp nhân (từ Bước 1)' : 'Select Company Entity (Step 1)');
-    const mgrOpts = window.buildSetupEmployeeOptions(item.transaction_managed_by || '', false, isVi ? 'Chọn quản lý giao dịch (từ Bước 3)' : 'Select Trans. Manager (Step 3)');
-    const finOpts = window.buildSetupEmployeeOptions(item.finance_control || '', false, isVi ? 'Chọn kiểm soát tài chính (từ Bước 3)' : 'Select Fin. Control (Step 3)');
+
+    const compSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-acct-comp',
+      category: 'company',
+      value: item.company_entity || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn pháp nhân (Bước 1)' : 'Select Company Entity (Step 1)'
+    });
+
+    const transSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-acct-trans',
+      category: 'employee',
+      value: item.transaction_managed_by || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn QL Giao dịch (Bước 3)' : 'Select Trans. Manager (Step 3)'
+    });
+
+    const finSelect = window.renderSwSearchableSelect({
+      id: 'sw-edit-acct-fin',
+      category: 'employee',
+      value: item.finance_control || '',
+      inputClass: 'sw-select',
+      placeholder: isVi ? 'Chọn Kiểm soát TC (Bước 3)' : 'Select Fin. Control (Step 3)'
+    });
 
     fieldsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       + '<div>' + swLabel('Account ID', false) + '<input type="text" id="sw-edit-acct-id" class="sw-input" value="' + escapeHTML(item.account_id || '') + '"></div>'
@@ -4289,9 +4892,9 @@ window.editSetupParsedItem = function(type, index) {
       + '<div>' + swLabel(swT('sw.step5_acct_num', 'Số tài khoản'), false) + '<input type="text" id="sw-edit-acct-num" class="sw-input" value="' + escapeHTML(item.account_number || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.step5_bank', 'Ngân hàng'), false) + '<input type="text" id="sw-edit-acct-bank" class="sw-input" value="' + escapeHTML(item.bank_name || '') + '"></div>'
       + '<div>' + swLabel(swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate'), false) + '<input type="number" step="any" id="sw-edit-acct-rate" class="sw-input" value="' + escapeHTML(String(item.exchange_rate || 1)) + '"></div>'
-      + '<div>' + swLabel(swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), false) + '<select id="sw-edit-acct-trans" class="sw-select">' + mgrOpts + '</select></div>'
-      + '<div>' + swLabel(swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), false) + '<select id="sw-edit-acct-fin" class="sw-select">' + finOpts + '</select></div>'
-      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.account_entity', 'Pháp nhân công ty', 'Company Entity'), false) + '<select id="sw-edit-acct-comp" class="sw-select">' + compOpts + '</select></div>'
+      + '<div>' + swLabel(swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), false) + transSelect + '</div>'
+      + '<div>' + swLabel(swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), false) + finSelect + '</div>'
+      + '<div style="grid-column:span 2;">' + swLabel(swT('sw.account_entity', 'Pháp nhân công ty', 'Company Entity'), false) + compSelect + '</div>'
       + '</div>';
   }
 
@@ -4365,8 +4968,12 @@ window.saveSwParsedEditModal = function(type, index) {
       renderSetupContent();
     }
   } else if (type === 'employee') {
+    const compId = document.getElementById('sw-edit-emp-company')?.value?.trim() || '';
+    const empCode = document.getElementById('sw-edit-emp-code')?.value?.trim() || '';
+    const nickName = document.getElementById('sw-edit-emp-nick')?.value?.trim() || '';
     const fullName = document.getElementById('sw-edit-emp-name')?.value?.trim();
     const username = document.getElementById('sw-edit-emp-user')?.value?.trim();
+    const pass = document.getElementById('sw-edit-emp-pass')?.value?.trim() || '';
     const email = document.getElementById('sw-edit-emp-email')?.value?.trim();
     if (!fullName || !username || !email) {
       showToast(swT('form.required_field', 'Vui lòng điền đủ Họ tên, Username và Email'), 'warning');
@@ -4393,8 +5000,12 @@ window.saveSwParsedEditModal = function(type, index) {
 
       window.setupParsedEmployees[index] = {
         ...window.setupParsedEmployees[index],
+        company_id: compId,
+        employee_code: empCode,
+        nick_name: nickName,
         full_name: fullName,
         username: username,
+        password: pass,
         email: email,
         department_code: deptCode,
         department_name: deptName,

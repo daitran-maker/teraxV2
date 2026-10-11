@@ -39,6 +39,14 @@ class PaymentService {
       }
     }
 
+    // 4b. Submitted payment (status 121) cannot be edited unless resetting to Draft (30) after request withdrawal
+    if (isEdit && oldRecord) {
+      const oldStatus = Number(oldRecord.payment_status);
+      if (oldStatus === 121 && Number(data.payment_status) !== 30) {
+        throw new Error('Chỉ có thể chỉnh sửa thanh toán khi ở trạng thái Draft hoặc sau khi đã withdraw yêu cầu.');
+      }
+    }
+
     // 5. Total payment check against contract
     const contractId = data.contract_id !== undefined ? data.contract_id : (oldRecord ? oldRecord.contract_id : null);
     if (contractId && dbClient) {

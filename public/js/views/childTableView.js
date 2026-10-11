@@ -583,7 +583,8 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
               actionText = typeof t === 'function' ? t('action.commented', 'commented') : 'commented';
               const cmtText = parsed.comment_text || (changesObj && changesObj.comment ? (changesObj.comment.new || changesObj.comment) : '');
               if (cmtText) {
-                detailsHtml = `<div style="margin-top:4px; padding:6px 10px; background:#F8FAFC; border-radius:6px; border-left:3px solid var(--accent); color:var(--text-primary); font-size:12px; white-space:pre-wrap;">${escapeHTML(String(cmtText).trim())}</div>`;
+                const formattedCmt = typeof formatCommentWithI18n === 'function' ? formatCommentWithI18n(String(cmtText).trim()) : escapeHTML(String(cmtText).trim());
+                detailsHtml = `<div style="margin-top:4px; padding:6px 10px; background:#F8FAFC; border-radius:6px; border-left:3px solid var(--accent); color:var(--text-primary); font-size:12px; white-space:pre-wrap;">${formattedCmt}</div>`;
               }
             } else if (actionText.toLowerCase().includes('approved') || actionText.toLowerCase().includes('rejected') || actionText.toLowerCase().includes('phê duyệt')) {
               const isApprove = !actionText.toLowerCase().includes('reject');
@@ -1306,7 +1307,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
           const authorName = empObj ? empObj.full_name : (empMap[createdByKey] || cmt.created_by || 'System');
           const authorInitial = authorName.substring(0, 1).toUpperCase();
           const date = formatDateTime(cmt.comment_date || cmt.created_date) || '';
-          const content = escapeHTML(cmt.comment || '');
+          const content = typeof formatCommentWithI18n === 'function' ? formatCommentWithI18n(cmt.comment || '') : escapeHTML(cmt.comment || '');
           let attachmentsHtml = '';
           if (cmt.file || cmt.link) {
             attachmentsHtml += `<div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">`;
@@ -1395,7 +1396,11 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   </div>
                 </div>
                 ${toTags}
-                <div style="font-size:13px; color:#374151; line-height:1.6; white-space:pre-wrap; padding-left:42px;">${content}</div>
+                ${(() => {
+                  const hasTable = /<table[\s>]/i.test(content);
+                  const contentStyle = `font-size:13px; color:#374151; line-height:1.6; padding-left:42px; ${hasTable ? 'white-space:normal; overflow-x:auto;' : 'white-space:pre-wrap;'}`;
+                  return `<div style="${contentStyle}">${content}</div>`;
+                })()}
                 ${attachmentsHtml}
               </div>
             `;
@@ -1501,27 +1506,142 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             ? isChildTableActionAllowed(childKey, 'edit', effectiveParentKey)
             : (parentKey === 'contract' ? ['payment', 'invoice'].includes(childKey) : (parentKey === 'account' ? childKey === 'mtr' : (parentKey === 'my_company' ? true : (parentKey === 'company' ? (childKey === 'contact' && isChildTableActionAllowed(childKey, 'edit', parentKey)) : false)))));
 
+          const isAmountColumnKey = (k) => {
+            const key = String(k || '').toLowerCase();
+            if (key.includes('type') || key.includes('rate') || key.includes('date') || key.includes('id') || key.includes('code') || key.includes('number') || key.includes('status') || key.includes('method') || key.includes('term')) return false;
+            return key.includes('amount') || key.includes('value') || key.includes('cost') || key.includes('price') || key.includes('balance') || key.includes('total') || key.includes('vat');
+          };
+
+          const resolveDerivedRowAmounts = (cKey, r) => {
+            const res = { ...r };
+            const rate = parseFloat(r.exchange_rate) || 1;
+            if (cKey === 'contract') {
+              const vBef = parseFloat(r.value_before_vat) || 0;
+              const vat = parseFloat(r.vat_value) || 0;
+              if (res.total_value === undefined || res.total_value === null || res.total_value === '') {
+                res.total_value = vBef + vat;
+              }
+              if (res.value_before_vat_in_base_currency === undefined || res.value_before_vat_in_base_currency === null || res.value_before_vat_in_base_currency === '') {
+                res.value_before_vat_in_base_currency = vBef * rate;
+              }
+              if (res.vat_value_in_base_currency === undefined || res.vat_value_in_base_currency === null || res.vat_value_in_base_currency === '') {
+                res.vat_value_in_base_currency = vat * rate;
+              }
+              if (res.total_value_in_base_currency === undefined || res.total_value_in_base_currency === null || res.total_value_in_base_currency === '') {
+                res.total_value_in_base_currency = (parseFloat(res.total_value) || (vBef + vat)) * rate;
+              }
+            } else if (cKey === 'invoice') {
+              const vBef = parseFloat(r.value_before_vat) || 0;
+              const vat = parseFloat(r.vat_value) || 0;
+              const val = parseFloat(r.value) || 0;
+              if (res.total_value === undefined || res.total_value === null || res.total_value === '') {
+                res.total_value = (vBef + vat > 0) ? (vBef + vat) : val;
+              }
+              if (res.value_in_base_currency === undefined || res.value_in_base_currency === null || res.value_in_base_currency === '') {
+                res.value_in_base_currency = val * rate;
+              }
+              if (res.total_value_in_base_currency === undefined || res.total_value_in_base_currency === null || res.total_value_in_base_currency === '') {
+                res.total_value_in_base_currency = (parseFloat(res.total_value) || val) * rate;
+              }
+            } else if (cKey === 'expense') {
+              const val = parseFloat(r.value) || 0;
+              const vat = parseFloat(r.vat_value) || 0;
+              if (res.total_value === undefined || res.total_value === null || res.total_value === '') {
+                res.total_value = val + vat;
+              }
+              if (res.value_in_base_currency === undefined || res.value_in_base_currency === null || res.value_in_base_currency === '') {
+                res.value_in_base_currency = val * rate;
+              }
+              if (res.total_value_in_base_currency === undefined || res.total_value_in_base_currency === null || res.total_value_in_base_currency === '') {
+                res.total_value_in_base_currency = (parseFloat(res.total_value) || val) * rate;
+              }
+            } else if (cKey === 'payment') {
+              const val = parseFloat(r.value) || 0;
+              if (res.value_in_base_currency === undefined || res.value_in_base_currency === null || res.value_in_base_currency === '') {
+                res.value_in_base_currency = val * rate;
+              }
+            }
+            return res;
+          };
+
+          const preparedData = data.map(r => resolveDerivedRowAmounts(childKey, r));
+
+          const renderChildTableFooters = (cKey, colsList, rowsList, hasActions, isDark = false) => {
+            if (!['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(cKey) || rowsList.length === 0) {
+              return '';
+            }
+            const bgFoot = isDark ? 'var(--bg-card)' : '#F8FAFC';
+            const textCol = isDark ? 'var(--text-primary)' : '#1E293B';
+            const textMuted = isDark ? 'var(--text-muted)' : '#64748B';
+            const borderTop = isDark ? '2px solid var(--border)' : '2px solid #CBD5E1';
+            const borderSub = isDark ? '1px solid var(--border-light)' : '1px solid #E2E8F0';
+            const shadow = isDark ? '0 -3px 8px rgba(0,0,0,0.3)' : '0 -3px 8px rgba(0,0,0,0.08)';
+
+            if (cKey === 'payment') {
+              const outgoingRows = rowsList.filter(r => String(r.payment_type) === '61' || String(r.payment_type).toLowerCase() === 'outgoing');
+              const incomingRows = rowsList.filter(r => String(r.payment_type) === '60' || String(r.payment_type).toLowerCase() === 'incoming');
+
+              const renderPaymentTypeRow = (label, pRows, isFirst) => `
+                <tr style="border-top: ${isFirst ? borderTop : borderSub}; background: ${bgFoot}; font-weight: 700;">
+                  ${hasActions ? `<td style="padding: 9px 14px; background: inherit;"></td>` : ''}
+                  ${colsList.map((c, colIdx) => {
+                    if (isAmountColumnKey(c.key)) {
+                      const sum = pRows.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+                      return `<td style="padding: 9px 14px; font-size: 13px; color: ${textCol}; font-weight: 700; white-space: nowrap; background: inherit;">${formatNumber(Math.round(sum))}</td>`;
+                    }
+                    if (colIdx === 0) {
+                      return `<td style="padding: 9px 14px; font-size: 11px; font-weight: 700; color: ${textMuted}; text-transform: uppercase; white-space: nowrap; background: inherit;">${escapeHTML(label)}</td>`;
+                    }
+                    return `<td style="padding: 9px 14px; background: inherit;"></td>`;
+                  }).join('')}
+                </tr>
+              `;
+
+              return `
+                <tfoot style="position: sticky; bottom: 0; z-index: 10; background: ${bgFoot}; box-shadow: ${shadow};">
+                  ${renderPaymentTypeRow((typeof t === 'function' ? t('col.total_outgoing', 'Total Outgoing') : 'Total Outgoing'), outgoingRows, true)}
+                  ${renderPaymentTypeRow((typeof t === 'function' ? t('col.total_incoming', 'Total Incoming') : 'Total Incoming'), incomingRows, false)}
+                </tfoot>
+              `;
+            }
+
+            return `
+              <tfoot style="position: sticky; bottom: 0; z-index: 10; background: ${bgFoot}; box-shadow: ${shadow};">
+                <tr style="border-top: ${borderTop}; background: ${bgFoot}; font-weight: 700;">
+                  ${hasActions ? `<td style="padding: 10px 14px; background: inherit;"></td>` : ''}
+                  ${colsList.map((c, colIdx) => {
+                    if (isAmountColumnKey(c.key)) {
+                      const sum = rowsList.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+                      return `<td style="padding: 10px 14px; font-size: 13px; color: ${textCol}; font-weight: 700; white-space: nowrap; background: inherit;">${formatNumber(Math.round(sum))}</td>`;
+                    }
+                    if (colIdx === 0) {
+                      return `<td style="padding: 10px 14px; font-size: 11px; font-weight: 700; color: ${textMuted}; text-transform: uppercase; white-space: nowrap; background: inherit;">Total</td>`;
+                    }
+                    return `<td style="padding: 10px 14px; background: inherit;"></td>`;
+                  }).join('')}
+                </tr>
+              </tfoot>
+            `;
+          };
+
           html = `
                  <style>
                    .child-table-row:hover {
                      background-color: #F8FAFC !important;
                    }
                  </style>
-                 <div class="table-responsive" style="margin: 0; overflow-x: auto; width:100%; border: none; border-radius: 0; background: transparent; box-shadow: none;">
-                   <table class="table modern-table" style="width: 100%; min-width: max-content; border-collapse: collapse; margin: 0;">
-                     <thead>
+                 <div class="table-responsive" style="margin: 0; overflow-x: auto; overflow-y: auto; max-height: 480px; width:100%; border: none; border-radius: 0; background: transparent; box-shadow: none; position: relative;">
+                   <table class="table modern-table" style="width: 100%; min-width: max-content; border-collapse: separate; border-spacing: 0; margin: 0;">
+                     <thead style="position: sticky; top: 0; z-index: 6; background: #F8FAFC;">
                        <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
-                         ${allowChildActions ? `<th style="padding: 12px 14px; text-align: center; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; width: 50px;">${t('col.actions', 'Actions')}</th>` : ''}
-                         ${cols.map(c => `<th style="padding: 12px 14px; text-align: left; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap;">${escapeHTML(t(c.labelKey || ('col.' + c.key), c.label))}</th>`).join('')}
+                         ${allowChildActions ? `<th style="padding: 12px 14px; text-align: center; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; width: 50px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">${t('col.actions', 'Actions')}</th>` : ''}
+                         ${cols.map(c => `<th style="padding: 12px 14px; text-align: left; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">${escapeHTML(t(c.labelKey || ('col.' + c.key), c.label))}</th>`).join('')}
                        </tr>
                      </thead>
                      <tbody>
-                       ${data.map(row => {
+                       ${preparedData.map(row => {
               const pkVal = row[mod.pk];
               const resolvedRow = { ...row };
-              if (childKey === 'contract') {
-                resolvedRow.total_value = (parseFloat(row.value_before_vat) || 0) + (parseFloat(row.vat_value) || 0);
-              }
               cols.forEach(c => {
                 const virtualVal = typeof resolveVirtualColumn === 'function' ? resolveVirtualColumn(childKey, c.key, row) : undefined;
                 if (virtualVal !== undefined) {
@@ -1577,6 +1697,16 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   }
                 }
 
+                if (c.key === 'sla' || c.key === 'policy_sla') {
+                  if (val !== undefined && val !== null && val !== '') {
+                    const cleanVal = String(val).replace(/\s*(days?|d|ngày)\s*$/i, '').trim();
+                    const numVal = Number(cleanVal !== '' ? cleanVal : val);
+                    displayVal = !isNaN(numVal) ? (numVal % 1 === 0 ? String(numVal) : String(Number(numVal.toFixed(2)))) : String(cleanVal || val);
+                  } else {
+                    displayVal = typeof t === 'function' ? t('badge.sla_na', 'Không áp dụng SLA') : 'Không áp dụng SLA';
+                  }
+                }
+
                 if ((c.key === 'point' || c.key === 'rating_point') && (childKey === 'request_rating' || childKey === 'rating')) {
                   const pointVal = parseInt(val) || 0;
                   let starsHTML = '';
@@ -1593,7 +1723,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   cellContentHTML = val !== undefined && val !== null ? String(val) : '';
                 } else if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
                   let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
-                  if (c.key === 'payment_type') {
+                  if (c.key === 'payment_status' && (val === 121 || val === '121' || String(val) === '121')) {
+                    translatedVal = typeof t === 'function' ? t('val.submitted_for_payment', 'Submitted for Payment') : 'Submitted for Payment';
+                  } else if (c.key === 'payment_type') {
                     if (val === '60' || Number(val) === 60 || String(val).toLowerCase() === 'incoming') translatedVal = (typeof t === 'function' ? t('status.incoming', 'Incoming') : 'Incoming');
                     else if (val === '61' || Number(val) === 61 || String(val).toLowerCase() === 'outgoing') translatedVal = (typeof t === 'function' ? t('status.outgoing', 'Outgoing') : 'Outgoing');
                   }
@@ -1617,128 +1749,218 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                          `;
             }).join('')}
                      </tbody>
-                     ${['mtr', 'contract', 'payment', 'invoice', 'expense'].includes(childKey) && data.length > 0 ? `
-                     <tfoot>
-                       <tr style="border-top: 2px solid #E2E8F0; background: #F8FAFC; font-weight: 700;">
-                         ${allowChildActions ? `<td style="padding: 10px 14px;"></td>` : ''}
-                         ${cols.map((c, colIdx) => {
-                           const k = String(c.key).toLowerCase();
-                           const isAmountCol = ['amount', 'amount_in_base_currency', 'total_value', 'value', 'total_value_in_base_currency', 'balance'].includes(k);
-                           if (isAmountCol) {
-                             const sum = data.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
-                             return `<td style="padding: 10px 14px; font-size: 13px; color: #1E293B; font-weight: 700; white-space: nowrap;">${formatNumber(Math.round(sum))}</td>`;
-                           }
-                           if (colIdx === 0) {
-                             return `<td style="padding: 10px 14px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase;">Total</td>`;
-                           }
-                           return `<td style="padding: 10px 14px;"></td>`;
-                         }).join('')}
-                       </tr>
-                     </tfoot>
-                     ` : ''}
+                     ${renderChildTableFooters(childKey, cols, preparedData, allowChildActions, false)}
                    </table>
                  </div>
                `;
         } else {
+          const isAmountColumnKey = (k) => {
+            const key = String(k || '').toLowerCase();
+            if (key.includes('type') || key.includes('rate') || key.includes('date') || key.includes('id') || key.includes('code') || key.includes('number') || key.includes('status') || key.includes('method') || key.includes('term')) return false;
+            return key.includes('amount') || key.includes('value') || key.includes('cost') || key.includes('price') || key.includes('balance') || key.includes('total') || key.includes('vat');
+          };
+
+          const resolveDerivedRowAmounts = (cKey, r) => {
+            const res = { ...r };
+            const rate = parseFloat(r.exchange_rate) || 1;
+            if (cKey === 'contract') {
+              const vBef = parseFloat(r.value_before_vat) || 0;
+              const vat = parseFloat(r.vat_value) || 0;
+              if (res.total_value === undefined || res.total_value === null || res.total_value === '') {
+                res.total_value = vBef + vat;
+              }
+              if (res.value_before_vat_in_base_currency === undefined || res.value_before_vat_in_base_currency === null || res.value_before_vat_in_base_currency === '') {
+                res.value_before_vat_in_base_currency = vBef * rate;
+              }
+              if (res.vat_value_in_base_currency === undefined || res.vat_value_in_base_currency === null || res.vat_value_in_base_currency === '') {
+                res.vat_value_in_base_currency = vat * rate;
+              }
+              if (res.total_value_in_base_currency === undefined || res.total_value_in_base_currency === null || res.total_value_in_base_currency === '') {
+                res.total_value_in_base_currency = (parseFloat(res.total_value) || (vBef + vat)) * rate;
+              }
+            } else if (cKey === 'invoice') {
+              const vBef = parseFloat(r.value_before_vat) || 0;
+              const vat = parseFloat(r.vat_value) || 0;
+              const val = parseFloat(r.value) || 0;
+              if (res.total_value === undefined || res.total_value === null || res.total_value === '') {
+                res.total_value = (vBef + vat > 0) ? (vBef + vat) : val;
+              }
+              if (res.value_in_base_currency === undefined || res.value_in_base_currency === null || res.value_in_base_currency === '') {
+                res.value_in_base_currency = val * rate;
+              }
+              if (res.total_value_in_base_currency === undefined || res.total_value_in_base_currency === null || res.total_value_in_base_currency === '') {
+                res.total_value_in_base_currency = (parseFloat(res.total_value) || val) * rate;
+              }
+            } else if (cKey === 'expense') {
+              const val = parseFloat(r.value) || 0;
+              const vat = parseFloat(r.vat_value) || 0;
+              if (res.total_value === undefined || res.total_value === null || res.total_value === '') {
+                res.total_value = val + vat;
+              }
+              if (res.value_in_base_currency === undefined || res.value_in_base_currency === null || res.value_in_base_currency === '') {
+                res.value_in_base_currency = val * rate;
+              }
+              if (res.total_value_in_base_currency === undefined || res.total_value_in_base_currency === null || res.total_value_in_base_currency === '') {
+                res.total_value_in_base_currency = (parseFloat(res.total_value) || val) * rate;
+              }
+            } else if (cKey === 'payment') {
+              const val = parseFloat(r.value) || 0;
+              if (res.value_in_base_currency === undefined || res.value_in_base_currency === null || res.value_in_base_currency === '') {
+                res.value_in_base_currency = val * rate;
+              }
+            }
+            return res;
+          };
+
+          const preparedData = data.map(r => resolveDerivedRowAmounts(childKey, r));
+
+          const renderChildTableFooters = (cKey, colsList, rowsList, hasActions, isDark = true) => {
+            if (!['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(cKey) || rowsList.length === 0) {
+              return '';
+            }
+            const bgFoot = isDark ? 'var(--bg-card)' : '#F8FAFC';
+            const textCol = isDark ? 'var(--text-primary)' : '#1E293B';
+            const textMuted = isDark ? 'var(--text-muted)' : '#64748B';
+            const borderTop = isDark ? '2px solid var(--border)' : '2px solid #CBD5E1';
+            const borderSub = isDark ? '1px solid var(--border-light)' : '1px solid #E2E8F0';
+            const shadow = isDark ? '0 -3px 8px rgba(0,0,0,0.3)' : '0 -3px 8px rgba(0,0,0,0.08)';
+
+            if (cKey === 'payment') {
+              const outgoingRows = rowsList.filter(r => String(r.payment_type) === '61' || String(r.payment_type).toLowerCase() === 'outgoing');
+              const incomingRows = rowsList.filter(r => String(r.payment_type) === '60' || String(r.payment_type).toLowerCase() === 'incoming');
+
+              const renderPaymentTypeRow = (label, pRows, isFirst) => `
+                <tr style="border-top: ${isFirst ? borderTop : borderSub}; background: ${bgFoot}; font-weight: 700;">
+                  ${colsList.map((c, colIdx) => {
+                    if (isAmountColumnKey(c.key)) {
+                      const sum = pRows.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+                      return `<td style="padding: 9px 14px; font-size: 12px; color: ${textCol}; font-weight: 700; white-space: nowrap; background: inherit;">${formatNumber(Math.round(sum))}</td>`;
+                    }
+                    if (colIdx === 0) {
+                      return `<td style="padding: 9px 14px; font-size: 10px; font-weight: 700; color: ${textMuted}; text-transform: uppercase; white-space: nowrap; background: inherit;">${escapeHTML(label)}</td>`;
+                    }
+                    return `<td style="padding: 9px 14px; background: inherit;"></td>`;
+                  }).join('')}
+                </tr>
+              `;
+
+              return `
+                <tfoot style="position: sticky; bottom: 0; z-index: 10; background: ${bgFoot}; box-shadow: ${shadow};">
+                  ${renderPaymentTypeRow((typeof t === 'function' ? t('col.total_outgoing', 'Total Outgoing') : 'Total Outgoing'), outgoingRows, true)}
+                  ${renderPaymentTypeRow((typeof t === 'function' ? t('col.total_incoming', 'Total Incoming') : 'Total Incoming'), incomingRows, false)}
+                </tfoot>
+              `;
+            }
+
+            return `
+              <tfoot style="position: sticky; bottom: 0; z-index: 10; background: ${bgFoot}; box-shadow: ${shadow};">
+                <tr style="border-top: ${borderTop}; background: ${bgFoot}; font-weight: 700;">
+                  ${colsList.map((c, colIdx) => {
+                    if (isAmountColumnKey(c.key)) {
+                      const sum = rowsList.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+                      return `<td style="padding: 10px 14px; font-size: 12px; color: ${textCol}; font-weight: 700; white-space: nowrap; background: inherit;">${formatNumber(Math.round(sum))}</td>`;
+                    }
+                    if (colIdx === 0) {
+                      return `<td style="padding: 10px 14px; font-size: 10px; font-weight: 700; color: ${textMuted}; text-transform: uppercase; white-space: nowrap; background: inherit;">Total</td>`;
+                    }
+                    return `<td style="padding: 10px 14px; background: inherit;"></td>`;
+                  }).join('')}
+                </tr>
+              </tfoot>
+            `;
+          };
+
           html = `
                  <style>
                    .child-table-row:hover {
                      background-color: var(--bg-hover) !important;
                    }
                  </style>
-                 <div class="table-responsive" style="margin: 8px 0; overflow-x: auto; width:100%; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card);">
-                   <table class="table modern-table" style="width: 100%; border-collapse: collapse; margin: 0;">
-                     <thead>
+                 <div class="table-responsive" style="margin: 8px 0; overflow-x: auto; overflow-y: auto; max-height: 480px; width:100%; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); position: relative;">
+                   <table class="table modern-table" style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 0;">
+                     <thead style="position: sticky; top: 0; z-index: 6; background: var(--bg-card);">
                        <tr style="border-bottom: 1px solid var(--border);">
-                         ${cols.map(c => `<th style="padding: 10px 14px; text-align: left; font-size:10px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; white-space: nowrap;">${escapeHTML(t('col.' + c.key, c.label))}</th>`).join('')}
+                         ${cols.map(c => `<th style="padding: 10px 14px; text-align: left; font-size:10px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; white-space: nowrap; background: var(--bg-card); border-bottom: 1px solid var(--border);">${escapeHTML(t('col.' + c.key, c.label))}</th>`).join('')}
                        </tr>
                      </thead>
                      <tbody>
-                       ${data.map(row => {
-            const pkVal = row[mod.pk];
-            const resolvedRow = { ...row };
-            if (childKey === 'contract') {
-              resolvedRow.total_value = (parseFloat(row.value_before_vat) || 0) + (parseFloat(row.vat_value) || 0);
-            }
-            cols.forEach(c => {
-              const virtualVal = typeof resolveVirtualColumn === 'function' ? resolveVirtualColumn(childKey, c.key, row) : undefined;
-              if (virtualVal !== undefined) {
-                resolvedRow[c.key] = virtualVal;
-              } else {
-                resolvedRow[c.key] = resolveLookupValue(childKey, c.key, row[c.key]);
-              }
-            });
-
-            const rowClickTarget = childKey === 'opportunity_list' ? 'policy' : childKey;
-
-            return `
-                           <tr onclick="window.location.hash = '${rowClickTarget}/${pkVal}'" style="cursor: pointer; border-bottom: 1px solid var(--border-light); transition: background 0.15s;" class="child-table-row">
-
-                             ${cols.map(c => {
-              let val = resolvedRow[c.key];
-              if (val === null || val === undefined) val = '';
-              const k = String(c.key).toLowerCase();
-              const l = String(c.label).toLowerCase();
-              let displayVal = String(val);
-
-              const isRequestChild = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(childKey);
-              if (isRequestChild && (c.type === 'date' || c.type === 'datetime' || ['date', 'due_date', 'payment_date', 'start_date', 'end_date', 'purchase_date', 'contract_signed_date', 'transaction_date', 'invoice_date', 'close_date', 'create_date', 'request_date'].includes(c.key) || c.key === 'log_time' || c.key === 'created_date' || c.key === 'updated_date' || k.endsWith('_date') || k.includes('date') || l.includes('date') || (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)))) {
-                displayVal = formatDateTime(val);
-              } else if (['date', 'due_date', 'payment_date', 'start_date', 'end_date', 'purchase_date', 'contract_signed_date', 'transaction_date', 'invoice_date', 'close_date', 'create_date', 'request_date'].includes(c.key) || c.type === 'date' || l === 'date' || l === 'transaction date' || (l.includes('date') && !['log_time', 'created_date', 'updated_date'].includes(c.key))) {
-                displayVal = formatDateMON(val);
-              } else if (c.key === 'log_time' || c.key === 'created_date' || c.key === 'updated_date') {
-                displayVal = formatDateTime(val);
-              } else if (k.endsWith('_date') || l.includes('date') || (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/))) {
-                displayVal = formatDateTime(val);
-              } else if (k.includes('rate')) {
-                displayVal = formatExchangeRate(val);
-              } else if ((k.includes('amount') || k.includes('price') || k.includes('cost') || k.includes('total') || k.includes('budget') || k.includes('tax') || k.includes('value') || k.includes('balance') || isNumericFieldKey(c.key, c.type)) && !k.includes('type')) {
-                if (childKey === 'finance' && (val === 0 || val === '0' || parseFloat(val) === 0 || val === '')) {
-                  displayVal = '';
+                       ${preparedData.map(row => {
+              const pkVal = row[mod.pk];
+              const resolvedRow = { ...row };
+              cols.forEach(c => {
+                const virtualVal = typeof resolveVirtualColumn === 'function' ? resolveVirtualColumn(childKey, c.key, row) : undefined;
+                if (virtualVal !== undefined) {
+                  resolvedRow[c.key] = virtualVal;
                 } else {
-                  displayVal = formatNumber(val);
+                  resolvedRow[c.key] = resolveLookupValue(childKey, c.key, row[c.key]);
                 }
-              }
+              });
 
-              if (childKey === 'target_table' && ['target', 'record_ids'].includes(c.key)) {
-                const titleAttr = escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim());
-                return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;" title="${titleAttr}">${val !== undefined && val !== null ? String(val) : ''}</td>`;
-              }
+              const rowClickTarget = childKey === 'opportunity_list' ? 'policy' : childKey;
 
-              if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
-                let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
-                if (c.key === 'payment_type') {
-                  if (val === '60' || Number(val) === 60 || String(val).toLowerCase() === 'incoming') translatedVal = (typeof t === 'function' ? t('status.incoming', 'Incoming') : 'Incoming');
-                  else if (val === '61' || Number(val) === 61 || String(val).toLowerCase() === 'outgoing') translatedVal = (typeof t === 'function' ? t('status.outgoing', 'Outgoing') : 'Outgoing');
+              return `
+                             <tr onclick="window.location.hash = '${rowClickTarget}/${pkVal}'" style="cursor: pointer; border-bottom: 1px solid var(--border-light); transition: background 0.15s;" class="child-table-row">
+
+                               ${cols.map(c => {
+                let val = resolvedRow[c.key];
+                if (val === null || val === undefined) val = '';
+                const k = String(c.key).toLowerCase();
+                const l = String(c.label).toLowerCase();
+                let displayVal = String(val);
+
+                const isRequestChild = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(childKey);
+                if (isRequestChild && (c.type === 'date' || c.type === 'datetime' || ['date', 'due_date', 'payment_date', 'start_date', 'end_date', 'purchase_date', 'contract_signed_date', 'transaction_date', 'invoice_date', 'close_date', 'create_date', 'request_date'].includes(c.key) || c.key === 'log_time' || c.key === 'created_date' || c.key === 'updated_date' || k.endsWith('_date') || k.includes('date') || l.includes('date') || (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)))) {
+                  displayVal = formatDateTime(val);
+                } else if (['date', 'due_date', 'payment_date', 'start_date', 'end_date', 'purchase_date', 'contract_signed_date', 'transaction_date', 'invoice_date', 'close_date', 'create_date', 'request_date'].includes(c.key) || c.type === 'date' || l === 'date' || l === 'transaction date' || (l.includes('date') && !['log_time', 'created_date', 'updated_date'].includes(c.key))) {
+                  displayVal = formatDateMON(val);
+                } else if (c.key === 'log_time' || c.key === 'created_date' || c.key === 'updated_date') {
+                  displayVal = formatDateTime(val);
+                } else if (k.endsWith('_date') || l.includes('date') || (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/))) {
+                  displayVal = formatDateTime(val);
+                } else if (k.includes('rate')) {
+                  displayVal = formatExchangeRate(val);
+                } else if ((k.includes('amount') || k.includes('price') || k.includes('cost') || k.includes('total') || k.includes('budget') || k.includes('tax') || k.includes('value') || k.includes('balance') || isNumericFieldKey(c.key, c.type)) && !k.includes('type')) {
+                  if (childKey === 'finance' && (val === 0 || val === '0' || parseFloat(val) === 0 || val === '')) {
+                    displayVal = '';
+                  } else {
+                    displayVal = formatNumber(val);
+                  }
                 }
-                return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;">${escapeHTML(translatedVal)}</td>`;
-              }
 
-              const display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
-              return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;" title="${escapeHTML(displayVal)}">${escapeHTML(display)}</td>`;
+                if (c.key === 'sla' || c.key === 'policy_sla') {
+                  if (val !== undefined && val !== null && val !== '') {
+                    const cleanVal = String(val).replace(/\s*(days?|d|ngày)\s*$/i, '').trim();
+                    const numVal = Number(cleanVal !== '' ? cleanVal : val);
+                    displayVal = !isNaN(numVal) ? (numVal % 1 === 0 ? String(numVal) : String(Number(numVal.toFixed(2)))) : String(cleanVal || val);
+                  } else {
+                    displayVal = typeof t === 'function' ? t('badge.sla_na', 'Không áp dụng SLA') : 'Không áp dụng SLA';
+                  }
+                }
+
+                if (childKey === 'target_table' && ['target', 'record_ids'].includes(c.key)) {
+                  const titleAttr = escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim());
+                  return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;" title="${titleAttr}">${val !== undefined && val !== null ? String(val) : ''}</td>`;
+                }
+
+                if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
+                  let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
+                  if (c.key === 'payment_status' && (val === 121 || val === '121' || String(val) === '121')) {
+                    translatedVal = typeof t === 'function' ? t('val.submitted_for_payment', 'Submitted for Payment') : 'Submitted for Payment';
+                  } else if (c.key === 'payment_type') {
+                    if (val === '60' || Number(val) === 60 || String(val).toLowerCase() === 'incoming') translatedVal = (typeof t === 'function' ? t('status.incoming', 'Incoming') : 'Incoming');
+                    else if (val === '61' || Number(val) === 61 || String(val).toLowerCase() === 'outgoing') translatedVal = (typeof t === 'function' ? t('status.outgoing', 'Outgoing') : 'Outgoing');
+                  }
+                  return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;">${escapeHTML(translatedVal)}</td>`;
+                }
+
+                const display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
+                return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;" title="${escapeHTML(displayVal)}">${escapeHTML(display)}</td>`;
+              }).join('')}
+                             </tr>
+                           `;
             }).join('')}
-                           </tr>
-                         `;
-          }).join('')}
                      </tbody>
-                     ${['mtr', 'contract', 'payment', 'invoice', 'expense'].includes(childKey) && data.length > 0 ? `
-                     <tfoot>
-                       <tr style="border-top: 2px solid var(--border); background: var(--bg-hover); font-weight: 700;">
-                         ${cols.map((c, colIdx) => {
-                           const k = String(c.key).toLowerCase();
-                           const isAmountCol = ['amount', 'amount_in_base_currency', 'total_value', 'value', 'total_value_in_base_currency', 'balance'].includes(k);
-                           if (isAmountCol) {
-                             const sum = data.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
-                             return `<td style="padding: 10px 14px; font-size: 12px; color: var(--text-primary); font-weight: 700; white-space: nowrap;">${formatNumber(Math.round(sum))}</td>`;
-                           }
-                           if (colIdx === 0) {
-                             return `<td style="padding: 10px 14px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total</td>`;
-                           }
-                           return `<td style="padding: 10px 14px;"></td>`;
-                         }).join('')}
-                       </tr>
-                     </tfoot>
-                     ` : ''}
+                     ${renderChildTableFooters(childKey, cols, preparedData, false, true)}
                    </table>
                  </div>
                `;

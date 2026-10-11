@@ -27,19 +27,36 @@ function markUserActive() {
   window.addEventListener(evt, markUserActive, { passive: true });
 });
 
+let syncBroadcastChannel = null;
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    syncBroadcastChannel = new BroadcastChannel('crc_sync_channel');
+    syncBroadcastChannel.onmessage = (event) => {
+      if (event.data && event.data.type === 'db_change' && event.data.payload) {
+        handleRealTimeUpdate(event.data.payload);
+      }
+    };
+  }
+} catch (e) {
+  console.warn('[Sync] BroadcastChannel not supported:', e);
+}
+
 // Tab visibility listener
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     isTabVisible = false;
-    console.log('[Sync] Tab hidden: pausing live UI updates');
+    console.log('[Sync] Tab hidden: releasing SSE connection to prevent socket pool starvation');
+    if (window.evtSource) {
+      try { window.evtSource.close(); } catch (e) {}
+      window.evtSource = null;
+    }
     updateSyncStatus(typeof t === 'function' ? t('sync.tab_hidden', 'Live paused (Tab hidden)') : 'Live paused (Tab hidden)', false, '#9ca3af');
   } else {
     isTabVisible = true;
-    console.log('[Sync] Tab visible again');
+    console.log('[Sync] Tab visible again: restoring live sync & refreshing');
     markUserActive();
-    if (hasPendingRealtimeUpdate) {
-      triggerCatchUpRefresh();
-    }
+    startAutoSync();
+    triggerCatchUpRefresh();
   }
 });
 
@@ -67,7 +84,14 @@ function triggerCatchUpRefresh() {
 }
 
 function startAutoSync() {
-  if (window.evtSource) window.evtSource.close();
+  if (document.hidden) {
+    console.log('[Sync] startAutoSync skipped while tab is hidden.');
+    return;
+  }
+  if (window.evtSource) {
+    try { window.evtSource.close(); } catch (e) {}
+    window.evtSource = null;
+  }
   const token = localStorage.getItem('crc_token');
   if (!token) return;
 
@@ -80,13 +104,23 @@ function startAutoSync() {
 
   window.evtSource.onerror = () => {
     updateSyncStatus(t('sync.offline', 'Live sync offline'), true);
-    window.evtSource.close();
-    setTimeout(startAutoSync, 5000);
+    if (window.evtSource) {
+      try { window.evtSource.close(); } catch (e) {}
+      window.evtSource = null;
+    }
+    if (!document.hidden) {
+      setTimeout(startAutoSync, 5000);
+    }
   };
 
   window.evtSource.addEventListener('db_change', (e) => {
     try {
       const payload = JSON.parse(e.data);
+      if (syncBroadcastChannel) {
+        try {
+          syncBroadcastChannel.postMessage({ type: 'db_change', payload });
+        } catch (bcErr) {}
+      }
       handleRealTimeUpdate(payload);
     } catch (err) {
       console.error(err);

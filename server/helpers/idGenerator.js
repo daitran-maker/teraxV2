@@ -40,6 +40,8 @@ async function generateSequentialId(tableName, client) {
   // Select all current IDs
   const result = await client.query(`SELECT "${pk}" FROM "${tableName}"`);
   
+  const existingSet = new Set(result.rows.map(row => String(row[pk] || '').trim().toLowerCase()));
+
   let maxSeq = 0;
   result.rows.forEach(row => {
     const val = row[pk];
@@ -63,8 +65,14 @@ async function generateSequentialId(tableName, client) {
     }
   }
 
-  const seqStr = config.padding ? String(nextSeq).padStart(config.padding, '0') : String(nextSeq);
-  return `${config.prefix}${seqStr}`;
+  let finalId;
+  do {
+    const seqStr = config.padding ? String(nextSeq).padStart(config.padding, '0') : String(nextSeq);
+    finalId = `${config.prefix}${seqStr}`;
+    nextSeq++;
+  } while (existingSet.has(finalId.toLowerCase()));
+
+  return finalId;
 }
 
 module.exports = {

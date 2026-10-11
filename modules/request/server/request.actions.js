@@ -233,6 +233,40 @@ async function withdrawRequest({ client, record, record_id, user, action_id, dat
         JSON.stringify([logEntry])
       ]
     );
+
+    // Reset linked payments back to Draft (30) so they can be edited again
+    try {
+      const resetPayRes = await client.query(`
+        UPDATE payment 
+        SET payment_status = 30 
+        WHERE (payment_request = $1 OR (request = $1 AND payment_status = 121)) 
+          AND deleted_at IS NULL
+        RETURNING payment_id, payment_request, request, contract_id, payment_status
+      `, [record_id]);
+
+      if (resetPayRes.rows && resetPayRes.rows.length > 0) {
+        resetPayRes.rows.forEach(pRow => {
+          try {
+            broadcastSSE('db_change', {
+              action: 'update',
+              table: 'payment',
+              id: pRow.payment_id,
+              record: {
+                payment_id: pRow.payment_id,
+                payment_status: 30,
+                payment_request: pRow.payment_request,
+                request: pRow.request,
+                contract_id: pRow.contract_id
+              }
+            });
+          } catch (sseErr) {
+            console.warn('Failed to broadcast SSE for reset payment:', sseErr);
+          }
+        });
+      }
+    } catch (payResetErr) {
+      console.warn('Failed to reset linked payments on withdraw_request:', payResetErr);
+    }
 }
 
 async function approveOrRejectRequest({ client, record, record_id, user, action_id, data }) {

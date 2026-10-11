@@ -76,12 +76,7 @@ function calculateRequestSLA(r, customPolicySLA = null) {
   const durationHours = diffMs / (1000 * 60 * 60);
   const durationDays = durationHours / 24;
 
-  let durationFormatted = '';
-  if (durationDays >= 1) {
-    durationFormatted = `${durationDays.toFixed(2)} ${unitDay} (${durationHours.toFixed(1)} ${unitHour})`;
-  } else {
-    durationFormatted = `${durationHours.toFixed(2)} ${unitHour} (${durationDays.toFixed(2)} ${unitDay})`;
-  }
+  let durationFormatted = `${durationDays.toFixed(2)} ${unitDay}`;
 
   if (!hasSLA) {
     return {
@@ -174,16 +169,19 @@ function fieldContainsEmail(value, email) {
 }
 
 function shouldHideRequestEditDeleteActions(moduleKey) {
-  const normKey = String(moduleKey || '').toLowerCase();
-  const requestViews = ['my_approval', 'my_process_owner', 'my_task', 'my_team', 'request', 'my_request'];
-  // If this check is for a child element module (not the request container itself), don't hide its actions
-  if (normKey && !requestViews.includes(normKey)) {
+  const requestViews = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'];
+  const targetMod = String(moduleKey || '').toLowerCase();
+  
+  // If target is not a request module (e.g. child elements: payment, invoice, mtr, expense, etc.), do NOT hide child actions
+  if (!requestViews.includes(targetMod)) {
     return false;
   }
-  const hashModule = window.location.hash.replace('#', '').split('/')[0];
-  return [normKey, hashModule, currentModule]
-    .map(v => String(v || '').toLowerCase())
-    .some(v => ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(v));
+
+  const hashModule = window.location.hash.replace('#', '').split('/')[0].toLowerCase();
+  const currentMod = String(window.currentModule || '').toLowerCase();
+  return ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(targetMod) ||
+         ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(hashModule) ||
+         ['my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentMod);
 }
 
 function shouldHideRequestDynamicAction(moduleKey, actionId) {

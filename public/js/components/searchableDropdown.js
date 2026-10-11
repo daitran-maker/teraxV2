@@ -460,6 +460,7 @@ window.initializeSearchableDropdowns = function (container = document) {
         const filtered = Array.from(select.options).filter(opt => {
           if (opt.value === '') return false;
           const labelMatch = opt.textContent.toLowerCase().includes(q);
+          const valueMatch = opt.value.toLowerCase().includes(q);
           const typeMatch = (opt.dataset.type || '').toLowerCase().includes(q);
           const nameMatch = (opt.dataset.name || '').toLowerCase().includes(q);
           const descMatch = (opt.dataset.desc || '').toLowerCase().includes(q);

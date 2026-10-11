@@ -521,6 +521,26 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+window.escapeHTML = escapeHTML;
+
+// Helper to format comment text resolving {{i18nKey::fallback}} dynamic tokens with t()
+function formatCommentWithI18n(str) {
+  if (str === null || str === undefined) return '';
+  const resolved = String(str).replace(/\{\{([a-zA-Z0-9_\-\.]+)(?:::([^}]+))?\}\}/g, (match, key, fallback) => {
+    if (typeof t === 'function') {
+      return t(key, fallback !== undefined ? fallback : key);
+    }
+    return fallback !== undefined ? fallback : key;
+  });
+  if (/<(table|thead|tbody|tfoot|tr|td|th|div|span|b|strong|i|em|br|hr)\b/i.test(resolved)) {
+    return resolved
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+  }
+  return escapeHTML(resolved);
+}
+window.formatCommentWithI18n = formatCommentWithI18n;
 
 // Helper to handle PostgreSQL bytea Buffer objects sent as JSON
 function parseBufferVal(val) {

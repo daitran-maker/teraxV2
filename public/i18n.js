@@ -106,7 +106,7 @@ function t_val(value) {
     // service.status
     '26': 'not_started_yet', '27': 'on_going', '28': 'going_to_expired', '29': 'expired',
     // payment.payment_status
-    '30': 'draft', '31': 'ready_for_payment', '32': 'paid', '33': 'deleted',
+    '30': 'draft', '31': 'ready_for_payment', '32': 'paid', '33': 'deleted', '121': 'submitted_for_payment',
     // invoice.invoice_status
     '34': 'draft', '35': 'ready_to_issue', '36': 'issued', '37': 'paid', '38': 'void', '39': 'deleted',
     // cms_tenant_info.billing_status

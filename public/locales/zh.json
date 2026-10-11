@@ -506,6 +506,8 @@
   "val.standard": "标准",
   "val.subcription": "订阅",
   "val.submit": "已提交",
+  "val.submitted": "已提交",
+  "val.submitted_for_payment": "已提交付款",
   "val.subscription": "订阅",
   "val.target_table": "目标表",
   "val.updated": "已更新",
