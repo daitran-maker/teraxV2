@@ -32,6 +32,14 @@ class PaymentService {
         throw new Error("Payment Type must be either 'Outgoing' or 'Incoming'.");
       }
     }
+
+    // 4. Submitted payment (status 121) cannot be edited unless resetting to Draft (30) after request withdrawal
+    if (isEdit && oldRecord) {
+      const oldStatus = Number(oldRecord.payment_status);
+      if (oldStatus === 121 && Number(data.payment_status) !== 30) {
+        throw new Error('Chỉ có thể chỉnh sửa thanh toán khi ở trạng thái Draft hoặc sau khi đã withdraw yêu cầu.');
+      }
+    }
   }
 
   async getPayment(id) {

@@ -69,7 +69,19 @@ function getApprovalStatusForUser(record) {
   if (record.tier_3_approval && [email, empId, username].includes(record.tier_3_approval.toLowerCase().trim())) {
     return mapStatus(record.tier_3_status);
   }
-  return 'N/A';
+  return 'Not started yet';
+}
+
+function getHighestTierApprovalStatusLabel(record) {
+  const srNum = Number(record?.sr_status);
+  const srKey = String(record?.sr_status_key || record?.sr_status || '').toLowerCase().trim();
+  if (srNum === 2 || srKey === 'pending_approval' || srKey === 'submitted' || srKey === 'pending approval' || srKey === 'pending') {
+    return 'Pending Approval';
+  }
+  if (srNum === 3 || srKey === 'approved') return 'Approved';
+  if (srNum === 4 || srKey === 'rejected') return 'Rejected';
+  if (srNum === 1 || srKey === 'draft') return 'Draft';
+  return 'Not started yet';
 }
 
 function getHighestTierApprovalStatus(record) {
@@ -476,6 +488,11 @@ function buildFilterSidebar(viewKey, data) {
   };
 
   if (viewKey === 'my_request') {
+    // Approval Status filter
+    const appCounts = {};
+    data.forEach(r => { const s = getHighestTierApprovalStatusLabel(r); appCounts[s] = (appCounts[s] || 0) + 1; });
+    filterGroups.push({ key: 'approval_status', label: typeof t === 'function' ? t('col.approval_flow', 'Approval Status') : 'Approval Status', values: appCounts });
+
     // SR Status filter
     const srCounts = {};
     data.forEach(r => { const s = getNormalizedSrStatus(r); srCounts[s] = (srCounts[s] || 0) + 1; });
@@ -498,7 +515,11 @@ function buildFilterSidebar(viewKey, data) {
     // Approval Status filter (synchronized with the top KPI cards)
     const appCounts = {};
     data.forEach(r => {
-      const s = r._cache?.approvalStatus || getApprovalStatusForUser(r);
+      let s = r._cache?.approvalStatus || getApprovalStatusForUser(r);
+      if (s === 'Pending Approval' || s === 'Pending' || s === 'pending_approval' || s === '2' || s === 2) s = 'Pending Approval';
+      else if (s === 'Approved' || s === 'approved' || s === '3' || s === 3) s = 'Approved';
+      else if (s === 'Rejected' || s === 'rejected' || s === '4' || s === 4) s = 'Rejected';
+      else s = 'Not started yet';
       appCounts[s] = (appCounts[s] || 0) + 1;
     });
     filterGroups.push({ key: 'approval_status', label: typeof t === 'function' ? t('col.approval_flow', 'Approval Status') : 'Approval Status', values: appCounts });
@@ -635,13 +656,18 @@ function getDashboardFilterValue(viewKey, row, filterKey) {
     return ['Not started yet', '7', 'not_started', 'not started yet', 'not started', row.process_status];
   }
   if (filterKey === 'approval_status') {
-    const s = row._cache?.approvalStatus || getApprovalStatusForUser(row);
-    if (s === 'Pending Approval' || s === 'Pending' || s === 'pending_approval' || s === '2' || s === 2) {
-      return ['Pending Approval', 'Pending', 'pending_approval', '2', s];
+    if (viewKey === 'my_approval') {
+      const s = row._cache?.approvalStatus || getApprovalStatusForUser(row);
+      if (s === 'Pending Approval' || s === 'Pending' || s === 'pending_approval' || s === '2' || s === 2) {
+        return ['Pending Approval', 'Pending', 'pending_approval', '2', s];
+      }
+      if (s === 'Approved' || s === 'approved' || s === '3' || s === 3) return ['Approved', 'approved', '3', s];
+      if (s === 'Rejected' || s === 'rejected' || s === '4' || s === 4) return ['Rejected', 'rejected', '4', s];
+      return ['Not started yet', 'not_started', s];
+    } else {
+      const s = getHighestTierApprovalStatusLabel(row);
+      return [s, s.toLowerCase()];
     }
-    if (s === 'Approved' || s === 'approved' || s === '3' || s === 3) return ['Approved', 'approved', '3', s];
-    if (s === 'Rejected' || s === 'rejected' || s === '4' || s === 4) return ['Rejected', 'rejected', '4', s];
-    return ['Not started yet', 'not_started', s];
   }
   if (filterKey === 'rating_status') {
     return row._cache?.ratingStatus || ((row.rating && typeof row.rating === 'object' && row.rating.point !== undefined && row.rating.point !== null) ? 'Rated' : 'Pending Rating');
@@ -842,6 +868,18 @@ window.handleKpiCardFilterClick = function (viewKey, cardKey) {
     dashboardFilters[filterKey].clear();
     dashboardFilters[filterKey].add(cardKey);
   }
+
+  // Also sync approval_status in my_request if matching
+  if (viewKey === 'my_request') {
+    if (['Pending Approval', 'Approved', 'Rejected', 'Draft'].includes(cardKey)) {
+      if (dashboardFilters[filterKey] && dashboardFilters[filterKey].has(cardKey)) {
+        dashboardFilters['approval_status'] = new Set([cardKey]);
+      } else {
+        delete dashboardFilters['approval_status'];
+      }
+    }
+  }
+
   savePersistedFilters(viewKey);
   currentDashboardPage = 1;
   applyDashboardFilters(viewKey);
@@ -927,6 +965,13 @@ function applyDashboardFilters(viewKey) {
   const statusContainer = document.querySelector(`#view-${viewKey} .dv-status-cards-outer`);
   if (statusContainer) {
     statusContainer.innerHTML = statusCardsHTML;
+  }
+
+  // Update filter sidebar checkboxes and counts to reflect current filtered state
+  const sidebarContainer = document.getElementById(`dv-filter-sidebar-${viewKey}`);
+  if (sidebarContainer) {
+    const rawAllData = (typeof dashboardData !== 'undefined' && Array.isArray(dashboardData)) ? dashboardData : [];
+    sidebarContainer.innerHTML = buildFilterSidebar(viewKey, rawAllData);
   }
 
   // Render pagination controls

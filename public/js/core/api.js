@@ -34,12 +34,26 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(API_BASE + endpoint, {
-    method,
-    headers,
-    cache: 'no-store',
-    body: body ? JSON.stringify(body) : null
-  });
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : null;
+
+  let res;
+  try {
+    res = await fetch(API_BASE + endpoint, {
+      method,
+      headers,
+      cache: 'no-store',
+      signal: controller ? controller.signal : undefined,
+      body: body ? JSON.stringify(body) : null
+    });
+  } catch (fetchErr) {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (fetchErr && fetchErr.name === 'AbortError') {
+      throw new Error(`Request timed out after 15s: ${endpoint}`);
+    }
+    throw fetchErr;
+  }
+  if (timeoutId) clearTimeout(timeoutId);
 
   const text = await res.text();
 

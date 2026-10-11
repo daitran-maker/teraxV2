@@ -1079,7 +1079,12 @@ async function cleanEmptyStringsForTable(tableName, data) {
           lowerType.includes('bool')
         ) {
           data[col] = null;
+          continue;
         }
+      }
+      // Also clean empty string foreign keys / reference columns to null
+      if (col.endsWith('_id') || col === 'request' || col === 'contract_id' || col === 'payment_id' || col === 'invoice_id' || col === 'id__request') {
+        data[col] = null;
       }
     }
   }
@@ -1186,7 +1191,7 @@ async function isUserNamedOnRequest(targetRequest, user) {
   if (userIds.length === 0) return false;
 
   const roleName = String(user.role || '').toUpperCase();
-  if (roleName === 'SUPER ADMIN') {
+  if (roleName === 'SUPER ADMIN' || roleName === 'ADMINISTRATOR' || roleName === 'ADMIN' || roleName === 'HR') {
     return true;
   }
 
@@ -1315,13 +1320,15 @@ router.post('/:tableName/bulk', async (req, res) => {
     await client.query('BEGIN');
     await client.query("SELECT set_config('app.current_user', $1, true)", [userEmployeeId]);
 
+    const existingPksRes = await client.query(`SELECT "${pk}" FROM "${tableName}"`);
+    const existingPkSet = new Set(existingPksRes.rows.map(r => String(r[pk] || '').trim().toLowerCase()));
+
     let bulkIdCounter = null;
     let tableConfig = tableConfigs[tableName];
     if (tableConfig) {
       await client.query(`LOCK TABLE "${tableName}" IN SHARE ROW EXCLUSIVE MODE`);
-      const result = await client.query(`SELECT "${pk}" FROM "${tableName}"`);
       let maxSeq = 0;
-      result.rows.forEach(row => {
+      existingPksRes.rows.forEach(row => {
         const val = row[pk];
         if (val) {
           const match = String(val).match(tableConfig.regex);
@@ -1334,6 +1341,16 @@ router.post('/:tableName/bulk', async (req, res) => {
         }
       });
       bulkIdCounter = maxSeq;
+    }
+
+    let empEmailToId = new Map();
+    let empUsernames = new Set();
+    if (tableName === 'employee') {
+      const allEmpsRes = await client.query('SELECT employee_id, LOWER(email) as email, LOWER(username) as username FROM employee');
+      allEmpsRes.rows.forEach(r => {
+        if (r.email) empEmailToId.set(r.email.trim(), r.employee_id);
+        if (r.username) empUsernames.add(r.username.trim());
+      });
     }
 
     let emailToEmpId = null;
@@ -1398,19 +1415,53 @@ router.post('/:tableName/bulk', async (req, res) => {
         }
       }
 
-      // 2. PK Generation
-      if (!finalData[pk]) {
-        if (bulkIdCounter !== null) {
-          bulkIdCounter++;
-          const seqStr = tableConfig.padding ? String(bulkIdCounter).padStart(tableConfig.padding, '0') : String(bulkIdCounter);
-          finalData[pk] = `${tableConfig.prefix}${seqStr}`;
-        } else {
-          finalData[pk] = uuidv4();
+      // 2. PK & Collision Handling
+      if (tableName === 'employee') {
+        const cleanEmail = finalData.email ? String(finalData.email).trim().toLowerCase() : null;
+        if (cleanEmail && empEmailToId.has(cleanEmail)) {
+          // Existing employee matched by email -> update that record
+          finalData[pk] = empEmailToId.get(cleanEmail);
+        } else if (finalData[pk] && existingPkSet.has(String(finalData[pk]).trim().toLowerCase())) {
+          // Conflicting PK from Excel row index (e.g. 2, 3...) that belongs to someone else
+          finalData[pk] = null;
         }
       }
 
-      // 3. Audit Fields
-      // We only set created_by/updated_by if necessary, DB trigger handles dates and logs.
+      if (!finalData[pk]) {
+        if (bulkIdCounter !== null) {
+          let candId;
+          do {
+            bulkIdCounter++;
+            const seqStr = tableConfig.padding ? String(bulkIdCounter).padStart(tableConfig.padding, '0') : String(bulkIdCounter);
+            candId = `${tableConfig.prefix}${seqStr}`;
+          } while (existingPkSet.has(candId.toLowerCase()));
+          finalData[pk] = candId;
+          existingPkSet.add(candId.toLowerCase());
+        } else {
+          finalData[pk] = uuidv4();
+          existingPkSet.add(finalData[pk].toLowerCase());
+        }
+      }
+
+      // 3. Employee specific constraints
+      if (tableName === 'employee') {
+        if (findCol('app_user_enabled') && finalData.app_user_enabled === undefined) {
+          finalData.app_user_enabled = true;
+        }
+        let rawU = finalData.username || (finalData.email ? finalData.email.split('@')[0] : finalData[pk]);
+        if (rawU) {
+          let baseU = String(rawU).trim().toLowerCase();
+          let candU = baseU;
+          let sfx = 1;
+          while (empUsernames.has(candU)) {
+            candU = `${baseU}_${sfx++}`;
+          }
+          finalData.username = candU;
+          empUsernames.add(candU);
+        }
+      }
+
+      // 4. Audit Fields
       if (tableName === 'request_rating') {
         delete finalData.created_by;
         delete finalData.updated_by;
@@ -1424,7 +1475,14 @@ router.post('/:tableName/bulk', async (req, res) => {
       if (keys.length === 0) continue;
 
       const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-      const query = `INSERT INTO "${tableName}" (${keys.join(', ')}) VALUES (${placeholders})`;
+      const updateCols = keys.filter(k => k !== pk);
+      let query;
+      if (updateCols.length > 0) {
+        const updateSet = updateCols.map(k => `"${k}" = EXCLUDED."${k}"`).join(', ');
+        query = `INSERT INTO "${tableName}" (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders}) ON CONFLICT ("${pk}") DO UPDATE SET ${updateSet}`;
+      } else {
+        query = `INSERT INTO "${tableName}" (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders}) ON CONFLICT ("${pk}") DO NOTHING`;
+      }
       await client.query(query, keys.map(k => finalData[k]));
     }
     await client.query('COMMIT');
@@ -3302,7 +3360,7 @@ router.get('/:tableName/:id', async (req, res) => {
       const roleName = String(userForCheck.role || '').toUpperCase();
       const isSuperAdmin = roleName === 'SUPER ADMIN';
       const isAdmin = roleName === 'HR' || roleName === 'ADMINISTRATOR' || roleName === 'ADMIN';
-      if (userForCheck.employee_id) {
+      if (!isSuperAdmin && !isAdmin && userForCheck.employee_id) {
         const userEmployeeId = userForCheck.employee_id.toLowerCase();
         let targetRequest = null;
 

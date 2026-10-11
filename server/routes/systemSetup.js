@@ -3,6 +3,8 @@ const router = express.Router();
 const pool = require('../db');
 const https = require('https');
 const http = require('http');
+let bcrypt = null;
+try { bcrypt = require('bcryptjs'); } catch(e) {}
 
 const CMS_BASE_URL = process.env.CMS_BASE_URL || 'http://cms.terax.ai';
 
@@ -633,7 +635,20 @@ router.post('/import-employees', async (req, res) => {
       if (check.rows.length > 0) continue;
 
       const empId = await generateSequentialId('employee', client);
-      const username = String(emp.username != null ? emp.username : '').trim() || email.split('@')[0];
+      let username = String(emp.username != null ? emp.username : '').trim() || email.split('@')[0];
+      
+      // Ensure username uniqueness to prevent employee_username_unique_key violations
+      let uCandidate = username;
+      let uSuffix = 1;
+      while (true) {
+        const uCheck = await client.query('SELECT employee_id FROM employee WHERE LOWER(username) = LOWER($1)', [uCandidate]);
+        if (uCheck.rows.length === 0) {
+          username = uCandidate;
+          break;
+        }
+        uCandidate = `${username}_${uSuffix++}`;
+      }
+
       const position = String(emp.position != null ? emp.position : '').trim() || 'Nhân viên';
       const startDate = String(emp.start_date != null ? emp.start_date : '').trim() || new Date().toISOString().split('T')[0];
       const emgName = String(emp.emergency_contact_name != null ? emp.emergency_contact_name : '').trim() || null;
@@ -657,8 +672,8 @@ router.post('/import-employees', async (req, res) => {
         INSERT INTO employee (
           employee_id, username, full_name, email, position,
           department_id, company_id, role, status, start_date,
-          emergency_contact_name, emergency_contact_phone
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Staff', 17, $8, $9, $10)
+          emergency_contact_name, emergency_contact_phone, app_user_enabled
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Staff', 17, $8, $9, $10, true)
       `, [empId, username, fullName, email, position, deptId, companyId, startDate, emgName, emgPhone]);
 
       created.push({
@@ -831,6 +846,17 @@ router.post('/commit-draft', async (req, res) => {
         const rawEmpId = emp.employee_id != null ? String(emp.employee_id).trim() : null;
         const empCode = String(emp.employee_code || '').trim() || null;
         const nickName = String(emp.nick_name || '').trim() || null;
+        const rawPass = emp.password != null ? String(emp.password).trim() : '';
+        let hashedPassword = null;
+        if (rawPass) {
+          if (rawPass.startsWith('$2a$') || rawPass.startsWith('$2b$')) {
+            hashedPassword = rawPass;
+          } else if (bcrypt) {
+            hashedPassword = await bcrypt.hash(rawPass, 10);
+          } else {
+            hashedPassword = rawPass;
+          }
+        }
         const gen = String(emp.gen || '').trim() || null;
         const pos = String(emp.position || 'Nhân viên').trim();
         const role = String(emp.role || 'Staff').trim() || 'Staff';
@@ -854,20 +880,53 @@ router.post('/commit-draft', async (req, res) => {
         let targetEmpId = rawEmpId;
         let existEmp = null;
         if (targetEmpId) {
-          const check = await client.query('SELECT employee_id FROM employee WHERE employee_id = $1', [targetEmpId]);
-          if (check.rows.length > 0) existEmp = check.rows[0];
+          const check = await client.query('SELECT employee_id, email, username, full_name FROM employee WHERE employee_id = $1', [targetEmpId]);
+          if (check.rows.length > 0) {
+            const ex = check.rows[0];
+            const sameEmail = email && ex.email && ex.email.toLowerCase() === email.toLowerCase();
+            const sameUser = uName && ex.username && ex.username.toLowerCase() === uName.toLowerCase();
+            const sameName = fName && ex.full_name && ex.full_name.toLowerCase() === fName.toLowerCase();
+            if (sameEmail || sameUser || sameName || (!ex.email && !ex.username)) {
+              existEmp = ex;
+            } else {
+              // Colliding ID: User entered arbitrary row index (e.g. 2, 3...) that belongs to an existing user!
+              // Don't overwrite or collide; auto-generate a new unique sequential ID!
+              targetEmpId = null;
+            }
+          }
         }
         if (!existEmp && email) {
-          const check = await client.query('SELECT employee_id FROM employee WHERE LOWER(email) = LOWER($1)', [email]);
+          const check = await client.query('SELECT employee_id, email, username FROM employee WHERE LOWER(email) = LOWER($1)', [email]);
           if (check.rows.length > 0) existEmp = check.rows[0];
         }
         if (!existEmp && uName) {
-          const check = await client.query('SELECT employee_id FROM employee WHERE LOWER(username) = LOWER($1)', [uName]);
+          const check = await client.query('SELECT employee_id, email, username FROM employee WHERE LOWER(username) = LOWER($1)', [uName]);
           if (check.rows.length > 0) existEmp = check.rows[0];
         }
 
         if (existEmp) {
           targetEmpId = existEmp.employee_id;
+        } else if (!targetEmpId) {
+          targetEmpId = await generateSequentialId('employee', client);
+        }
+
+        // Ensure username is unique to prevent employee_username_unique_key duplicate key error
+        let finalUsername = uName || (email ? email.split('@')[0] : targetEmpId);
+        let uCandidate = finalUsername;
+        let uSuffix = 1;
+        while (true) {
+          const uCheck = await client.query(
+            'SELECT employee_id FROM employee WHERE LOWER(username) = LOWER($1) AND employee_id != $2',
+            [uCandidate, targetEmpId || '']
+          );
+          if (uCheck.rows.length === 0) {
+            finalUsername = uCandidate;
+            break;
+          }
+          uCandidate = `${finalUsername}_${uSuffix++}`;
+        }
+
+        if (existEmp) {
           await client.query(`
             UPDATE employee SET
               full_name = COALESCE($2, full_name),
@@ -883,17 +942,19 @@ router.post('/commit-draft', async (req, res) => {
               address = COALESCE($12, address),
               department_id = COALESCE($13, department_id),
               company_id = COALESCE($14, company_id),
-              status = $15
+              status = $15,
+              password = COALESCE($16, password),
+              app_user_enabled = true
             WHERE employee_id = $1
-          `, [targetEmpId, fName, uName || null, email, empCode, nickName, gen, pos, role, loc, phone, address, resolvedDeptId, empComp, status]);
+          `, [targetEmpId, fName, finalUsername, email, empCode, nickName, gen, pos, role, loc, phone, address, resolvedDeptId, empComp, status, hashedPassword]);
         } else {
-          if (!targetEmpId) targetEmpId = await generateSequentialId('employee', client);
+          const insertPass = hashedPassword || (bcrypt ? await bcrypt.hash('123456', 10) : '123456');
           await client.query(`
             INSERT INTO employee (
               employee_id, full_name, username, email, employee_code, nick_name, gen, position,
-              role, location_base, phone, address, department_id, company_id, status, start_date, app_user_enabled
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
-          `, [targetEmpId, fName, uName || (email ? email.split('@')[0] : targetEmpId), email, empCode, nickName, gen, pos, role, loc, phone, address, resolvedDeptId, empComp, status, startDate]);
+              role, location_base, phone, address, department_id, company_id, status, start_date, password, app_user_enabled
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true)
+          `, [targetEmpId, fName, finalUsername, email, empCode, nickName, gen, pos, role, loc, phone, address, resolvedDeptId, empComp, status, startDate, insertPass]);
         }
 
         createdEmployees.push({

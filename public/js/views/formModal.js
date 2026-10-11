@@ -4,6 +4,9 @@
  * Contains openAddModal, openEditModal, buildFormHTML, renderFieldHTML, form submission, and field handlers
  */
 
+var currentFormModuleKey = null;
+window.currentFormModuleKey = null;
+
 async function handleOperationProgramCompanyChange() {
   const companySelect = document.getElementById('f-company_id');
   const deptSelect = document.getElementById('f-department_id');
@@ -111,6 +114,8 @@ window.handleContractNoValidation = function () {
 };
 
 async function openAddModal(moduleKey, initialData = null) {
+  currentFormModuleKey = moduleKey;
+  window.currentFormModuleKey = moduleKey;
   try {
     const mod = MODULES[moduleKey];
     const isRequestForm = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
@@ -398,7 +403,10 @@ async function openAddModal(moduleKey, initialData = null) {
 
 
 async function openEditModal(moduleKey, pkVal) {
+  currentFormModuleKey = moduleKey;
+  window.currentFormModuleKey = moduleKey;
   try {
+    console.log('openEditModal:', moduleKey, pkVal);
     if (shouldHideRequestEditDeleteActions(moduleKey)) {
       return;
     }
@@ -606,6 +614,10 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
     }
   } else if (!isEdit && field.defaultValue !== undefined) {
     val = typeof field.defaultValue === 'function' ? field.defaultValue() : field.defaultValue;
+  }
+
+  if (typeof val === 'string' && (field.key === 'sla' || field.key === 'policy_sla' || field.type === 'number')) {
+    val = val.replace(/\s*(days?|d|ngày)\s*$/i, '').trim();
   }
 
   if (typeof val === 'object' && val !== null && !field.arrayField && !(val instanceof Array)) {
@@ -3212,8 +3224,10 @@ async function submitAdd(moduleKey, extraData = {}) {
       } else if (['permissions', 'exception_rules', 'action_rules', 'account'].includes(moduleKey)) {
         await refreshTableData(moduleKey, true);
       } else {
-        const pkField = mod.pk;
-        if (newRecord && newRecord[pkField]) {
+        const pkField = mod ? mod.pk : 'id';
+        if (currentView === 'table' || !currentView) {
+          await refreshTableData(currentModule || moduleKey, true);
+        } else if (newRecord && newRecord[pkField] && currentView !== 'table') {
           let targetModule = moduleKey;
           if (moduleKey === 'request' && ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule)) {
             targetModule = currentModule;

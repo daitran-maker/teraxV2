@@ -1954,12 +1954,27 @@ async function initDb() {
   BEGIN
     CREATE OR REPLACE FUNCTION public.sync_request_and_source_from_contract()
     RETURNS TRIGGER AS $sync_req$
+    DECLARE
+        v_req TEXT;
     BEGIN
+        IF NEW.contract_id IS NOT NULL AND TRIM(NEW.contract_id::text) = '' THEN
+            NEW.contract_id := NULL;
+        END IF;
+
+        IF NEW.request IS NOT NULL AND TRIM(NEW.request::text) = '' THEN
+            NEW.request := NULL;
+        END IF;
+
         IF NEW.contract_id IS NOT NULL THEN
-            SELECT request INTO NEW.request FROM public.contract WHERE contract_id = NEW.contract_id;
-            NEW.source := 'Contract';
+            SELECT request INTO v_req FROM public.contract WHERE contract_id = NEW.contract_id;
+            IF v_req IS NOT NULL AND TRIM(v_req) <> '' THEN
+                NEW.request := v_req;
+            END IF;
+            IF NEW.source IS NULL OR TRIM(NEW.source) = '' THEN
+                NEW.source := 'Contract';
+            END IF;
         ELSE
-            IF NEW.source IS NULL THEN
+            IF NEW.source IS NULL OR TRIM(NEW.source) = '' THEN
                 NEW.source := 'Request';
             END IF;
         END IF;

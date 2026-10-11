@@ -3632,14 +3632,15 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
 
     if (col.key === 'sla' || col.key === 'policy_sla') {
       let tdStyle = getStickyTableColumnStyle(moduleKey, col.key, false, mod);
+      const headerLabel = (typeof t === 'function' ? t(col.labelKey || ('col.' + col.key), col.label || 'SLA (days)') : (col.label || 'SLA (days)'));
       if (val !== undefined && val !== null && val !== '') {
-        const numVal = Number(val);
-        const unitDay = typeof t === 'function' ? t('unit.days', 'd') : 'd';
-        const disp = !isNaN(numVal) ? `${numVal.toFixed(2)} ${unitDay}` : String(val);
-        return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle} font-size: 12px; white-space: nowrap;">${escapeHTML(disp)}</td>`;
+        const cleanVal = String(val).replace(/\s*(days?|d|ngày)\s*$/i, '').trim();
+        const numVal = Number(cleanVal !== '' ? cleanVal : val);
+        const disp = !isNaN(numVal) ? (numVal % 1 === 0 ? String(numVal) : String(Number(numVal.toFixed(2)))) : String(cleanVal || val);
+        return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(headerLabel)}" style="${tdStyle} font-size: 12px; white-space: nowrap;">${escapeHTML(disp)}</td>`;
       } else {
         const naText = typeof t === 'function' ? t('badge.sla_na', 'Không áp dụng SLA') : 'Không áp dụng SLA';
-        return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" style="${tdStyle} color: #94A3B8; font-size: 12px; white-space: nowrap;">${escapeHTML(naText)}</td>`;
+        return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(headerLabel)}" style="${tdStyle} color: #94A3B8; font-size: 12px; white-space: nowrap;">${escapeHTML(naText)}</td>`;
       }
     }
 
@@ -3673,6 +3674,11 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
         if (col.key === 'payment_type') {
           if (part === '60' || Number(part) === 60 || String(part).toLowerCase() === 'incoming') return (typeof t === 'function' ? t('status.incoming', 'Incoming') : 'Incoming');
           if (part === '61' || Number(part) === 61 || String(part).toLowerCase() === 'outgoing') return (typeof t === 'function' ? t('status.outgoing', 'Outgoing') : 'Outgoing');
+        }
+        if (col.key === 'payment_status') {
+          if (part === '121' || Number(part) === 121 || String(part).toLowerCase() === 'submitted_for_payment') {
+            return (typeof t === 'function' ? t('val.submitted_for_payment', 'Submitted for Payment') : 'Submitted for Payment');
+          }
         }
         return (typeof t_val === 'function') ? t_val(part) : String(part);
       }).join(', ');
@@ -4013,7 +4019,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
 
     if (canEdit) {
       allItems.push(`
-        <button class="row-action-dropdown-item is-edit" onclick="closeRowActionDropdown(); openEditModal('${moduleKey}', '${pkVal}')">
+        <button class="row-action-dropdown-item is-edit" onclick="event.stopPropagation(); const _mk='${moduleKey}', _pv='${pkVal}'; closeRowActionDropdown(); setTimeout(() => { if (typeof openEditModal === 'function') openEditModal(_mk, _pv); else if (typeof window.openEditModal === 'function') window.openEditModal(_mk, _pv); }, 20);">
           <span class="material-symbols-rounded" style="font-size:15px;">edit</span>
           <span>${(typeof t === 'function') ? t('detail.edit', 'Edit') : 'Edit'}</span>
         </button>
@@ -4033,7 +4039,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
 
     if (canDuplicate) {
       allItems.push(`
-        <button class="row-action-dropdown-item" onclick="closeRowActionDropdown(); duplicateRecord('${moduleKey}', '${pkVal}')">
+        <button class="row-action-dropdown-item" onclick="event.stopPropagation(); const _mk='${moduleKey}', _pv='${pkVal}'; closeRowActionDropdown(); setTimeout(() => { if (typeof duplicateRecord === 'function') duplicateRecord(_mk, _pv); else if (typeof window.duplicateRecord === 'function') window.duplicateRecord(_mk, _pv); }, 20);">
           <span class="material-symbols-rounded" style="font-size:15px;">content_copy</span>
           <span>${(typeof t === 'function') ? t('detail.duplicate', 'Duplicate') : 'Duplicate'}</span>
         </button>
@@ -4057,7 +4063,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
           : `<span class="material-symbols-rounded" style="font-size:15px;">${act.icon || 'play_circle'}</span>`;
 
         allItems.push(`
-          <button class="${itemClass}" onclick="executeRowAction('${actionId}', '${moduleKey}', '${pkVal}')">
+          <button class="${itemClass}" onclick="event.stopPropagation(); const _aid='${actionId}', _mk='${moduleKey}', _pv='${pkVal}'; closeRowActionDropdown(); setTimeout(() => { if (typeof executeRowAction === 'function') executeRowAction(_aid, _mk, _pv); }, 20);">
             ${iconHTML}
             <span>${label}</span>
           </button>
@@ -4071,7 +4077,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
       } else {
         const displayName = record ? (mod && mod.displayName ? mod.displayName(record) : pkVal) : pkVal;
         allItems.push(`
-          <button class="row-action-dropdown-item is-danger" onclick="closeRowActionDropdown(); confirmDelete('${moduleKey}', '${pkVal}', '${String(displayName).replace(/'/g, "\\'")}')">
+          <button class="row-action-dropdown-item is-danger" onclick="event.stopPropagation(); const _mk='${moduleKey}', _pv='${pkVal}', _dn='${String(displayName).replace(/'/g, "\\'")}'; closeRowActionDropdown(); setTimeout(() => { confirmDelete(_mk, _pv, _dn); }, 20);">
             <span class="material-symbols-rounded" style="font-size:15px;">delete</span>
             <span>Delete</span>
           </button>
@@ -4079,7 +4085,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
         const isSuperAdmin = authUser && authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN';
         if (isSuperAdmin) {
           allItems.push(`
-            <button class="row-action-dropdown-item is-danger" style="background:#FFF5F5; border-top:1px solid #FFEBEB;" onclick="closeRowActionDropdown(); confirmHardDelete('${moduleKey}', '${pkVal}', '${String(displayName).replace(/'/g, "\\'")}')">
+            <button class="row-action-dropdown-item is-danger" style="background:#FFF5F5; border-top:1px solid #FFEBEB;" onclick="event.stopPropagation(); const _mk='${moduleKey}', _pv='${pkVal}', _dn='${String(displayName).replace(/'/g, "\\'")}'; closeRowActionDropdown(); setTimeout(() => { confirmHardDelete(_mk, _pv, _dn); }, 20);">
               <span class="material-symbols-rounded" style="font-size:15px; color:#EF4444;">delete_forever</span>
               <span style="color:#EF4444; font-weight:600;">Hard Delete</span>
             </button>

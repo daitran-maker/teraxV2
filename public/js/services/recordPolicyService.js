@@ -76,12 +76,7 @@ function calculateRequestSLA(r, customPolicySLA = null) {
   const durationHours = diffMs / (1000 * 60 * 60);
   const durationDays = durationHours / 24;
 
-  let durationFormatted = '';
-  if (durationDays >= 1) {
-    durationFormatted = `${durationDays.toFixed(2)} ${unitDay} (${durationHours.toFixed(1)} ${unitHour})`;
-  } else {
-    durationFormatted = `${durationHours.toFixed(2)} ${unitHour} (${durationDays.toFixed(2)} ${unitDay})`;
-  }
+  let durationFormatted = `${durationDays.toFixed(2)} ${unitDay}`;
 
   if (!hasSLA) {
     return {

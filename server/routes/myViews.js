@@ -252,6 +252,7 @@ router.get('/stats/summary', async (req, res) => {
         FROM request r 
         WHERE r.sr_status NOT IN (1, 4, 5, 6)
           ${isSuperAdmin ? '' : 'AND r.deleted_at IS NULL'}
+          AND jsonb_typeof(r.approval_flow->'steps') = 'array'
           AND EXISTS (
             SELECT 1 
             FROM jsonb_array_elements(r.approval_flow->'steps') AS step 
@@ -371,6 +372,7 @@ router.get('/:viewType', async (req, res) => {
         LEFT JOIN policy_and_program p ON r.request_type = p.policy_id::text
         WHERE r.sr_status != 1
           ${isSuperAdmin ? '' : 'AND r.deleted_at IS NULL'}
+          AND jsonb_typeof(r.approval_flow->'steps') = 'array'
           AND (
             EXISTS (
               SELECT 1

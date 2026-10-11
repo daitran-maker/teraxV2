@@ -8,6 +8,18 @@
 // DETAIL VIEW
 // ============================================================
 async function openDetailView(moduleKey, pkVal) {
+  if (!moduleKey || !pkVal) return;
+  const nonNavigableModules = ['cms_country', 'cms_province', 'cms_city', 'cms_currency', 'account_currency', 'country', 'currency', 'province', 'city', 'location', 'my_location', 'employee', 'employee_active', 'helpdesk_policy'];
+  if (nonNavigableModules.includes(moduleKey) || !MODULES[moduleKey] || !MODULES[moduleKey].pk) {
+    console.warn(`[openDetailView] Navigation prevented for non-navigable module: ${moduleKey}`);
+    return;
+  }
+  const mod = MODULES[moduleKey];
+  if ((!mod.fields || mod.fields.length === 0) && (!mod.columns || mod.columns.length === 0) && (!mod.detailFields || mod.detailFields.length === 0)) {
+    console.warn(`[openDetailView] Module ${moduleKey} has no detail view config.`);
+    return;
+  }
+
   // Save scroll position
   const viewEl = document.getElementById(`view-${moduleKey}`);
   if (viewEl) {
@@ -24,8 +36,17 @@ async function openDetailView(moduleKey, pkVal) {
 
 async function openDetailInternal(moduleKey, pkVal, force = false, silent = false, skipFetch = false) {
   updateGlobalStatusCards('');
+  const nonNavigableModules = ['cms_country', 'cms_province', 'cms_city', 'cms_currency', 'account_currency', 'country', 'currency', 'province', 'city', 'location', 'my_location'];
+  if (!moduleKey || nonNavigableModules.includes(moduleKey)) {
+    console.warn(`[openDetailInternal] Navigation ignored for non-navigable module: ${moduleKey}`);
+    return;
+  }
   const mod = MODULES[moduleKey];
   const content = document.getElementById('content');
+  if (!mod || !mod.pk || ((!mod.fields || mod.fields.length === 0) && (!mod.columns || mod.columns.length === 0) && (!mod.detailFields || mod.detailFields.length === 0))) {
+    console.warn(`[openDetailInternal] Module ${moduleKey} has no detail view config.`);
+    return;
+  }
 
   // Nhớ tab hiện tại trước khi vẽ lại để tránh mất tab đang mở (tránh giật lag và chuyển về tab mặc định)
   const activeTabBtn = content.querySelector('.detail-tab.active');
@@ -2731,6 +2752,10 @@ function buildDetailViewHTML(moduleKey, record) {
       if (f.key && f.key.startsWith('tier_1_') && level < 1) continue;
       if (f.key && f.key.startsWith('tier_2_') && level < 2) continue;
       if (f.key && f.key.startsWith('tier_3_') && level < 3) continue;
+      if (f.key === 'process_duration') {
+        const isCompleted = Number(record.process_status) === 9 || String(record.process_status || '').toLowerCase() === 'completed' || !!record.process_end_date;
+        if (!isCompleted) continue;
+      }
 
       rows.push({ type: 'field', ...f });
       sectionHasFields = true;
@@ -2888,11 +2913,12 @@ function buildDetailViewHTML(moduleKey, record) {
       } else if (row.key === 'sla_status') {
         const slaInfo = calculateRequestSLA(record);
         val = slaInfo.badgeLabel;
-      } else if (row.key === 'policy_sla' || (row.key === 'sla' && moduleKey === 'policy')) {
+      } else if (row.key === 'policy_sla' || (row.key === 'sla' && moduleKey === 'policy') || row.key === 'sla') {
         let slaRaw = record.policy_sla !== undefined ? record.policy_sla : record.sla;
         if (slaRaw !== undefined && slaRaw !== null && slaRaw !== '') {
-          const numSla = Number(slaRaw);
-          val = !isNaN(numSla) ? `${numSla.toFixed(2)} ${typeof t === 'function' ? t('unit.days', 'd') : 'd'}` : String(slaRaw);
+          const cleanSla = String(slaRaw).replace(/\s*(days?|d|ngày)\s*$/i, '').trim();
+          const numSla = Number(cleanSla !== '' ? cleanSla : slaRaw);
+          val = !isNaN(numSla) ? (numSla % 1 === 0 ? String(numSla) : String(Number(numSla.toFixed(2)))) : String(cleanSla || slaRaw);
         } else {
           val = typeof t === 'function' ? t('badge.sla_na', 'Không áp dụng SLA') : 'Không áp dụng SLA';
         }
@@ -2980,6 +3006,9 @@ function buildDetailViewHTML(moduleKey, record) {
         .replace(/\bSr Owner\b/g, 'SR Owner')
         .replace(/\bSla\b/g, 'SLA')
         .replace(/\bSr\b/g, 'SR');
+      if (row.key === 'sla' && displayLabel.trim().toLowerCase() === 'sla') {
+        displayLabel = 'SLA (days)';
+      }
 
       let valHTML = '';
       if (val === null || val === undefined || val === '' || (typeof val === 'object' && Object.keys(val).length === 0 && !(val instanceof Date))) {
@@ -3132,9 +3161,17 @@ function buildDetailViewHTML(moduleKey, record) {
 
         let linkIcon = '';
         const targetOptionsFrom = (fieldCfg && fieldCfg.optionsFrom) || (colCfg && colCfg.optionsFrom) || (mod.fields && mod.fields.find(f => f.key === row.key)?.optionsFrom);
-        if (targetOptionsFrom && record[row.key] && targetOptionsFrom !== 'employee' && targetOptionsFrom !== 'employee_active' && targetOptionsFrom !== 'helpdesk_policy') {
-          const rawId = record[row.key];
-          linkIcon = `<span class="material-symbols-rounded" style="cursor:pointer; color:#2563EB; font-size:16px; margin-left:6px; vertical-align:middle; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="openDetailView('${targetOptionsFrom}', '${rawId}')" title="View Details">chevron_right</span>`;
+        const nonNavigableLookups = ['cms_country', 'cms_province', 'cms_city', 'cms_currency', 'account_currency', 'country', 'currency', 'province', 'city', 'location', 'my_location', 'employee', 'employee_active', 'helpdesk_policy'];
+        const rowKeyLower = String(row.key || '').toLowerCase();
+        const isExcludedKey = ['country', 'currency', 'id__currency', 'currency_code', 'country_code', 'province', 'city', 'location', 'my_location'].includes(rowKeyLower) || rowKeyLower.includes('country') || (rowKeyLower.includes('currency') && !rowKeyLower.includes('base_currency_val'));
+
+        const isProcessTypeField = ['request_type', 'policy_name'].includes(row.key) || (targetOptionsFrom === 'policy' && ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey));
+        if (targetOptionsFrom && record[row.key] && !nonNavigableLookups.includes(targetOptionsFrom) && !isExcludedKey && !isProcessTypeField) {
+          const targetMod = MODULES[targetOptionsFrom];
+          if (targetMod && targetMod.pk && ((targetMod.fields && targetMod.fields.length > 0) || (targetMod.detailFields && targetMod.detailFields.length > 0) || (targetMod.columns && targetMod.columns.length > 0))) {
+            const rawId = record[row.key];
+            linkIcon = `<span class="material-symbols-rounded" style="cursor:pointer; color:#2563EB; font-size:16px; margin-left:6px; vertical-align:middle; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="openDetailView('${targetOptionsFrom}', '${rawId}')" title="View Details">chevron_right</span>`;
+          }
         }
         if (moduleKey === 'payment' && row.key === 'my_company' && record.my_company) {
           linkIcon = `<span class="material-symbols-rounded" style="cursor:pointer; color:#2563EB; font-size:16px; margin-left:6px; vertical-align:middle; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="openDetailView('my_company', '${record.my_company}')" title="View Details">chevron_right</span>`;
