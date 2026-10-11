@@ -12,8 +12,8 @@
     pk: 'payment_id',
     icon: '💳',
     columns: [
-      { key: 'payment_period', label: 'Payment Period' },
-      { key: 'payment_description', label: 'Payment Description' },
+      { key: 'payment_period', label: 'Period', labelKey: 'col.period' },
+      { key: 'payment_description', label: 'Description', labelKey: 'col.description' },
       { key: 'counter_party', label: 'Pay to / Pay from', labelKey: 'col.pay_to_from' },
       { key: 'value', label: 'Value', labelKey: 'col.value', type: 'number' },
       { key: 'currency', label: 'Currency' },
@@ -31,8 +31,8 @@
     ],
     fields: [
       { section: 'payment summary' },
-      { key: 'payment_period', label: 'PAYMENT PERIOD', type: 'number', required: true, min: 1, step: 1, placeholder: 'Enter whole number (e.g. 30)' },
-      { key: 'payment_description', label: 'PAYMENT DESCRIPTION', type: 'textarea', full: true, required: true },
+      { key: 'payment_period', label: 'PERIOD', labelKey: 'col.period', type: 'number', required: true, min: 1, step: 1, placeholder: 'Enter whole number (e.g. 30)' },
+      { key: 'payment_description', label: 'DESCRIPTION', labelKey: 'col.description', type: 'textarea', full: true, required: true },
       { key: 'counter_party', label: 'PAY TO / COUNTER PARTY', labelKey: 'col.pay_to_from', type: 'counter_party', full: true },
       { key: 'value', label: 'VALUE', labelKey: 'col.value', type: 'text', onchange: 'handlePaymentValueChange()', required: true },
       { key: 'currency', label: 'CURRENCY', type: 'select', optionsFrom: 'account_currency', optionValue: 'code', optionLabel: 'label', onchange: 'handlePaymentValueChange()', required: true },
@@ -71,8 +71,8 @@
     ],
     detailFields: [
       { section: 'payment summary' },
-      { key: 'payment_period', label: 'PAYMENT PERIOD' },
-      { key: 'payment_description', label: 'PAYMENT DESCRIPTION', full: true },
+      { key: 'payment_period', label: 'PERIOD', labelKey: 'col.period' },
+      { key: 'payment_description', label: 'DESCRIPTION', labelKey: 'col.description', full: true },
       { key: 'counter_party', label: 'PAY TO', full: true },
       { key: 'value', label: 'VALUE', labelKey: 'col.value' },
       { key: 'currency', label: 'CURRENCY' },
