@@ -1648,8 +1648,8 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                      background-color: #F8FAFC !important;
                    }
                  </style>
-                 <div class="table-responsive" style="margin: 0; overflow-x: auto; overflow-y: auto; max-height: 480px; width:100%; border: none; border-radius: 0; background: transparent; box-shadow: none; position: relative;">
-                   <table class="table modern-table" style="width: 100%; min-width: max-content; border-collapse: separate; border-spacing: 0; margin: 0;">
+                 <div class="table-responsive child-table-scroll-wrap" style="margin: 0; flex: 1; height: 100%; min-height: 0; width: 100%; overflow-x: auto; overflow-y: auto; border: none; border-radius: 0; background: transparent; box-shadow: none; position: relative;">
+                   <table class="table modern-table" style="width: 100%; min-width: max-content; height: 100%; border-collapse: separate; border-spacing: 0; margin: 0;">
                      <thead style="position: sticky; top: 0; z-index: 6; background: #F8FAFC;">
                        <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                          ${allowChildActions ? `<th style="padding: 12px 14px; text-align: center; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; width: 50px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">${t('col.actions', 'Actions')}</th>` : ''}
@@ -1777,6 +1777,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                            </tr>
                          `;
             }).join('')}
+                       ${['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(childKey) ? `
+                         <tr style="height: 100%; pointer-events: none;"><td colspan="${(allowChildActions ? 1 : 0) + cols.length}" style="border: none; padding: 0; background: transparent;"></td></tr>
+                       ` : ''}
                      </tbody>
                      ${renderChildTableFooters(childKey, cols, preparedData, allowChildActions, false)}
                    </table>
@@ -1905,8 +1908,8 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                      background-color: var(--bg-hover) !important;
                    }
                  </style>
-                 <div class="table-responsive" style="margin: 8px 0; overflow-x: auto; overflow-y: auto; max-height: 480px; width:100%; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); position: relative;">
-                   <table class="table modern-table" style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 0;">
+                 <div class="table-responsive child-table-scroll-wrap" style="margin: 8px 0; flex: 1; height: 100%; min-height: 0; width: 100%; overflow-x: auto; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); position: relative;">
+                   <table class="table modern-table" style="width: 100%; min-width: max-content; height: 100%; border-collapse: separate; border-spacing: 0; margin: 0;">
                      <thead style="position: sticky; top: 0; z-index: 6; background: var(--bg-card);">
                        <tr style="border-bottom: 1px solid var(--border);">
                          ${cols.map(c => `<th style="padding: 10px 14px; text-align: left; font-size:10px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; white-space: nowrap; background: var(--bg-card); border-bottom: 1px solid var(--border);">${escapeHTML(t('col.' + c.key, c.label))}</th>`).join('')}
@@ -1997,6 +2000,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                              </tr>
                            `;
             }).join('')}
+                      ${['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(childKey) ? `
+                        <tr style="height: 100%; pointer-events: none;"><td colspan="${cols.length}" style="border: none; padding: 0; background: transparent;"></td></tr>
+                      ` : ''}
                      </tbody>
                      ${renderChildTableFooters(childKey, cols, preparedData, false, true)}
                    </table>
