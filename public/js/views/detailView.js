@@ -3739,7 +3739,7 @@ function buildDetailViewHTML(moduleKey, record) {
                   ` : ''}
                 </div>
              </div>` : `<span id="child-sum-${childKey}" style="display:none;"></span>`}
-            <div id="child-table-container-${childKey}" style="margin:0; flex:1; overflow-y:auto; overflow-x:auto; display:flex; flex-direction:column; min-height:0;">
+            <div id="child-table-container-${childKey}" style="margin:0; flex:1; display:flex; flex-direction:column; min-height:0; height:100%; width:100%; overflow:hidden; position:relative;">
                <div style="padding:20px; text-align:center; color:#94A3B8; font-size:12px;">Loading...</div>
             </div>
           </div>

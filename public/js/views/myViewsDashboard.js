@@ -637,36 +637,36 @@ function getDashboardFilterValue(viewKey, row, filterKey) {
   if (filterKey === 'sr_status') {
     const srNum = Number(row.sr_status);
     const srKey = String(row.sr_status_key || row.sr_status || '').toLowerCase().trim();
-    if (srNum === 1 || srKey === 'draft') return ['Draft', '1', 'draft', row.sr_status];
-    if (srNum === 4 || srKey === 'rejected') return ['Rejected', '4', 'rejected', row.sr_status];
+    if (srNum === 1 || srKey === 'draft') return ['Draft', '1', 'draft'];
+    if (srNum === 4 || srKey === 'rejected') return ['Rejected', '4', 'rejected'];
     if (srNum === 2 || srKey === 'pending_approval' || srKey === 'submitted' || srKey === 'pending approval' || srKey === 'pending') {
-      return ['Pending Approval', '2', 'pending_approval', 'submitted', 'pending', row.sr_status];
+      return ['Pending Approval', '2', 'pending_approval', 'submitted', 'pending'];
     }
-    if (srNum === 3 || srKey === 'approved') return ['Approved', '3', 'approved', row.sr_status];
+    if (srNum === 3 || srKey === 'approved') return ['Approved', '3', 'approved'];
     if (Number(row.process_status) === 9 || srNum === 5 || srKey === 'completed' || srKey === 'closed') {
-      return ['Completed', '5', 'completed', 'closed', row.sr_status];
+      return ['Completed', '5', 'completed', 'closed'];
     }
     return [row.sr_status_key || row.sr_status || 'Unknown'];
   }
   if (filterKey === 'process_status') {
     const procNum = Number(row.process_status);
     const procKey = String(row.process_status_key || row.process_status || '').toLowerCase().trim();
-    if (procNum === 8 || procKey === 'processing') return ['Processing', '8', 'processing', row.process_status];
-    if (procNum === 9 || procKey === 'completed') return ['Completed', '9', 'completed', row.process_status];
-    return ['Not started yet', '7', 'not_started', 'not started yet', 'not started', row.process_status];
+    if (procNum === 8 || procKey === 'processing') return ['Processing', '8', 'processing'];
+    if (procNum === 9 || procKey === 'completed') return ['Completed', '9', 'completed'];
+    return ['Not started yet', '7', 'not_started', 'not started'];
   }
   if (filterKey === 'approval_status') {
     if (viewKey === 'my_approval') {
       const s = row._cache?.approvalStatus || getApprovalStatusForUser(row);
       if (s === 'Pending Approval' || s === 'Pending' || s === 'pending_approval' || s === '2' || s === 2) {
-        return ['Pending Approval', 'Pending', 'pending_approval', '2', s];
+        return ['Pending Approval', 'Pending', 'pending_approval', '2'];
       }
-      if (s === 'Approved' || s === 'approved' || s === '3' || s === 3) return ['Approved', 'approved', '3', s];
-      if (s === 'Rejected' || s === 'rejected' || s === '4' || s === 4) return ['Rejected', 'rejected', '4', s];
-      return ['Not started yet', 'not_started', s];
+      if (s === 'Approved' || s === 'approved' || s === '3' || s === 3) return ['Approved', 'approved', '3'];
+      if (s === 'Rejected' || s === 'rejected' || s === '4' || s === 4) return ['Rejected', 'rejected', '4'];
+      return ['Not started yet', 'not_started', '7'];
     } else {
       const s = getHighestTierApprovalStatusLabel(row);
-      return [s, s.toLowerCase()];
+      return s ? [s, s.toLowerCase()] : ['Unknown'];
     }
   }
   if (filterKey === 'rating_status') {
@@ -978,11 +978,7 @@ function applyDashboardFilters(viewKey) {
   if (pagination) {
     if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(viewKey)) {
       let paginationHTML = `
-        <div style="font-size:13px; font-weight: 500; color: #6B7280; font-family: 'Inter', sans-serif;">
-          ${(typeof window.formatShowingRecords === 'function')
-            ? window.formatShowingRecords(start + 1, Math.min(start + DASHBOARD_PAGE_SIZE, total), total)
-            : `Showing <strong style="color: #111827;">${start + 1}-${Math.min(start + DASHBOARD_PAGE_SIZE, total)}</strong> of <strong style="color: #111827;">${total}</strong> records`}
-        </div>
+        <div></div>
         <div style="display: flex; gap: 8px; align-items: center; height: 48px;">
           <button class="btn" onclick="changeDashboardPage('${viewKey}', ${currentDashboardPage - 1})" ${currentDashboardPage <= 1 ? 'disabled' : ''} style="height: 36px !important; padding: 6px 12px !important; font-size: 13px !important; border: 1px solid #E5E7EB !important; border-radius: 6px !important; background: #FFFFFF !important; color: #374151 !important; font-weight: 500 !important; cursor: pointer; transition: all 0.2s ease;">${t('table.prev', 'Prev')}</button>
           
@@ -1031,9 +1027,9 @@ function applyDashboardFilters(viewKey) {
       dashboardData.forEach(r => {
         if (!rowMatchesDashboardFilters(viewKey, r, { searchQuery, excludeFilterKey: filterKey })) return;
         const value = getDashboardFilterValue(viewKey, r, filterKey);
-        const values = Array.isArray(value) ? value : [value];
-        values.forEach(v => {
-          const key = String(v);
+        const rawValues = Array.isArray(value) ? value : [value];
+        const uniqueValues = [...new Set(rawValues.map(v => String(v)))];
+        uniqueValues.forEach(key => {
           counts[key] = (counts[key] || 0) + 1;
         });
       });
