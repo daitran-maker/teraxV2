@@ -1489,6 +1489,24 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             { key: 'currency', label: 'Currency' },
             { key: 'note', label: 'Note' }
           ];
+        } else if (childKey === 'payment') {
+          cols = [
+            { key: 'payment_period', label: 'Period', labelKey: 'col.period' },
+            { key: 'payment_description', label: 'Description', labelKey: 'col.payment_description' },
+            { key: 'counter_party', label: 'Pay to / Pay from', labelKey: 'col.pay_to_from' },
+            { key: 'value', label: 'Value', labelKey: 'col.value', type: 'number' },
+            { key: 'currency', label: 'Currency' },
+            { key: 'value_in_base_currency', label: 'Value in Base Currency', labelKey: 'col.value_in_base_currency', type: 'number' },
+            { key: 'exchange_rate', label: 'Exchange Rate' },
+            { key: 'payment_type', label: 'Payment Type', badge: true },
+            { key: 'payment_status', label: 'Payment Status', badge: true },
+            { key: 'due_date', label: 'Due Date' },
+            { key: 'payment_date', label: 'Payment Date' },
+            { key: 'payment_method', label: 'Payment Method' },
+            { key: 'my_company', label: 'My Company', labelKey: 'col.my_company', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname' },
+            { key: 'transaction_id', label: 'Transaction ID' },
+            { key: 'payment_request', label: 'Payment Request', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description' }
+          ];
         }
 
         if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'contract'].includes(parentKey)) {
