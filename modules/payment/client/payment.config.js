@@ -12,7 +12,7 @@
     pk: 'payment_id',
     icon: '💳',
     columns: [
-      { key: 'payment_period', label: 'Period', labelKey: 'col.period' },
+      { key: 'payment_period', label: 'Period', labelKey: 'col.period', width: '60px' },
       { key: 'payment_description', label: 'Description', labelKey: 'col.description' },
       { key: 'counter_party', label: 'Pay to / Pay from', labelKey: 'col.pay_to_from' },
       { key: 'value', label: 'Value', labelKey: 'col.value', type: 'number' },

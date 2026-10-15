@@ -1491,7 +1491,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
           ];
         } else if (childKey === 'payment') {
           cols = [
-            { key: 'payment_period', label: 'Period', labelKey: 'col.period' },
+            { key: 'payment_period', label: 'Period', labelKey: 'col.period', width: '60px' },
             { key: 'payment_description', label: 'Description', labelKey: 'col.payment_description' },
             { key: 'counter_party', label: 'Pay to / Pay from', labelKey: 'col.pay_to_from' },
             { key: 'value', label: 'Value', labelKey: 'col.value', type: 'number' },
@@ -1603,14 +1603,16 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 <tr style="border-top: ${isFirst ? borderTop : borderSub}; background: ${bgFoot}; font-weight: 700;">
                   ${hasActions ? `<td style="padding: 9px 14px; background: inherit;"></td>` : ''}
                   ${colsList.map((c, colIdx) => {
+                    const isPeriod = c.key === 'payment_period' || c.key === 'period';
                     if (isAmountColumnKey(c.key)) {
                       const sum = pRows.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
                       return `<td style="padding: 9px 14px; font-size: 13px; color: ${textCol}; font-weight: 700; white-space: nowrap; background: inherit;">${formatNumber(Math.round(sum))}</td>`;
                     }
-                    if (colIdx === 0) {
+                    if (c.key === 'payment_description' || (colIdx === 1 && !colsList.some(col => col.key === 'payment_description')) || (colIdx === 0 && !colsList.some(col => col.key === 'payment_period'))) {
                       return `<td style="padding: 9px 14px; font-size: 11px; font-weight: 700; color: ${textMuted}; text-transform: uppercase; white-space: nowrap; background: inherit;">${escapeHTML(label)}</td>`;
                     }
-                    return `<td style="padding: 9px 14px; background: inherit;"></td>`;
+                    const padStyle = isPeriod ? 'padding: 9px 8px; width: 60px; max-width: 70px;' : 'padding: 9px 14px;';
+                    return `<td style="${padStyle} background: inherit;"></td>`;
                   }).join('')}
                 </tr>
               `;
@@ -1654,7 +1656,12 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                      <thead style="position: sticky; top: 0; z-index: 6; background: #F8FAFC;">
                        <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                          ${allowChildActions ? `<th style="padding: 12px 14px; text-align: center; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; width: 50px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">${t('col.actions', 'Actions')}</th>` : ''}
-                         ${cols.map(c => `<th style="padding: 12px 14px; text-align: left; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">${escapeHTML(t(c.labelKey || ('col.' + c.key), c.label))}</th>`).join('')}
+                         ${cols.map(c => {
+                            const isPeriod = c.key === 'payment_period' || c.key === 'period';
+                            const widthStyle = c.width ? ('width: ' + c.width + '; min-width: ' + c.width + '; max-width: ' + c.width + ';') : (isPeriod ? 'width: 60px; min-width: 50px; max-width: 70px;' : '');
+                            const paddingStyle = isPeriod ? 'padding: 12px 8px;' : 'padding: 12px 14px;';
+                            return '<th style="' + paddingStyle + ' text-align: left; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; ' + widthStyle + '">' + escapeHTML(t(c.labelKey || ('col.' + c.key), c.label)) + '</th>';
+                          }).join('')}
                        </tr>
                      </thead>
                      <tbody>
@@ -1768,10 +1775,16 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   ? escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim())
                   : escapeHTML(displayVal);
 
+                const isPeriod = c.key === 'payment_period' || c.key === 'period';
                 const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description') || c.key === 'note' || c.key === 'comment';
-                const cellStyle = isDescCol
-                  ? 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;'
-                  : (c.key === 'service_name' ? 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;' : 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;');
+                let cellStyle = 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;';
+                if (isPeriod) {
+                  cellStyle = 'padding: 12px 8px; font-size: 13px; color: #334155; white-space: nowrap; width: 60px; max-width: 70px;';
+                } else if (isDescCol) {
+                  cellStyle = 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;';
+                } else if (c.key === 'service_name') {
+                  cellStyle = 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;';
+                }
 
                 return `<td style="${cellStyle}" title="${titleAttr}">${cellContentHTML}</td>`;
               }).join('')}
@@ -1914,7 +1927,12 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                    <table class="table modern-table" style="width: 100%; min-width: max-content; ${hasFooterDark ? 'height: 100%;' : ''} border-collapse: separate; border-spacing: 0; margin: 0;">
                      <thead style="position: sticky; top: 0; z-index: 6; background: var(--bg-card);">
                        <tr style="border-bottom: 1px solid var(--border);">
-                         ${cols.map(c => `<th style="padding: 10px 14px; text-align: left; font-size:10px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; white-space: nowrap; background: var(--bg-card); border-bottom: 1px solid var(--border);">${escapeHTML(t('col.' + c.key, c.label))}</th>`).join('')}
+                         ${cols.map(c => {
+                            const isPeriod = c.key === 'payment_period' || c.key === 'period';
+                            const widthStyle = c.width ? ('width: ' + c.width + '; min-width: ' + c.width + '; max-width: ' + c.width + ';') : (isPeriod ? 'width: 60px; min-width: 50px; max-width: 70px;' : '');
+                            const paddingStyle = isPeriod ? 'padding: 10px 8px;' : 'padding: 10px 14px;';
+                            return '<th style="' + paddingStyle + ' text-align: left; font-size:10px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; white-space: nowrap; background: var(--bg-card); border-bottom: 1px solid var(--border); ' + widthStyle + '">' + escapeHTML(t('col.' + c.key, c.label)) + '</th>';
+                          }).join('')}
                        </tr>
                      </thead>
                      <tbody>
@@ -1987,6 +2005,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;">${escapeHTML(translatedVal)}</td>`;
                 }
 
+                const isPeriod = c.key === 'payment_period' || c.key === 'period';
                 const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description') || c.key === 'note' || c.key === 'comment';
                 let display;
                 if (isDescCol) {
@@ -1994,9 +2013,14 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 } else {
                   display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
                 }
-                const cellStyle = isDescCol
-                  ? 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;'
-                  : (c.key === 'service_name' ? 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;' : 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;');
+                let cellStyle = 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;';
+                if (isPeriod) {
+                  cellStyle = 'padding: 10px 8px; font-size:12px; color: var(--text-primary); white-space: nowrap; width: 60px; max-width: 70px;';
+                } else if (isDescCol) {
+                  cellStyle = 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;';
+                } else if (c.key === 'service_name') {
+                  cellStyle = 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;';
+                }
                 return `<td style="${cellStyle}" title="${escapeHTML(displayVal)}">${escapeHTML(display)}</td>`;
               }).join('')}
                              </tr>
