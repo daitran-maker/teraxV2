@@ -2598,12 +2598,12 @@ router.post('/execute', async (req, res) => {
             {{col.payment::Khoản thanh toán}}:
           </div>
           <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-            <table style="width:100%; min-width:1100px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+            <table style="width:100%; min-width:1350px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
               <thead>
                 <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.period::Period}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.description::Description}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.pay_to_from::Pay to / Pay from}}</th>
+                  <th style="padding:6px 10px; border:none; min-width:280px;">{{col.description::Description}}</th>
+                  <th style="padding:6px 10px; border:none; min-width:160px;">{{col.pay_to_from::Pay to / Pay from}}</th>
                   <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value::Value}}</th>
                   <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
                   <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_in_base_currency::Value in VND}}</th>
@@ -2624,8 +2624,8 @@ router.post('/execute', async (req, res) => {
                     ${record.payment_period != null ? record.payment_period : '—'}
                     <span style="display:inline-block; margin-left:4px; padding:1px 5px; font-size:10px; font-weight:600; color:#475569; background:#E2E8F0; border-radius:4px;">{{msg.current_proposal::Current}}</span>
                   </td>
-                  <td style="padding:7px 10px; border:none;">${record.payment_description || '—'}</td>
-                  <td style="padding:7px 10px; border:none;">${partyName || resolveCounterParty(record)}</td>
+                  <td style="padding:7px 10px; border:none; min-width:280px; word-break:break-word;">${record.payment_description || '—'}</td>
+                  <td style="padding:7px 10px; border:none; min-width:160px;">${partyName || resolveCounterParty(record)}</td>
                   <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(record.value || 0)}</td>
                   <td style="padding:7px 10px; border:none; text-align:center;">${resolveCurrency(record.currency)}</td>
                   <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(record.value_in_base_currency || 0)}</td>
@@ -2645,7 +2645,7 @@ router.post('/execute', async (req, res) => {
             htmlParts.push(`
               <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_period != null ? p.payment_period : '—'}</td>
-                <td style="padding:6px 10px; border:none;">${p.payment_description || '—'}</td>
+                <td style="padding:6px 10px; border:none; min-width:280px; word-break:break-word;">${p.payment_description || '—'}</td>
                 <td style="padding:6px 10px; border:none;">${resolveCounterParty(p)}</td>
                 <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(p.value || 0)}</td>
                 <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(p.currency)}</td>
@@ -2743,11 +2743,11 @@ router.post('/execute', async (req, res) => {
                 {{col.invoice::Hóa đơn}} (${invoicesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:1150px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1350px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_no::Invoice No.}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.description::Description}}</th>
+                      <th style="padding:6px 10px; border:none; min-width:280px;">{{col.description::Description}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_type::Type}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_method::Payment Method}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_status::Invoice Status}}</th>
@@ -2768,7 +2768,7 @@ router.post('/execute', async (req, res) => {
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.invoice_no || inv.invoice_id || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${inv.description || '—'}</td>
+                  <td style="padding:6px 10px; border:none; min-width:280px; word-break:break-word;">${inv.description || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.invoice_type || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.payment_method || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveInvoiceStatusToken(inv.invoice_status)}</td>
