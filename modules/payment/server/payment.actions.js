@@ -1,6 +1,7 @@
 // Payment actions used by POST /api/actions/execute.
 // MOVED verbatim from server/routes/actions.js (no logic change); `req.body.data` is passed in as `data`.
 const { broadcastSSE } = require('../../../server/helpers/sseHelper');
+const pool = require('../../../server/db');
 const RequestModel = require('../../../server/models/requestModel');
 const { normalizeEmail } = require('../../workflow/server/actions.helpers');
 const { getRecordStatusId } = require('../../../server/helpers/statuses');
@@ -240,6 +241,410 @@ async function submitForPayment({ client, record, record_id, user, action_id, da
   } catch (e) {
     console.warn('Failed to broadcast SSE for created request:', e);
   }
+
+      // Generate executive summary comment for the newly created payment request
+      try {
+        let rootReqRes = null;
+        let contractsRes = null;
+        let invoicesRes = null;
+        let expensesRes = null;
+        let assetsRes = null;
+        let servicesRes = null;
+
+        let otherPaymentsRes = null;
+        if (parentReqId) {
+          [rootReqRes, contractsRes, invoicesRes, expensesRes, assetsRes, servicesRes, otherPaymentsRes] = await Promise.all([
+            pool.query(
+              `SELECT r.request_id, r.description, r.requester, r.sr_creater, r.elements, e.full_name as requester_name
+               FROM request r
+               LEFT JOIN employee e ON (e.employee_id = r.requester OR e.email = r.requester)
+               WHERE r.request_id = $1`,
+              [parentReqId]
+            ).catch(err => { console.warn('rootReq query err:', err.message); return null; }),
+            pool.query(
+              `SELECT c.contract_id, c.contractspood_no, c.contract_name_or_description, c.contractor, c.total_value, c.currency,
+                      cmp.company_fullname as contractor_name
+               FROM contract c
+               LEFT JOIN company cmp ON (cmp.company_id::text = c.contractor::text)
+               WHERE (c.request = $1 OR c.id__request = $1 ${record.contract_id ? 'OR c.contract_id = $2' : ''})
+                 AND c.deleted_at IS NULL`,
+              record.contract_id ? [parentReqId, record.contract_id] : [parentReqId]
+            ).catch(err => { console.warn('contracts query err:', err.message); return null; }),
+            pool.query(
+              `SELECT invoice_id, invoice_no, invoice_type, invoice_date, total_value, currency, description
+               FROM invoice
+               WHERE (request = $1 OR invoice_request = $1 ${record.contract_id ? 'OR (contract_id IS NOT NULL AND contract_id = $2)' : ''})
+                 AND deleted_at IS NULL`,
+              record.contract_id ? [parentReqId, record.contract_id] : [parentReqId]
+            ).catch(err => { console.warn('invoices query err:', err.message); return null; }),
+            pool.query(
+              `SELECT id, description, total_value, id__currency, id__expense_type, id__expense_cost
+               FROM expense
+               WHERE id__request = $1
+                 AND deleted_at IS NULL`,
+              [parentReqId]
+            ).catch(err => { console.warn('expenses query err:', err.message); return null; }),
+            pool.query(
+              `SELECT office_asset_id, asset_name, qty, purchase_cost, currency
+               FROM asset
+               WHERE request = $1
+                 AND deleted_at IS NULL`,
+              [parentReqId]
+            ).catch(err => { console.warn('assets query err:', err.message); return null; }),
+            pool.query(
+              `SELECT service_id, service_name, service_type, start_date, end_date
+               FROM service
+               WHERE request = $1
+                 AND deleted_at IS NULL`,
+              [parentReqId]
+            ).catch(err => { console.warn('services query err:', err.message); return null; }),
+            pool.query(
+              `SELECT payment_id, payment_type, value, currency, payment_status, payment_description, due_date
+               FROM payment
+               WHERE request = $1 AND payment_id != $2 AND deleted_at IS NULL
+               ORDER BY payment_id ASC`,
+              [parentReqId, record.payment_id || record_id]
+            ).catch(err => { console.warn('other payments query err:', err.message); return null; })
+          ]);
+        }
+
+        const rootReq = (rootReqRes && rootReqRes.rows && rootReqRes.rows.length > 0) ? rootReqRes.rows[0] : null;
+        let htmlParts = [];
+        htmlParts.push(`
+          <div style="font-weight:700; color:#1E293B; margin-bottom:8px; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">
+            [{{msg.root_request_summary::TỔNG HỢP THÔNG TIN TỪ YÊU CẦU GỐC}}]
+          </div>
+        `);
+
+        if (rootReq) {
+          const reqAuthor = rootReq.requester_name || rootReq.requester || rootReq.sr_creater || '—';
+          htmlParts.push(`
+            <div style="margin-bottom:12px; font-size:12px; color:#475569; line-height:1.5;">
+              <div><b>{{col.request_id::Mã yêu cầu}}:</b> ${rootReq.request_id} &nbsp;|&nbsp; <b>{{col.requester::Người yêu cầu}}:</b> ${reqAuthor}</div>
+              ${rootReq.description ? `<div><b>{{col.description::Mô tả}}:</b> ${rootReq.description}</div>` : ''}
+            </div>
+          `);
+        }
+
+        // Parse rootReq elements
+        let rootElements = [];
+        if (rootReq && rootReq.elements) {
+          if (Array.isArray(rootReq.elements)) {
+            rootElements = rootReq.elements.map(e => String(e).trim().toUpperCase());
+          } else if (typeof rootReq.elements === 'string') {
+            rootElements = rootReq.elements.toUpperCase().split(/[,{}"]+/).map(s => s.trim()).filter(Boolean);
+          }
+        }
+
+        const resolvePaymentStatusToken = (s) => {
+          const map = {
+            30: '{{val.draft::Bản nháp}}',
+            31: '{{val.ready_for_payment::Sẵn sàng thanh toán}}',
+            32: '{{val.paid::Đã thanh toán}}',
+            33: '{{val.deleted::Đã xóa}}',
+            121: '{{val.submitted_for_payment::Đã gửi yêu cầu thanh toán}}'
+          };
+          return map[s] || (s != null ? String(s) : '—');
+        };
+
+        const resolvePaymentTypeToken = (pType) => {
+          if (pType === 60 || String(pType).toLowerCase() === '60' || String(pType).toLowerCase() === 'incoming') {
+            return '{{val.incoming::Thu vào}}';
+          }
+          if (pType === 61 || String(pType).toLowerCase() === '61' || String(pType).toLowerCase() === 'outgoing') {
+            return '{{val.outgoing::Chi ra}}';
+          }
+          return String(pType || '');
+        };
+
+        // Payments Table (without border line, current record highlighted in light gray, responsive horizontal scroll)
+        htmlParts.push(`
+          <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+            {{col.payment::Khoản thanh toán}}:
+          </div>
+          <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
+            <table style="width:100%; min-width:620px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+              <thead>
+                <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
+                  <th style="padding:6px 10px; border:none;">{{col.payment_id::Mã}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.payment_type::Loại}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.counter_party::Đối tác}}</th>
+                  <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.payment_status::Trạng thái}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.payment_description::Mô tả}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Highlighted Current Record in subtle light gray -->
+                <tr style="background:#F1F5F9; border-bottom:1px solid #E2E8F0; font-weight:600; color:#1E293B;">
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">
+                    ${record.payment_id || record_id}
+                    <span style="display:inline-block; margin-left:6px; padding:1px 6px; font-size:10px; font-weight:600; color:#475569; background:#E2E8F0; border-radius:4px;">{{msg.current_proposal::Current}}</span>
+                  </td>
+                  <td style="padding:7px 10px; border:none;">${paymentTypeLabel}</td>
+                  <td style="padding:7px 10px; border:none;">${partyName || '—'}</td>
+                  <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formattedValue}</td>
+                  <td style="padding:7px 10px; border:none;">{{val.submitted_for_payment::Đã gửi yêu cầu}}</td>
+                  <td style="padding:7px 10px; border:none;">${record.payment_description || '—'}</td>
+                </tr>
+        `);
+
+        if (otherPaymentsRes && otherPaymentsRes.rows && otherPaymentsRes.rows.length > 0) {
+          otherPaymentsRes.rows.forEach(p => {
+            const pType = resolvePaymentTypeToken(p.payment_type);
+            const pVal = `${formatAmount(p.value || 0)} ${resolveCurrency(p.currency)}`;
+            const pStatus = resolvePaymentStatusToken(p.payment_status);
+            htmlParts.push(`
+              <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_id}</td>
+                <td style="padding:6px 10px; border:none;">${pType}</td>
+                <td style="padding:6px 10px; border:none;">—</td>
+                <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${pVal}</td>
+                <td style="padding:6px 10px; border:none;">${pStatus}</td>
+                <td style="padding:6px 10px; border:none;">${p.payment_description || '—'}</td>
+              </tr>
+            `);
+          });
+        }
+        htmlParts.push(`</tbody></table></div>`);
+
+        // Contracts
+        const hasContracts = contractsRes && contractsRes.rows && contractsRes.rows.length > 0;
+        const showContracts = hasContracts || rootElements.includes('CONTRACT');
+        if (showContracts) {
+          if (!hasContracts) {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.contract::Hợp đồng}} (0): <span style="font-weight:400; color:#94A3B8; font-style:italic; font-size:11px;">{{msg.no_data::Không có dữ liệu}}</span>
+              </div>
+            `);
+          } else {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.contract::Hợp đồng}} (${contractsRes.rows.length}):
+              </div>
+              <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
+                <table style="width:100%; min-width:550px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
+                      <th style="padding:6px 10px; border:none;">{{col.contractspood_no::Số HĐ}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.contract_name_or_description::Mô tả}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.contractor::Đối tác}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+            `);
+            contractsRes.rows.forEach(c => {
+              const no = c.contractspood_no || c.contract_id || '—';
+              const name = c.contract_name_or_description || '—';
+              const partner = c.contractor_name || c.contractor || '—';
+              const val = c.total_value ? `${formatAmount(c.total_value)} ${resolveCurrency(c.currency)}` : '—';
+              htmlParts.push(`
+                <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${no}</td>
+                  <td style="padding:6px 10px; border:none;">${name}</td>
+                  <td style="padding:6px 10px; border:none;">${partner}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                </tr>
+              `);
+            });
+            htmlParts.push(`</tbody></table></div>`);
+          }
+        }
+
+        // Invoices
+        const hasInvoices = invoicesRes && invoicesRes.rows && invoicesRes.rows.length > 0;
+        const showInvoices = hasInvoices || rootElements.includes('INVOICE');
+        if (showInvoices) {
+          if (!hasInvoices) {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.invoice::Hóa đơn}} (0): <span style="font-weight:400; color:#94A3B8; font-style:italic; font-size:11px;">{{msg.no_data::Không có dữ liệu}}</span>
+              </div>
+            `);
+          } else {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.invoice::Hóa đơn}} (${invoicesRes.rows.length}):
+              </div>
+              <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
+                <table style="width:100%; min-width:550px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
+                      <th style="padding:6px 10px; border:none;">{{col.invoice_no::Số HĐ}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.invoice_date::Ngày}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.description::Mô tả}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+            `);
+            invoicesRes.rows.forEach(inv => {
+              const invNo = inv.invoice_no || inv.invoice_id || '—';
+              const dateStr = inv.invoice_date ? String(inv.invoice_date).split('T')[0] : '—';
+              const val = inv.total_value ? `${formatAmount(inv.total_value)} ${resolveCurrency(inv.currency)}` : '—';
+              htmlParts.push(`
+                <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${invNo}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${dateStr}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                  <td style="padding:6px 10px; border:none;">${inv.description || '—'}</td>
+                </tr>
+              `);
+            });
+            htmlParts.push(`</tbody></table></div>`);
+          }
+        }
+
+        // Expenses
+        const hasExpenses = expensesRes && expensesRes.rows && expensesRes.rows.length > 0;
+        const showExpenses = hasExpenses || rootElements.includes('EXPENSE');
+        if (showExpenses) {
+          if (!hasExpenses) {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.expense::Chi phí}} (0): <span style="font-weight:400; color:#94A3B8; font-style:italic; font-size:11px;">{{msg.no_data::Không có dữ liệu}}</span>
+              </div>
+            `);
+          } else {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.expense::Chi phí}} (${expensesRes.rows.length}):
+              </div>
+              <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
+                <table style="width:100%; min-width:450px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
+                      <th style="padding:6px 10px; border:none;">{{col.description::Mô tả}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+            `);
+            expensesRes.rows.forEach(exp => {
+              const desc = exp.description || '—';
+              const val = exp.total_value ? `${formatAmount(exp.total_value)} ${resolveCurrency(exp.id__currency)}` : '—';
+              htmlParts.push(`
+                <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
+                  <td style="padding:6px 10px; border:none;">${desc}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                </tr>
+              `);
+            });
+            htmlParts.push(`</tbody></table></div>`);
+          }
+        }
+
+        // Assets
+        const hasAssets = assetsRes && assetsRes.rows && assetsRes.rows.length > 0;
+        const showAssets = hasAssets || rootElements.includes('ASSET') || rootElements.includes('DEVICE AND ASSET');
+        if (showAssets) {
+          if (!hasAssets) {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.asset::Tài sản}} (0): <span style="font-weight:400; color:#94A3B8; font-style:italic; font-size:11px;">{{msg.no_data::Không có dữ liệu}}</span>
+              </div>
+            `);
+          } else {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.asset::Tài sản}} (${assetsRes.rows.length}):
+              </div>
+              <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
+                <table style="width:100%; min-width:480px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
+                      <th style="padding:6px 10px; border:none;">{{col.asset_name::Tên tài sản}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.qty::SL}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.purchase_cost::Giá mua}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+            `);
+            assetsRes.rows.forEach(a => {
+              const code = a.office_asset_id ? `[${a.office_asset_id}] ` : '';
+              const name = `${code}${a.asset_name || '—'}`;
+              const qty = a.qty ? `x${a.qty}` : '1';
+              const val = a.purchase_cost ? `${formatAmount(a.purchase_cost)} ${resolveCurrency(a.currency)}` : '—';
+              htmlParts.push(`
+                <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
+                  <td style="padding:6px 10px; border:none;">${name}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center;">${qty}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                </tr>
+              `);
+            });
+            htmlParts.push(`</tbody></table></div>`);
+          }
+        }
+
+        // Services
+        const hasServices = servicesRes && servicesRes.rows && servicesRes.rows.length > 0;
+        const showServices = hasServices || rootElements.includes('SERVICE');
+        if (showServices) {
+          if (!hasServices) {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.service::Dịch vụ}} (0): <span style="font-weight:400; color:#94A3B8; font-style:italic; font-size:11px;">{{msg.no_data::Không có dữ liệu}}</span>
+              </div>
+            `);
+          } else {
+            htmlParts.push(`
+              <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
+                {{col.service::Dịch vụ}} (${servicesRes.rows.length}):
+              </div>
+              <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
+                <table style="width:100%; min-width:480px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
+                      <th style="padding:6px 10px; border:none;">{{col.service_name::Tên dịch vụ}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.start_date::Thời hạn}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+            `);
+            servicesRes.rows.forEach(s => {
+              const name = s.service_name || s.service_id || '—';
+              const sDate = s.start_date ? String(s.start_date).split('T')[0] : '';
+              const eDate = s.end_date ? String(s.end_date).split('T')[0] : '';
+              const period = (sDate || eDate) ? `${sDate} ~ ${eDate}` : '—';
+              htmlParts.push(`
+                <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
+                  <td style="padding:6px 10px; border:none;">${name}</td>
+                  <td style="padding:6px 10px; border:none;">${period}</td>
+                </tr>
+              `);
+            });
+            htmlParts.push(`</tbody></table></div>`);
+          }
+        }
+
+        const summaryCommentText = htmlParts.join('').trim();
+        const commId = (typeof uuidv4 === 'function' ? uuidv4() : require('crypto').randomUUID());
+        await client.query(`
+          INSERT INTO "comment" ("comment_id", "request", "comment", "comment_by", "comment_date")
+          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+        `, [commId, newPaymentReqId, summaryCommentText, user.employee_id || user.email || 'System']);
+
+        try {
+          broadcastSSE('db_change', {
+            action: 'insert',
+            table: 'comment',
+            record: {
+              comment_id: commId,
+              request: newPaymentReqId,
+              comment: summaryCommentText,
+              comment_by: user.employee_id || user.email || 'System',
+              comment_date: new Date().toISOString()
+            }
+          });
+        } catch (eCmtSse) {
+          console.warn('Failed to broadcast SSE for summary comment:', eCmtSse);
+        }
+      } catch (cmtErr) {
+        console.error('Failed to create root summary comment for payment request:', cmtErr);
+      }
 }
 
 async function markPaidOrUpdateMtr({ client, record, record_id, user, action_id, data }) {
