@@ -1731,6 +1731,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   let starsHTML = '';
                   for (let i = 1; i <= 5; i++) {
                     const starColor = i <= pointVal ? '#EAB308' : '#D1D5DB';
+                    starsHTML += `<span class="material-symbols-rounded" style="font-size:16px; color:${starColor}; vertical-align:middle; line-height:1;">star</span>`;
                   }
                   const cellContent = `${starsHTML} <span style="font-size:11px; color:#64748B; font-weight:600; margin-left:4px; vertical-align:middle;">(${pointVal})</span>`;
                   return `<td style="padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;">${cellContent}</td>`;
