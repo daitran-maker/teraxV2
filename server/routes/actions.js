@@ -2722,7 +2722,7 @@ router.post('/execute', async (req, res) => {
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
                       <th style="padding:6px 10px; border:none;">{{col.service_name::Tên dịch vụ}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.start_date::Thời hạn}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.service_period::Thời hạn}}</th>
                     </tr>
                   </thead>
                   <tbody>

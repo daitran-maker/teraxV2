@@ -527,10 +527,14 @@ window.escapeHTML = escapeHTML;
 function formatCommentWithI18n(str) {
   if (str === null || str === undefined) return '';
   const resolved = String(str).replace(/\{\{([a-zA-Z0-9_\-\.]+)(?:::([^}]+))?\}\}/g, (match, key, fallback) => {
-    if (typeof t === 'function') {
-      return t(key, fallback !== undefined ? fallback : key);
+    let effectiveKey = key;
+    if (key === 'col.start_date' && (fallback === 'Thời hạn' || fallback === 'Thời hạn dịch vụ')) {
+      effectiveKey = 'col.service_period';
     }
-    return fallback !== undefined ? fallback : key;
+    if (typeof t === 'function') {
+      return t(effectiveKey, fallback !== undefined ? fallback : effectiveKey);
+    }
+    return fallback !== undefined ? fallback : effectiveKey;
   });
   if (/<(table|thead|tbody|tfoot|tr|td|th|div|span|b|strong|i|em|br|hr)\b/i.test(resolved)) {
     return resolved
