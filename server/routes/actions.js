@@ -2373,8 +2373,28 @@ router.post('/execute', async (req, res) => {
         let expensesRes = null;
         let assetsRes = null;
         let servicesRes = null;
-
         let otherPaymentsRes = null;
+
+        const [mcRes, compRes, empRes] = await Promise.all([
+          pool.query(`SELECT my_company_id, company_shortname, company_fullname FROM my_company`).catch(() => ({ rows: [] })),
+          pool.query(`SELECT company_id, company_fullname, company_shortname FROM company`).catch(() => ({ rows: [] })),
+          pool.query(`SELECT employee_id, full_name, email FROM employee`).catch(() => ({ rows: [] }))
+        ]);
+
+        const myCompMap = new Map();
+        (mcRes.rows || []).forEach(r => {
+          myCompMap.set(String(r.my_company_id), r.company_shortname || r.company_fullname);
+        });
+        const compMap = new Map();
+        (compRes.rows || []).forEach(r => {
+          compMap.set(String(r.company_id), r.company_fullname || r.company_shortname);
+        });
+        const empMap = new Map();
+        (empRes.rows || []).forEach(r => {
+          empMap.set(String(r.employee_id), r.full_name);
+          if (r.email) empMap.set(String(r.email).toLowerCase(), r.full_name);
+        });
+
         if (parentReqId) {
           [rootReqRes, contractsRes, invoicesRes, expensesRes, assetsRes, servicesRes, otherPaymentsRes] = await Promise.all([
             pool.query(
@@ -2385,44 +2405,42 @@ router.post('/execute', async (req, res) => {
               [parentReqId]
             ).catch(err => { console.warn('rootReq query err:', err.message); return null; }),
             pool.query(
-              `SELECT c.contract_id, c.contractspood_no, c.contract_name_or_description, c.contractor, c.total_value, c.currency,
-                      cmp.company_fullname as contractor_name
-               FROM contract c
-               LEFT JOIN company cmp ON (cmp.company_id::text = c.contractor::text)
-               WHERE (c.request = $1 OR c.id__request = $1 ${record.contract_id ? 'OR c.contract_id = $2' : ''})
-                 AND c.deleted_at IS NULL`,
+              `SELECT contract_id, contractspood_no, contract_name_or_description, my_company, contract_owner, contractor, type, contract_signed_date, value_before_vat, vat_value, total_value, currency, exchance_rate, value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency
+               FROM contract
+               WHERE (request = $1 OR id__request = $1 ${record.contract_id ? 'OR contract_id = $2' : ''})
+                 AND deleted_at IS NULL`,
               record.contract_id ? [parentReqId, record.contract_id] : [parentReqId]
             ).catch(err => { console.warn('contracts query err:', err.message); return null; }),
             pool.query(
-              `SELECT invoice_id, invoice_no, invoice_type, invoice_date, total_value, currency, description
+              `SELECT invoice_id, invoice_no, description, invoice_type, payment_method, invoice_status, invoice_date, value_before_vat, vat_value, total_value, currency, exchange_rate, value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency
                FROM invoice
                WHERE (request = $1 OR invoice_request = $1 ${record.contract_id ? 'OR (contract_id IS NOT NULL AND contract_id = $2)' : ''})
                  AND deleted_at IS NULL`,
               record.contract_id ? [parentReqId, record.contract_id] : [parentReqId]
             ).catch(err => { console.warn('invoices query err:', err.message); return null; }),
             pool.query(
-              `SELECT id, description, total_value, id__currency, id__expense_type, id__expense_cost
+              `SELECT id, description, value_before_vat, vat_value, total_value, id__currency, exchange_rate, value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency, id__employee, id__my_company, id__expense_type, id__expense_cost, fy
                FROM expense
                WHERE id__request = $1
                  AND deleted_at IS NULL`,
               [parentReqId]
             ).catch(err => { console.warn('expenses query err:', err.message); return null; }),
             pool.query(
-              `SELECT office_asset_id, asset_name, qty, purchase_cost, currency
+              `SELECT office_asset_id, asset_name, type, status, qty, identity_number, purchase_date, purchase_cost, currency, exchange_rate, value_in_base_currency, current_owner, location, id__my_company
                FROM asset
                WHERE request = $1
                  AND deleted_at IS NULL`,
               [parentReqId]
             ).catch(err => { console.warn('assets query err:', err.message); return null; }),
             pool.query(
-              `SELECT service_id, service_name, service_type, start_date, end_date
+              `SELECT service_id, service_name, service_type, status, note, start_date, end_date, fy, my_company
                FROM service
                WHERE request = $1
                  AND deleted_at IS NULL`,
               [parentReqId]
             ).catch(err => { console.warn('services query err:', err.message); return null; }),
             pool.query(
-              `SELECT payment_id, payment_type, value, currency, payment_status, payment_description, due_date
+              `SELECT payment_id, payment_period, payment_description, counter_party, company, employee, value, currency, value_in_base_currency, exchange_rate, payment_type, payment_status, due_date, payment_date, payment_method, my_company, transaction_id
                FROM payment
                WHERE request = $1 AND payment_id != $2 AND deleted_at IS NULL
                ORDER BY payment_id ASC`,
@@ -2459,6 +2477,53 @@ router.post('/execute', async (req, res) => {
           }
         }
 
+        const formatDate = (val) => {
+          if (!val) return '—';
+          if (val instanceof Date) return val.toISOString().split('T')[0];
+          const s = String(val).trim();
+          if (s.includes('T')) return s.split('T')[0];
+          if (s.length >= 10 && /^\\d{4}-\\d{2}-\\d{2}/.test(s)) return s.slice(0, 10);
+          return s;
+        };
+
+        const resolveCounterParty = (p) => {
+          if (p.counter_party) {
+            let cpType = 'company';
+            let cpId = p.counter_party;
+            if (typeof p.counter_party === 'object' && p.counter_party !== null) {
+              cpType = p.counter_party.type || 'company';
+              cpId = p.counter_party.id;
+            } else {
+              try {
+                const parsed = JSON.parse(p.counter_party);
+                if (parsed && parsed.id) {
+                  cpType = parsed.type || 'company';
+                  cpId = parsed.id;
+                }
+              } catch (e) {}
+            }
+            if (cpType === 'employee') {
+              const eName = empMap.get(String(cpId));
+              if (eName) return eName;
+            } else {
+              const cName = compMap.get(String(cpId));
+              if (cName) return cName;
+            }
+            return cpId || '—';
+          }
+          if (p.company) {
+            const cName = compMap.get(String(p.company));
+            if (cName) return cName;
+            return p.company;
+          }
+          if (p.employee) {
+            const eName = empMap.get(String(p.employee));
+            if (eName) return eName;
+            return p.employee;
+          }
+          return '—';
+        };
+
         const resolvePaymentStatusToken = (s) => {
           const map = {
             30: '{{val.draft::Bản nháp}}',
@@ -2477,61 +2542,129 @@ router.post('/execute', async (req, res) => {
           if (pType === 61 || String(pType).toLowerCase() === '61' || String(pType).toLowerCase() === 'outgoing') {
             return '{{val.outgoing::Chi ra}}';
           }
-          return String(pType || '');
+          return String(pType || '—');
         };
 
-        // Payments Table (without border line, current record highlighted in light gray, responsive horizontal scroll)
+        const resolveContractTypeToken = (t) => {
+          if (t === 69 || String(t) === '69' || String(t).toLowerCase() === 'selling') {
+            return '{{val.selling::Bán ra}}';
+          }
+          if (t === 70 || String(t) === '70' || String(t).toLowerCase() === 'buying') {
+            return '{{val.buying::Mua vào}}';
+          }
+          return String(t || '—');
+        };
+
+        const resolveInvoiceStatusToken = (s) => {
+          const map = {
+            34: '{{val.draft::Bản nháp}}',
+            36: '{{val.issued::Đã phát hành}}',
+            37: '{{val.paid::Đã thanh toán}}',
+            38: '{{val.void::Đã hủy}}'
+          };
+          return map[s] || (s != null ? String(s) : '—');
+        };
+
+        const resolveExpenseTypeToken = (t) => {
+          if (t === 71 || String(t) === '71' || String(t).toUpperCase() === 'CAPEX') return 'CAPEX';
+          if (t === 72 || String(t) === '72' || String(t).toUpperCase() === 'OPEX') return 'OPEX';
+          return String(t || '—');
+        };
+
+        const resolveAssetStatusToken = (s) => {
+          const map = {
+            21: '{{val.draft::Bản nháp}}',
+            22: '{{val.pending::Đang chờ}}',
+            23: '{{val.in_progress::Đang xử lý}}',
+            24: '{{val.approved::Đã phê duyệt}}',
+            25: '{{val.completed::Hoàn thành}}'
+          };
+          return map[s] || (s != null ? String(s) : '—');
+        };
+
+        const resolveServiceStatusToken = (s) => {
+          const map = {
+            26: '{{val.draft::Bản nháp}}',
+            27: '{{val.pending::Đang chờ}}',
+            28: '{{val.in_progress::Đang xử lý}}',
+            29: '{{val.completed::Hoàn thành}}'
+          };
+          return map[s] || (s != null ? String(s) : '—');
+        };
+
+        // 1. Payments Table (Columns matching payment table view config)
         htmlParts.push(`
           <div style="font-weight:600; color:#0F172A; font-size:12px; margin-top:10px; margin-bottom:4px;">
             {{col.payment::Khoản thanh toán}}:
           </div>
           <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-            <table style="width:100%; min-width:620px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+            <table style="width:100%; min-width:1100px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
               <thead>
                 <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                  <th style="padding:6px 10px; border:none;">{{col.payment_id::Mã}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.payment_type::Loại}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.counter_party::Đối tác}}</th>
-                  <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.payment_status::Trạng thái}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.payment_description::Mô tả}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.period::Period}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.description::Description}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.pay_to_from::Pay to / Pay from}}</th>
+                  <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value::Value}}</th>
+                  <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
+                  <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_in_base_currency::Value in VND}}</th>
+                  <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_type::Payment Type}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_status::Payment Status}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.due_date::Due Date}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_date::Payment Date}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_method::Payment Method}}</th>
+                  <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.transaction_id::Transaction ID}}</th>
                 </tr>
               </thead>
               <tbody>
                 <!-- Highlighted Current Record in subtle light gray -->
                 <tr style="background:#F1F5F9; border-bottom:1px solid #E2E8F0; font-weight:600; color:#1E293B;">
                   <td style="padding:7px 10px; border:none; white-space:nowrap;">
-                    ${record.payment_id || record_id}
-                    <span style="display:inline-block; margin-left:6px; padding:1px 6px; font-size:10px; font-weight:600; color:#475569; background:#E2E8F0; border-radius:4px;">{{msg.current_proposal::Current}}</span>
+                    ${record.payment_period != null ? record.payment_period : '—'}
+                    <span style="display:inline-block; margin-left:4px; padding:1px 5px; font-size:10px; font-weight:600; color:#475569; background:#E2E8F0; border-radius:4px;">{{msg.current_proposal::Current}}</span>
                   </td>
-                  <td style="padding:7px 10px; border:none;">${paymentTypeLabel}</td>
-                  <td style="padding:7px 10px; border:none;">${partyName || '—'}</td>
-                  <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formattedValue}</td>
-                  <td style="padding:7px 10px; border:none;">{{val.submitted_for_payment::Đã gửi yêu cầu}}</td>
                   <td style="padding:7px 10px; border:none;">${record.payment_description || '—'}</td>
+                  <td style="padding:7px 10px; border:none;">${partyName || resolveCounterParty(record)}</td>
+                  <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(record.value || 0)}</td>
+                  <td style="padding:7px 10px; border:none; text-align:center;">${resolveCurrency(record.currency)}</td>
+                  <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(record.value_in_base_currency || 0)}</td>
+                  <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${record.exchange_rate != null ? formatAmount(record.exchange_rate) : '—'}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${resolvePaymentTypeToken(record.payment_type)}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">{{val.submitted_for_payment::Đã gửi yêu cầu thanh toán}}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${formatDate(record.due_date)}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${formatDate(record.payment_date)}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${record.payment_method || '—'}</td>
+                  <td style="padding:7px 10px; border:none;">${myCompMap.get(String(record.my_company)) || record.my_company || '—'}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${record.transaction_id || '—'}</td>
                 </tr>
         `);
 
         if (otherPaymentsRes && otherPaymentsRes.rows && otherPaymentsRes.rows.length > 0) {
           otherPaymentsRes.rows.forEach(p => {
-            const pType = resolvePaymentTypeToken(p.payment_type);
-            const pVal = `${formatAmount(p.value || 0)} ${resolveCurrency(p.currency)}`;
-            const pStatus = resolvePaymentStatusToken(p.payment_status);
             htmlParts.push(`
               <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_id}</td>
-                <td style="padding:6px 10px; border:none;">${pType}</td>
-                <td style="padding:6px 10px; border:none;">—</td>
-                <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${pVal}</td>
-                <td style="padding:6px 10px; border:none;">${pStatus}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_period != null ? p.payment_period : '—'}</td>
                 <td style="padding:6px 10px; border:none;">${p.payment_description || '—'}</td>
+                <td style="padding:6px 10px; border:none;">${resolveCounterParty(p)}</td>
+                <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(p.value || 0)}</td>
+                <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(p.currency)}</td>
+                <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(p.value_in_base_currency || 0)}</td>
+                <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${p.exchange_rate != null ? formatAmount(p.exchange_rate) : '—'}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolvePaymentTypeToken(p.payment_type)}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolvePaymentStatusToken(p.payment_status)}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(p.due_date)}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(p.payment_date)}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_method || '—'}</td>
+                <td style="padding:6px 10px; border:none;">${myCompMap.get(String(p.my_company)) || p.my_company || '—'}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.transaction_id || '—'}</td>
               </tr>
             `);
           });
         }
         htmlParts.push(`</tbody></table></div>`);
 
-        // Contracts
+        // 2. Contracts Table (Columns matching contract table view config)
         const hasContracts = contractsRes && contractsRes.rows && contractsRes.rows.length > 0;
         const showContracts = hasContracts || rootElements.includes('CONTRACT');
         if (showContracts) {
@@ -2547,28 +2680,46 @@ router.post('/execute', async (req, res) => {
                 {{col.contract::Hợp đồng}} (${contractsRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:550px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1200px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.contractspood_no::Số HĐ}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.contract_name_or_description::Mô tả}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.contractor::Đối tác}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.contract_name_or_description::Contract Name}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contractspood_no::Contracts/PO/OD No}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.contract_owner::Contract Owner}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.contractor::Contractor}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contract_type::Type}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contract_signed_date::Contract Signed Date}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat::Value Before VAT}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value::VAT Value}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value::Total Value}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
                     </tr>
                   </thead>
                   <tbody>
             `);
             contractsRes.rows.forEach(c => {
-              const no = c.contractspood_no || c.contract_id || '—';
-              const name = c.contract_name_or_description || '—';
-              const partner = c.contractor_name || c.contractor || '—';
-              const val = c.total_value ? `${formatAmount(c.total_value)} ${resolveCurrency(c.currency)}` : '—';
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${no}</td>
-                  <td style="padding:6px 10px; border:none;">${name}</td>
-                  <td style="padding:6px 10px; border:none;">${partner}</td>
-                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                  <td style="padding:6px 10px; border:none;">${c.contract_name_or_description || c.contract_id || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${c.contractspood_no || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(c.my_company)) || c.my_company || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${empMap.get(String(c.contract_owner)) || c.contract_owner || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${compMap.get(String(c.contractor)) || c.contractor || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveContractTypeToken(c.type)}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(c.contract_signed_date)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.value_before_vat != null ? formatAmount(c.value_before_vat) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.vat_value != null ? formatAmount(c.vat_value) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.total_value != null ? formatAmount(c.total_value) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(c.currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.exchance_rate != null ? formatAmount(c.exchance_rate) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.value_before_vat_in_base_currency != null ? formatAmount(c.value_before_vat_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.vat_value_in_base_currency != null ? formatAmount(c.vat_value_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.total_value_in_base_currency != null ? formatAmount(c.total_value_in_base_currency) : '—'}</td>
                 </tr>
               `);
             });
@@ -2576,7 +2727,7 @@ router.post('/execute', async (req, res) => {
           }
         }
 
-        // Invoices
+        // 3. Invoices Table (Columns matching invoice table view config)
         const hasInvoices = invoicesRes && invoicesRes.rows && invoicesRes.rows.length > 0;
         const showInvoices = hasInvoices || rootElements.includes('INVOICE');
         if (showInvoices) {
@@ -2592,27 +2743,44 @@ router.post('/execute', async (req, res) => {
                 {{col.invoice::Hóa đơn}} (${invoicesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:550px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1150px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.invoice_no::Số HĐ}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.invoice_date::Ngày}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.description::Mô tả}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_no::Invoice No.}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.description::Description}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_type::Type}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_method::Payment Method}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_status::Invoice Status}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_date::Sent or Received Date}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat::Value Before VAT}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value::VAT Value}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value::Total Value}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
                     </tr>
                   </thead>
                   <tbody>
             `);
             invoicesRes.rows.forEach(inv => {
-              const invNo = inv.invoice_no || inv.invoice_id || '—';
-              const dateStr = inv.invoice_date ? String(inv.invoice_date).split('T')[0] : '—';
-              const val = inv.total_value ? `${formatAmount(inv.total_value)} ${resolveCurrency(inv.currency)}` : '—';
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${invNo}</td>
-                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${dateStr}</td>
-                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.invoice_no || inv.invoice_id || '—'}</td>
                   <td style="padding:6px 10px; border:none;">${inv.description || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.invoice_type || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.payment_method || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveInvoiceStatusToken(inv.invoice_status)}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(inv.invoice_date)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.value_before_vat != null ? formatAmount(inv.value_before_vat) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.vat_value != null ? formatAmount(inv.vat_value) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.total_value != null ? formatAmount(inv.total_value) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(inv.currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.exchange_rate != null ? formatAmount(inv.exchange_rate) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.value_before_vat_in_base_currency != null ? formatAmount(inv.value_before_vat_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.vat_value_in_base_currency != null ? formatAmount(inv.vat_value_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.total_value_in_base_currency != null ? formatAmount(inv.total_value_in_base_currency) : '—'}</td>
                 </tr>
               `);
             });
@@ -2620,7 +2788,7 @@ router.post('/execute', async (req, res) => {
           }
         }
 
-        // Expenses
+        // 4. Expenses Table (Columns matching expense table view config)
         const hasExpenses = expensesRes && expensesRes.rows && expensesRes.rows.length > 0;
         const showExpenses = hasExpenses || rootElements.includes('EXPENSE');
         if (showExpenses) {
@@ -2636,22 +2804,44 @@ router.post('/execute', async (req, res) => {
                 {{col.expense::Chi phí}} (${expensesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:450px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1200px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.description::Mô tả}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.total_value::Tổng giá trị}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.description::Description}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat::Value Before VAT}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value::VAT Value}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value::Total Value}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.employee::Employee}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.id__expense_type::Expense Type}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.id__expense_cost::Expense Cost}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.fy::Fiscal Year}}</th>
                     </tr>
                   </thead>
                   <tbody>
             `);
             expensesRes.rows.forEach(exp => {
-              const desc = exp.description || '—';
-              const val = exp.total_value ? `${formatAmount(exp.total_value)} ${resolveCurrency(exp.id__currency)}` : '—';
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${desc}</td>
-                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                  <td style="padding:6px 10px; border:none;">${exp.description || '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.value_before_vat != null ? formatAmount(exp.value_before_vat) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.vat_value != null ? formatAmount(exp.vat_value) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.total_value != null ? formatAmount(exp.total_value) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(exp.id__currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.exchange_rate != null ? formatAmount(exp.exchange_rate) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.value_before_vat_in_base_currency != null ? formatAmount(exp.value_before_vat_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.vat_value_in_base_currency != null ? formatAmount(exp.vat_value_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.total_value_in_base_currency != null ? formatAmount(exp.total_value_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${empMap.get(String(exp.id__employee)) || exp.id__employee || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(exp.id__my_company)) || exp.id__my_company || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveExpenseTypeToken(exp.id__expense_type)}</td>
+                  <td style="padding:6px 10px; border:none;">${exp.id__expense_cost || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${exp.fy || '—'}</td>
                 </tr>
               `);
             });
@@ -2659,7 +2849,7 @@ router.post('/execute', async (req, res) => {
           }
         }
 
-        // Assets
+        // 5. Assets Table (Columns matching asset table view config)
         const hasAssets = assetsRes && assetsRes.rows && assetsRes.rows.length > 0;
         const showAssets = hasAssets || rootElements.includes('ASSET') || rootElements.includes('DEVICE AND ASSET');
         if (showAssets) {
@@ -2675,26 +2865,42 @@ router.post('/execute', async (req, res) => {
                 {{col.asset::Tài sản}} (${assetsRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:480px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1150px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.asset_name::Tên tài sản}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.qty::SL}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right;">{{col.purchase_cost::Giá mua}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.asset_name::Asset Name}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.type::Type}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.status::Status}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">{{col.qty::Qty}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.identity_number::Identity Number}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.purchase_date::Purchase Date}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.purchase_cost::Purchase Cost}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.asset_value_in_base_currency::Purchase Cost in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.current_owner::Current Owner}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.location::Location}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
                     </tr>
                   </thead>
                   <tbody>
             `);
             assetsRes.rows.forEach(a => {
-              const code = a.office_asset_id ? `[${a.office_asset_id}] ` : '';
-              const name = `${code}${a.asset_name || '—'}`;
-              const qty = a.qty ? `x${a.qty}` : '1';
-              const val = a.purchase_cost ? `${formatAmount(a.purchase_cost)} ${resolveCurrency(a.currency)}` : '—';
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${name}</td>
-                  <td style="padding:6px 10px; border:none; text-align:center;">${qty}</td>
-                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${val}</td>
+                  <td style="padding:6px 10px; border:none;">${a.office_asset_id ? `[${a.office_asset_id}] ` : ''}${a.asset_name || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${a.type || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveAssetStatusToken(a.status)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${a.qty != null ? a.qty : '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${a.identity_number || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(a.purchase_date)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${a.purchase_cost != null ? formatAmount(a.purchase_cost) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(a.currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${a.exchange_rate != null ? formatAmount(a.exchange_rate) : '—'}</td>
+                  <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${a.value_in_base_currency != null ? formatAmount(a.value_in_base_currency) : '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${empMap.get(String(a.current_owner)) || a.current_owner || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${a.location || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(a.id__my_company)) || a.id__my_company || '—'}</td>
                 </tr>
               `);
             });
@@ -2702,7 +2908,7 @@ router.post('/execute', async (req, res) => {
           }
         }
 
-        // Services
+        // 6. Services Table (Columns matching service table view config)
         const hasServices = servicesRes && servicesRes.rows && servicesRes.rows.length > 0;
         const showServices = hasServices || rootElements.includes('SERVICE');
         if (showServices) {
@@ -2718,24 +2924,34 @@ router.post('/execute', async (req, res) => {
                 {{col.service::Dịch vụ}} (${servicesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:480px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:850px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.service_name::Tên dịch vụ}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.service_period::Thời hạn}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.service_name::Service Name}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.service_id::Service Code}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.service_type::Type}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.status::Status}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.note::Note}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.start_date::Start Date}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.end_date::End Date}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.fy::Fiscal Year}}</th>
+                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
                     </tr>
                   </thead>
                   <tbody>
             `);
             servicesRes.rows.forEach(s => {
-              const name = s.service_name || s.service_id || '—';
-              const sDate = s.start_date ? String(s.start_date).split('T')[0] : '';
-              const eDate = s.end_date ? String(s.end_date).split('T')[0] : '';
-              const period = (sDate || eDate) ? `${sDate} ~ ${eDate}` : '—';
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${name}</td>
-                  <td style="padding:6px 10px; border:none;">${period}</td>
+                  <td style="padding:6px 10px; border:none;">${s.service_name || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${s.service_id || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${s.service_type || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveServiceStatusToken(s.status)}</td>
+                  <td style="padding:6px 10px; border:none;">${s.note || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(s.start_date)}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(s.end_date)}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${s.fy || '—'}</td>
+                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(s.my_company)) || s.my_company || '—'}</td>
                 </tr>
               `);
             });
