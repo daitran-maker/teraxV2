@@ -882,7 +882,8 @@ router.get('/:tableName', async (req, res) => {
             values: [accessibleReqIds, userEmpId]
           }));
         } else {
-          const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId);
+          const reqParam = req.query.request || req.query.request_id || req.query.id__request || req.query.id_request;
+          const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId, reqParam);
           let reqCol = dbCols.includes('id__request') ? 'id__request' : (dbCols.includes('id_request') ? 'id_request' : 'request');
           let extraOwnerConds = [];
           if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $2`);

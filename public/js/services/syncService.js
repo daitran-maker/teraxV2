@@ -154,6 +154,9 @@ function handleRealTimeUpdate(payload) {
     const pkField = MODULES[actualModule] ? MODULES[actualModule].pk : null;
 
     if (currentView === 'detail' && currentRecord && pkField && String(currentRecord[pkField]) === String(parentId)) {
+      if (typeof clearChildTableCache === 'function') {
+        clearChildTableCache(table, currentModule, parentId);
+      }
       loadChildTable(table, currentModule, parentId);
     }
   } else {

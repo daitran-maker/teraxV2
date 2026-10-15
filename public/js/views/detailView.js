@@ -3802,18 +3802,25 @@ window.switchTab = function (btnOrKey, childKey) {
       }
     }
   } else {
-    // Child tables: lazy load on first click if not loaded yet
+    // Child tables: lazy load on first click, or refresh comments on click to ensure live content
     const childContainer = container.querySelector(`#child-table-container-${key}`);
-    if (childContainer && childContainer.dataset.loaded !== 'true') {
+    const isCommentTab = key === 'comment' || key === 'ticket_comment';
+    if (childContainer && (childContainer.dataset.loaded !== 'true' || isCommentTab)) {
       const pane = btn ? btn.closest('.main > .content, .main > [id^="pane-"]') : document.getElementById('content');
       const hash = pane ? (pane.dataset.hash || '') : '';
       const [path] = hash.split('&');
       const [resolvedModule, resolvedPkVal] = path.split('/');
       if (resolvedModule && resolvedPkVal) {
+        if (isCommentTab && typeof clearChildTableCache === 'function') {
+          clearChildTableCache(key, resolvedModule, resolvedPkVal);
+        }
         loadChildTable(key, resolvedModule, resolvedPkVal);
       } else if (typeof currentRecord !== 'undefined' && currentRecord && typeof currentModule !== 'undefined' && currentModule) {
         const mod = MODULES[currentModule];
         if (mod && mod.pk && currentRecord[mod.pk]) {
+          if (isCommentTab && typeof clearChildTableCache === 'function') {
+            clearChildTableCache(key, currentModule, currentRecord[mod.pk]);
+          }
           loadChildTable(key, currentModule, currentRecord[mod.pk]);
         }
       }

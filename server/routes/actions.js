@@ -353,6 +353,10 @@ router.get('/:tableName/:recordId', async (req, res) => {
             }
           }
 
+          if (actionId === 'payment_req_outgoing' && record.payment_request) {
+            label = 'Request payment again';
+          }
+
           availableActions.push({
             action_id: actionId,
             label: label,

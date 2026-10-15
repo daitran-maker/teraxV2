@@ -171,6 +171,21 @@ async function submitRequest({ client, record, record_id, user, action_id, data 
        WHERE request_id = $1`,
       [record_id, flow ? JSON.stringify(flow) : record.approval_flow, newSrStatus, newProcessStatus, JSON.stringify([logEntry])]
     );
+
+    // If this is a Payment Request (type 5 or RPM or PAYMENT), update linked payments back to 121 (or 31 if Tier 0)
+    const reqTypeUpper = String(record.request_type || '').toUpperCase();
+    if (reqTypeUpper === '5' || reqTypeUpper === 'RPM' || reqTypeUpper === 'PAYMENT' || String(record_id).startsWith('5-')) {
+      const payStatus = isTier0 ? 31 : 121;
+      await client.query(
+        `UPDATE payment SET payment_status = $2 WHERE payment_request = $1 AND payment_status = 30`,
+        [record_id, payStatus]
+      );
+    }
+
+    try {
+      const { clearUserReqIdsCache } = require('../../crud/server/crud.helpers');
+      if (typeof clearUserReqIdsCache === 'function') clearUserReqIdsCache();
+    } catch (e) {}
 }
 
 async function withdrawRequest({ client, record, record_id, user, action_id, data }) {
