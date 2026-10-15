@@ -2598,22 +2598,22 @@ router.post('/execute', async (req, res) => {
             {{col.payment::Khoản thanh toán}}:
           </div>
           <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-            <table style="width:100%; min-width:1350px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+            <table style="width:100%; min-width:1300px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
               <thead>
                 <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.period::Period}}</th>
-                  <th style="padding:6px 10px; border:none; min-width:280px;">{{col.description::Description}}</th>
-                  <th style="padding:6px 10px; border:none; min-width:160px;">{{col.pay_to_from::Pay to / Pay from}}</th>
-                  <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value::Value}}</th>
-                  <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
-                  <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_in_base_currency::Value in VND}}</th>
-                  <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.description::Description}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.pay_to_from::Pay to / Pay from}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value::Value}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:center;">{{col.currency::Currency}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_in_base_currency::Value in VND}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.exchange_rate::Exchange Rate}}</th>
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_type::Payment Type}}</th>
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_status::Payment Status}}</th>
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.due_date::Due Date}}</th>
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_date::Payment Date}}</th>
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_method::Payment Method}}</th>
-                  <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                  <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.my_company::My Company}}</th>
                   <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.transaction_id::Transaction ID}}</th>
                 </tr>
               </thead>
@@ -2624,10 +2624,10 @@ router.post('/execute', async (req, res) => {
                     ${record.payment_period != null ? record.payment_period : '—'}
                     <span style="display:inline-block; margin-left:4px; padding:1px 5px; font-size:10px; font-weight:600; color:#475569; background:#E2E8F0; border-radius:4px;">{{msg.current_proposal::Current}}</span>
                   </td>
-                  <td style="padding:7px 10px; border:none; min-width:280px; word-break:break-word;">${record.payment_description || '—'}</td>
-                  <td style="padding:7px 10px; border:none; min-width:160px;">${partyName || resolveCounterParty(record)}</td>
+                  <td style="padding:7px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${record.payment_description || '—'}</div></td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${partyName || resolveCounterParty(record)}</td>
                   <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(record.value || 0)}</td>
-                  <td style="padding:7px 10px; border:none; text-align:center;">${resolveCurrency(record.currency)}</td>
+                  <td style="padding:7px 10px; border:none; text-align:center; white-space:nowrap;">${resolveCurrency(record.currency)}</td>
                   <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(record.value_in_base_currency || 0)}</td>
                   <td style="padding:7px 10px; border:none; text-align:right; white-space:nowrap;">${record.exchange_rate != null ? formatAmount(record.exchange_rate) : '—'}</td>
                   <td style="padding:7px 10px; border:none; white-space:nowrap;">${resolvePaymentTypeToken(record.payment_type)}</td>
@@ -2635,7 +2635,7 @@ router.post('/execute', async (req, res) => {
                   <td style="padding:7px 10px; border:none; white-space:nowrap;">${formatDate(record.due_date)}</td>
                   <td style="padding:7px 10px; border:none; white-space:nowrap;">${formatDate(record.payment_date)}</td>
                   <td style="padding:7px 10px; border:none; white-space:nowrap;">${record.payment_method || '—'}</td>
-                  <td style="padding:7px 10px; border:none;">${myCompMap.get(String(record.my_company)) || record.my_company || '—'}</td>
+                  <td style="padding:7px 10px; border:none; white-space:nowrap;">${myCompMap.get(String(record.my_company)) || record.my_company || '—'}</td>
                   <td style="padding:7px 10px; border:none; white-space:nowrap;">${record.transaction_id || '—'}</td>
                 </tr>
         `);
@@ -2645,10 +2645,10 @@ router.post('/execute', async (req, res) => {
             htmlParts.push(`
               <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_period != null ? p.payment_period : '—'}</td>
-                <td style="padding:6px 10px; border:none; min-width:280px; word-break:break-word;">${p.payment_description || '—'}</td>
-                <td style="padding:6px 10px; border:none;">${resolveCounterParty(p)}</td>
+                <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${p.payment_description || '—'}</div></td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveCounterParty(p)}</td>
                 <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(p.value || 0)}</td>
-                <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(p.currency)}</td>
+                <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${resolveCurrency(p.currency)}</td>
                 <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${formatAmount(p.value_in_base_currency || 0)}</td>
                 <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${p.exchange_rate != null ? formatAmount(p.exchange_rate) : '—'}</td>
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolvePaymentTypeToken(p.payment_type)}</td>
@@ -2656,7 +2656,7 @@ router.post('/execute', async (req, res) => {
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(p.due_date)}</td>
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(p.payment_date)}</td>
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.payment_method || '—'}</td>
-                <td style="padding:6px 10px; border:none;">${myCompMap.get(String(p.my_company)) || p.my_company || '—'}</td>
+                <td style="padding:6px 10px; border:none; white-space:nowrap;">${myCompMap.get(String(p.my_company)) || p.my_company || '—'}</td>
                 <td style="padding:6px 10px; border:none; white-space:nowrap;">${p.transaction_id || '—'}</td>
               </tr>
             `);
@@ -2680,24 +2680,24 @@ router.post('/execute', async (req, res) => {
                 {{col.contract::Hợp đồng}} (${contractsRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:1200px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1300px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.contract_name_or_description::Contract Name}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contract_name_or_description::Contract Name}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contractspood_no::Contracts/PO/OD No}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.contract_owner::Contract Owner}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.contractor::Contractor}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.my_company::My Company}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contract_owner::Contract Owner}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contractor::Contractor}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contract_type::Type}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.contract_signed_date::Contract Signed Date}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat::Value Before VAT}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value::VAT Value}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value::Total Value}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_before_vat::Value Before VAT}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.vat_value::VAT Value}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.total_value::Total Value}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2705,17 +2705,17 @@ router.post('/execute', async (req, res) => {
             contractsRes.rows.forEach(c => {
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${c.contract_name_or_description || c.contract_id || '—'}</td>
+                  <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${c.contract_name_or_description || c.contract_id || '—'}</div></td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${c.contractspood_no || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(c.my_company)) || c.my_company || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${empMap.get(String(c.contract_owner)) || c.contract_owner || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${compMap.get(String(c.contractor)) || c.contractor || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${myCompMap.get(String(c.my_company)) || c.my_company || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${empMap.get(String(c.contract_owner)) || c.contract_owner || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${compMap.get(String(c.contractor)) || c.contractor || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveContractTypeToken(c.type)}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(c.contract_signed_date)}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.value_before_vat != null ? formatAmount(c.value_before_vat) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.vat_value != null ? formatAmount(c.vat_value) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.total_value != null ? formatAmount(c.total_value) : '—'}</td>
-                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(c.currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${resolveCurrency(c.currency)}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.exchance_rate != null ? formatAmount(c.exchance_rate) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.value_before_vat_in_base_currency != null ? formatAmount(c.value_before_vat_in_base_currency) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${c.vat_value_in_base_currency != null ? formatAmount(c.vat_value_in_base_currency) : '—'}</td>
@@ -2743,23 +2743,23 @@ router.post('/execute', async (req, res) => {
                 {{col.invoice::Hóa đơn}} (${invoicesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:1350px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1300px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_no::Invoice No.}}</th>
-                      <th style="padding:6px 10px; border:none; min-width:280px;">{{col.description::Description}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.description::Description}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_type::Type}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.payment_method::Payment Method}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_status::Invoice Status}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.invoice_date::Sent or Received Date}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat::Value Before VAT}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value::VAT Value}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value::Total Value}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_before_vat::Value Before VAT}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.vat_value::VAT Value}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.total_value::Total Value}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2768,7 +2768,7 @@ router.post('/execute', async (req, res) => {
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.invoice_no || inv.invoice_id || '—'}</td>
-                  <td style="padding:6px 10px; border:none; min-width:280px; word-break:break-word;">${inv.description || '—'}</td>
+                  <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${inv.description || '—'}</div></td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.invoice_type || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${inv.payment_method || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveInvoiceStatusToken(inv.invoice_status)}</td>
@@ -2776,7 +2776,7 @@ router.post('/execute', async (req, res) => {
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.value_before_vat != null ? formatAmount(inv.value_before_vat) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.vat_value != null ? formatAmount(inv.vat_value) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.total_value != null ? formatAmount(inv.total_value) : '—'}</td>
-                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(inv.currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${resolveCurrency(inv.currency)}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.exchange_rate != null ? formatAmount(inv.exchange_rate) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.value_before_vat_in_base_currency != null ? formatAmount(inv.value_before_vat_in_base_currency) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${inv.vat_value_in_base_currency != null ? formatAmount(inv.vat_value_in_base_currency) : '—'}</td>
@@ -2804,22 +2804,22 @@ router.post('/execute', async (req, res) => {
                 {{col.expense::Chi phí}} (${expensesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:1200px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1300px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.description::Description}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat::Value Before VAT}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value::VAT Value}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value::Total Value}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.employee::Employee}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.description::Description}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_before_vat::Value Before VAT}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.vat_value::VAT Value}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.total_value::Total Value}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.exchange_rate::Exchange Rate}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.value_before_vat_in_base_currency::Value Before VAT in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.vat_value_in_base_currency::VAT Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap; text-align:right;">{{col.total_value_in_base_currency::Total Value in Base Currency}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.employee::Employee}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.my_company::My Company}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.id__expense_type::Expense Type}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.id__expense_cost::Expense Cost}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.id__expense_cost::Expense Cost}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.fy::Fiscal Year}}</th>
                     </tr>
                   </thead>
@@ -2828,19 +2828,19 @@ router.post('/execute', async (req, res) => {
             expensesRes.rows.forEach(exp => {
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${exp.description || '—'}</td>
+                  <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${exp.description || '—'}</div></td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.value_before_vat != null ? formatAmount(exp.value_before_vat) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.vat_value != null ? formatAmount(exp.vat_value) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.total_value != null ? formatAmount(exp.total_value) : '—'}</td>
-                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(exp.id__currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${resolveCurrency(exp.id__currency)}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.exchange_rate != null ? formatAmount(exp.exchange_rate) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.value_before_vat_in_base_currency != null ? formatAmount(exp.value_before_vat_in_base_currency) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.vat_value_in_base_currency != null ? formatAmount(exp.vat_value_in_base_currency) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${exp.total_value_in_base_currency != null ? formatAmount(exp.total_value_in_base_currency) : '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${empMap.get(String(exp.id__employee)) || exp.id__employee || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(exp.id__my_company)) || exp.id__my_company || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${empMap.get(String(exp.id__employee)) || exp.id__employee || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${myCompMap.get(String(exp.id__my_company)) || exp.id__my_company || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveExpenseTypeToken(exp.id__expense_type)}</td>
-                  <td style="padding:6px 10px; border:none;">${exp.id__expense_cost || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${exp.id__expense_cost || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${exp.fy || '—'}</td>
                 </tr>
               `);
@@ -2865,22 +2865,22 @@ router.post('/execute', async (req, res) => {
                 {{col.asset::Tài sản}} (${assetsRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:1150px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:1250px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.asset_name::Asset Name}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.asset_name::Asset Name}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.type::Type}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.status::Status}}</th>
                       <th style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">{{col.qty::Qty}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.identity_number::Identity Number}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.purchase_date::Purchase Date}}</th>
                       <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.purchase_cost::Purchase Cost}}</th>
-                      <th style="padding:6px 10px; border:none; text-align:center;">{{col.currency::Currency}}</th>
+                      <th style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">{{col.currency::Currency}}</th>
                       <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.exchange_rate::Exchange Rate}}</th>
                       <th style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">{{col.asset_value_in_base_currency::Purchase Cost in Base Currency}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.current_owner::Current Owner}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.location::Location}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.current_owner::Current Owner}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.location::Location}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.my_company::My Company}}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2888,19 +2888,19 @@ router.post('/execute', async (req, res) => {
             assetsRes.rows.forEach(a => {
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${a.office_asset_id ? `[${a.office_asset_id}] ` : ''}${a.asset_name || '—'}</td>
+                  <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${a.office_asset_id ? `[${a.office_asset_id}] ` : ''}${a.asset_name || '—'}</div></td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${a.type || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveAssetStatusToken(a.status)}</td>
                   <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${a.qty != null ? a.qty : '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${a.identity_number || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(a.purchase_date)}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${a.purchase_cost != null ? formatAmount(a.purchase_cost) : '—'}</td>
-                  <td style="padding:6px 10px; border:none; text-align:center;">${resolveCurrency(a.currency)}</td>
+                  <td style="padding:6px 10px; border:none; text-align:center; white-space:nowrap;">${resolveCurrency(a.currency)}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${a.exchange_rate != null ? formatAmount(a.exchange_rate) : '—'}</td>
                   <td style="padding:6px 10px; border:none; text-align:right; white-space:nowrap;">${a.value_in_base_currency != null ? formatAmount(a.value_in_base_currency) : '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${empMap.get(String(a.current_owner)) || a.current_owner || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${a.location || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(a.id__my_company)) || a.id__my_company || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${empMap.get(String(a.current_owner)) || a.current_owner || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${a.location || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${myCompMap.get(String(a.id__my_company)) || a.id__my_company || '—'}</td>
                 </tr>
               `);
             });
@@ -2924,18 +2924,18 @@ router.post('/execute', async (req, res) => {
                 {{col.service::Dịch vụ}} (${servicesRes.rows.length}):
               </div>
               <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px;">
-                <table style="width:100%; min-width:850px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
+                <table style="width:100%; min-width:950px; border-collapse:collapse; border:none; font-size:12px; background:transparent;">
                   <thead>
                     <tr style="border-bottom:2px solid #E2E8F0; background:#F8FAFC; color:#64748B; font-weight:600; text-align:left;">
-                      <th style="padding:6px 10px; border:none;">{{col.service_name::Service Name}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.service_name::Service Name}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.service_id::Service Code}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.service_type::Type}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.status::Status}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.note::Note}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.note::Note}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.start_date::Start Date}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.end_date::End Date}}</th>
                       <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.fy::Fiscal Year}}</th>
-                      <th style="padding:6px 10px; border:none;">{{col.my_company::My Company}}</th>
+                      <th style="padding:6px 10px; border:none; white-space:nowrap;">{{col.my_company::My Company}}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2943,15 +2943,15 @@ router.post('/execute', async (req, res) => {
             servicesRes.rows.forEach(s => {
               htmlParts.push(`
                 <tr style="border-bottom:1px solid #F1F5F9; color:#334155;">
-                  <td style="padding:6px 10px; border:none;">${s.service_name || '—'}</td>
+                  <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${s.service_name || '—'}</div></td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${s.service_id || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${s.service_type || '—'}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${resolveServiceStatusToken(s.status)}</td>
-                  <td style="padding:6px 10px; border:none;">${s.note || '—'}</td>
+                  <td style="padding:6px 10px; border:none; vertical-align:top;"><div style="max-width:240px; min-width:140px; white-space:normal; word-break:break-word; line-height:1.4;">${s.note || '—'}</div></td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(s.start_date)}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${formatDate(s.end_date)}</td>
                   <td style="padding:6px 10px; border:none; white-space:nowrap;">${s.fy || '—'}</td>
-                  <td style="padding:6px 10px; border:none;">${myCompMap.get(String(s.my_company)) || s.my_company || '—'}</td>
+                  <td style="padding:6px 10px; border:none; white-space:nowrap;">${myCompMap.get(String(s.my_company)) || s.my_company || '—'}</td>
                 </tr>
               `);
             });
