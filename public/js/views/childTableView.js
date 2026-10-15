@@ -1381,7 +1381,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
           const replyTagVal = authorEmail || cmt.comment_by || cmt.created_by || authorName;
 
           html += `
-              <div class="comment-card ${isMyComment ? 'my-comment' : ''}" data-comment-id="${cmt.comment_id}" style="margin-bottom:8px; background:${cardBg}; padding:${cardPadding}; border-radius:12px; border:1px solid ${cardBorder}; box-shadow:${cardShadow}; max-width:${cardMaxWidth}; align-self:${cardAlign}; width:${cardWidth}; min-width:${cardMinWidth};">
+              <div class="comment-card ${isMyComment ? 'my-comment' : ''}" data-comment-id="${cmt.comment_id}" style="margin-bottom:8px; background:${cardBg}; padding:${cardPadding}; border-radius:12px; border:1px solid ${cardBorder}; box-shadow:${cardShadow}; max-width:${cardMaxWidth}; align-self:${cardAlign}; width:${cardWidth}; min-width:${cardMinWidth}; overflow:hidden;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:20px;">
                   <div style="display:flex; align-items:center; gap:10px;">
                     <div style="width:32px; height:32px; border-radius:50%; background:#F97316; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; letter-spacing:0.5px;">${displayAuthorInitial}</div>
@@ -1398,7 +1398,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 ${toTags}
                 ${(() => {
                   const hasTable = /<table[\s>]/i.test(content);
-                  const contentStyle = `font-size:13px; color:#374151; line-height:1.6; padding-left:42px; ${hasTable ? 'white-space:normal; overflow-x:auto;' : 'white-space:pre-wrap;'}`;
+                  const contentStyle = `font-size:13px; color:#374151; line-height:1.6; padding-left:42px; ${hasTable ? 'white-space:normal; overflow-x:auto; width:100%; max-width:100%; -webkit-overflow-scrolling:touch;' : 'white-space:pre-wrap;'}`;
                   return `<div style="${contentStyle}">${content}</div>`;
                 })()}
                 ${attachmentsHtml}
@@ -1642,6 +1642,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             `;
           };
 
+          const hasFooter = ['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(childKey) && preparedData.length > 0;
           html = `
                  <style>
                    .child-table-row:hover {
@@ -1649,7 +1650,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                    }
                  </style>
                  <div class="table-responsive child-table-scroll-wrap" style="margin: 0; flex: 1; height: 100%; min-height: 0; width: 100%; overflow-x: auto; overflow-y: auto; border: none; border-radius: 0; background: transparent; box-shadow: none; position: relative;">
-                   <table class="table modern-table" style="width: 100%; min-width: max-content; height: 100%; border-collapse: separate; border-spacing: 0; margin: 0;">
+                   <table class="table modern-table" style="width: 100%; min-width: max-content; ${hasFooter ? 'height: 100%;' : ''} border-collapse: separate; border-spacing: 0; margin: 0;">
                      <thead style="position: sticky; top: 0; z-index: 6; background: #F8FAFC;">
                        <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                          ${allowChildActions ? `<th style="padding: 12px 14px; text-align: center; font-size:11px; font-weight: 600; text-transform: uppercase; color: #64748B; letter-spacing: 0.5px; white-space: nowrap; width: 50px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">${t('col.actions', 'Actions')}</th>` : ''}
@@ -1730,7 +1731,6 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   let starsHTML = '';
                   for (let i = 1; i <= 5; i++) {
                     const starColor = i <= pointVal ? '#EAB308' : '#D1D5DB';
-                    starsHTML += `<span class="material-symbols-rounded" style="font-size:16px; color:${starColor}; vertical-align:middle; line-height:1;">star</span>`;
                   }
                   const cellContent = `${starsHTML} <span style="font-size:11px; color:#64748B; font-weight:600; margin-left:4px; vertical-align:middle;">(${pointVal})</span>`;
                   return `<td style="padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;">${cellContent}</td>`;
@@ -1749,7 +1749,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   }
                   cellContentHTML = escapeHTML(translatedVal);
                 } else {
-                  const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description');
+                  const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description') || c.key === 'note' || c.key === 'comment';
                   let display;
                   if (isDescCol) {
                     display = displayVal.length > 35 ? displayVal.substring(0, 35) + '....' : displayVal;
@@ -1767,17 +1767,17 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   ? escapeHTML(String(val || '').replace(/<[^>]*>/g, '').trim())
                   : escapeHTML(displayVal);
 
-                const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description');
+                const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description') || c.key === 'note' || c.key === 'comment';
                 const cellStyle = isDescCol
-                  ? 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis;'
-                  : 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;';
+                  ? 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;'
+                  : (c.key === 'service_name' ? 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;' : 'padding: 12px 14px; font-size: 13px; color: #334155; white-space: nowrap;');
 
                 return `<td style="${cellStyle}" title="${titleAttr}">${cellContentHTML}</td>`;
               }).join('')}
                            </tr>
                          `;
             }).join('')}
-                       ${['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(childKey) ? `
+                       ${hasFooter ? `
                          <tr style="height: 100%; pointer-events: none;"><td colspan="${(allowChildActions ? 1 : 0) + cols.length}" style="border: none; padding: 0; background: transparent;"></td></tr>
                        ` : ''}
                      </tbody>
@@ -1902,6 +1902,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             `;
           };
 
+          const hasFooterDark = ['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(childKey) && preparedData.length > 0;
           html = `
                  <style>
                    .child-table-row:hover {
@@ -1909,7 +1910,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                    }
                  </style>
                  <div class="table-responsive child-table-scroll-wrap" style="margin: 8px 0; flex: 1; height: 100%; min-height: 0; width: 100%; overflow-x: auto; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); position: relative;">
-                   <table class="table modern-table" style="width: 100%; min-width: max-content; height: 100%; border-collapse: separate; border-spacing: 0; margin: 0;">
+                   <table class="table modern-table" style="width: 100%; min-width: max-content; ${hasFooterDark ? 'height: 100%;' : ''} border-collapse: separate; border-spacing: 0; margin: 0;">
                      <thead style="position: sticky; top: 0; z-index: 6; background: var(--bg-card);">
                        <tr style="border-bottom: 1px solid var(--border);">
                          ${cols.map(c => `<th style="padding: 10px 14px; text-align: left; font-size:10px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; white-space: nowrap; background: var(--bg-card); border-bottom: 1px solid var(--border);">${escapeHTML(t('col.' + c.key, c.label))}</th>`).join('')}
@@ -1985,7 +1986,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   return `<td style="padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;">${escapeHTML(translatedVal)}</td>`;
                 }
 
-                const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description');
+                const isDescCol = c.key === 'payment_description' || c.key === 'description' || String(c.key).toLowerCase().includes('description') || c.key === 'note' || c.key === 'comment';
                 let display;
                 if (isDescCol) {
                   display = displayVal.length > 35 ? displayVal.substring(0, 35) + '....' : displayVal;
@@ -1993,14 +1994,14 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                   display = displayVal.length > 80 ? displayVal.substring(0, 78) + '…' : displayVal;
                 }
                 const cellStyle = isDescCol
-                  ? 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis;'
-                  : 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;';
+                  ? 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;'
+                  : (c.key === 'service_name' ? 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;' : 'padding: 10px 14px; font-size:12px; color: var(--text-primary); white-space: nowrap;');
                 return `<td style="${cellStyle}" title="${escapeHTML(displayVal)}">${escapeHTML(display)}</td>`;
               }).join('')}
                              </tr>
                            `;
             }).join('')}
-                      ${['mtr', 'contract', 'payment', 'invoice', 'expense', 'asset'].includes(childKey) ? `
+                      ${hasFooterDark ? `
                         <tr style="height: 100%; pointer-events: none;"><td colspan="${cols.length}" style="border: none; padding: 0; background: transparent;"></td></tr>
                       ` : ''}
                      </tbody>
