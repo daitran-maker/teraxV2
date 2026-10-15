@@ -853,6 +853,10 @@ router.get('/:tableName/:recordId', async (req, res) => {
             }
           }
 
+          if (actionId === 'payment_req_outgoing' && record.payment_request) {
+            label = 'Request payment again';
+          }
+
           availableActions.push({
             action_id: actionId,
             label: label,
@@ -1448,6 +1452,40 @@ router.post('/execute', async (req, res) => {
          WHERE request_id = $1`,
         [record_id, flow ? JSON.stringify(flow) : record.approval_flow, newSrStatus, newProcessStatus, JSON.stringify([logEntry])]
       );
+
+      if (['5', 'RPM', 'PAYMENT'].includes(String(record.request_type || '').toUpperCase())) {
+        const payStatus = isTier0 ? 31 : 121;
+        try {
+          const linkedPays = await client.query(`
+            UPDATE payment
+            SET payment_status = $1
+            WHERE (payment_request = $2 OR (request = $2 AND payment_status = 30))
+              AND deleted_at IS NULL
+            RETURNING payment_id, payment_request, request, contract_id, payment_status, value, currency, payment_description, payment_type
+          `, [payStatus, record_id]);
+
+          if (linkedPays.rows.length > 0) {
+            linkedPays.rows.forEach(pRow => {
+              try {
+                broadcastSSE('db_change', {
+                  action: 'update',
+                  table: 'payment',
+                  id: pRow.payment_id,
+                  record: pRow
+                });
+              } catch(e) {}
+            });
+          }
+        } catch(e) {
+          console.warn('Failed to update linked payment on ACT-REQUEST-09:', e);
+        }
+      }
+      try {
+        const dynamicCrud = require('./dynamic_crud');
+        if (dynamicCrud && typeof dynamicCrud.clearUserReqIdsCache === 'function') {
+          dynamicCrud.clearUserReqIdsCache();
+        }
+      } catch(e) {}
     } else if (action_id === 'withdraw_request') {
       // Withdraw
       let flow = null;
@@ -1983,53 +2021,58 @@ router.post('/execute', async (req, res) => {
       }
 
     } else if (action_id === 'payment_req_outgoing') {
-      // Outgoing: Submit for payment → tạo request mới, update status = 31 (Ready for payment)
-      const newPaymentStatusId = 31; // Ready for payment
+      // Outgoing: Submit for payment → tạo request mới hoặc re-submit request hiện tại nếu đã withdraw
       const newRequestType = '5'; // Payment Request type ID (5)
 
-      const nowUtc = new Date();
-      const dd = String(nowUtc.getUTCDate()).padStart(2, '0');
-      const mm = String(nowUtc.getUTCMonth() + 1).padStart(2, '0');
-      const yy = String(nowUtc.getUTCFullYear()).slice(-2);
-      const dateStr = `${dd}${mm}${yy}`;
+      let isReSubmit = false;
+      let targetPaymentReqId = null;
+      let existingReq = null;
 
-      const requesterEmail = user.email || '';
-      const prefixEmail = requesterEmail.includes('@') ? requesterEmail.split('@')[0] : requesterEmail;
-      const initials = prefixEmail.slice(0, 2).toUpperCase() || 'XX';
-      const prefix = `${newRequestType}-${dateStr}-${initials}-`;
-
-      // Get next sequence number
-      const seqResult = await client.query(
-        `SELECT request_id FROM request WHERE request_id LIKE $1`,
-        [`${prefix}%`]
-      );
-      let maxSeq = 0;
-      seqResult.rows.forEach(row => {
-        const parts = row.request_id.split('-');
-        const seqPart = parts[parts.length - 1];
-        const seqNum = parseInt(seqPart, 10);
-        if (!isNaN(seqNum) && seqNum > maxSeq) {
-          maxSeq = seqNum;
+      if (record.payment_request) {
+        const existReqRes = await client.query(
+          `SELECT * FROM request WHERE request_id = $1`,
+          [record.payment_request]
+        );
+        if (existReqRes.rows.length > 0) {
+          const rRow = existReqRes.rows[0];
+          const srStatusNum = Number(rRow.sr_status);
+          const prStatusNum = Number(rRow.process_status);
+          // If in Draft (1), Rejected (4), Cancelled (117) or process_status Not started (7)
+          if (srStatusNum === 1 || srStatusNum === 4 || prStatusNum === 117 || prStatusNum === 7) {
+            isReSubmit = true;
+            targetPaymentReqId = rRow.request_id;
+            existingReq = rRow;
+          }
         }
-      });
-      const newPaymentReqId = `${prefix}${maxSeq + 1}`;
+      }
 
-      // Update payment status (121: Submitted for payment) và payment_request ID
-      await client.query(`
-        UPDATE payment 
-        SET payment_status = 121, payment_request = $1 
-        WHERE payment_id = $2
-      `, [newPaymentReqId, record_id]);
+      if (!isReSubmit) {
+        const nowUtc = new Date();
+        const dd = String(nowUtc.getUTCDate()).padStart(2, '0');
+        const mm = String(nowUtc.getUTCMonth() + 1).padStart(2, '0');
+        const yy = String(nowUtc.getUTCFullYear()).slice(-2);
+        const dateStr = `${dd}${mm}${yy}`;
 
-      try {
-        broadcastSSE('db_change', {
-          action: 'update',
-          table: 'payment',
-          id: record_id,
-          record: { payment_id: record_id, payment_status: 121, payment_request: newPaymentReqId, request: record.request, contract_id: record.contract_id }
+        const requesterEmail = user.email || '';
+        const prefixEmail = requesterEmail.includes('@') ? requesterEmail.split('@')[0] : requesterEmail;
+        const initials = prefixEmail.slice(0, 2).toUpperCase() || 'XX';
+        const prefix = `${newRequestType}-${dateStr}-${initials}-`;
+
+        // Get next sequence number
+        const seqResult = await client.query(
+          `SELECT request_id FROM request WHERE request_id LIKE $1`,
+          [`${prefix}%`]
+        );
+        let maxSeq = 0;
+        seqResult.rows.forEach(row => {
+          const parts = row.request_id.split('-');
+          const seqPart = parts[parts.length - 1];
+          const seqNum = parseInt(seqPart, 10);
+          if (!isNaN(seqNum) && seqNum > maxSeq) {
+            maxSeq = seqNum;
+          }
         });
-      } catch (sseErr) {
-        console.warn('Failed to broadcast SSE for payment status update:', sseErr);
+        targetPaymentReqId = `${prefix}${maxSeq + 1}`;
       }
 
       // Tạo request mới cho payment này
@@ -2124,97 +2167,202 @@ router.post('/execute', async (req, res) => {
         }
       }
 
-      const requestData = {
-        request_id: newPaymentReqId,
-        request_type: newRequestType,
-        sr_creater: user.employee_id,
-        requester: user.employee_id,
-        description: desc,
-        sr_status: 2, // Pending Approval ID
-        process_status: 7, // Not started ID
-        parent__id_request: parentReqId
-      };
-
-      const tzTimeStr = new Date().toISOString();
-      const logEntries = [
-        { timestamp: tzTimeStr, user: user.employee_id, action: 'created request' },
-        { timestamp: tzTimeStr, user: user.employee_id, action: 'submitted request' }
-      ];
-      requestData.log = JSON.stringify(logEntries);
-
-      await RequestModel.resolveApprovals(requestData, client);
-
-      const ptUpper = String(requestData.request_type || '').toUpperCase();
-      const isPay = ptUpper === '5' || ptUpper === 'RPM' || ptUpper === 'PAYMENT';
-      if (isPay && Number(requestData.sr_status) === 3) {
-        requestData.process_status = 9;
-        requestData.process_start_date = requestData.process_start_date || new Date().toISOString();
-        requestData.process_end_date = requestData.process_end_date || new Date().toISOString();
-      }
-
-      // Normalize sr_owner if present
-      if (requestData.sr_owner !== undefined && requestData.sr_owner !== null) {
-        if (Array.isArray(requestData.sr_owner)) {
-          requestData.sr_owner = requestData.sr_owner.map(s => s.trim().replace(/^\[|\]$/g, '').toLowerCase()).filter(Boolean);
-        } else if (typeof requestData.sr_owner === 'string') {
-          requestData.sr_owner = requestData.sr_owner.split(',').map(s => s.trim().replace(/^\[|\]$/g, '').toLowerCase()).filter(Boolean);
-        }
-      }
-
-      await client.query(`
-        INSERT INTO request (
-          request_id, request_type, sr_creater, requester, description, 
-          sr_status, process_status, 
-          sr_submitted_date, sr_created_date,  
-          policy_lead, sr_owner, approval_flow, approval_level, log,
-          parent__id_request,
-          process_start_date, process_end_date
-        ) VALUES (
-          $1, $2, $3, $4, $5, 
-          $6, $7, 
-          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 
-          $8, $9, $10, $11, $12,
-          $13,
-          CASE WHEN $7 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END,
-          CASE WHEN $7 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END
-        )
-      `, [
-        requestData.request_id,
-        requestData.request_type,
-        requestData.sr_creater,
-        requestData.requester,
-        requestData.description,
-        requestData.sr_status,
-        requestData.process_status,
-        requestData.policy_lead || null,
-        requestData.sr_owner || null,
-        requestData.approval_flow || null,
-        requestData.approval_level || null,
-        requestData.log || null,
-        requestData.parent__id_request || null
-      ]);
-
-      if (isPay && Number(requestData.sr_status) === 3) {
+      if (isReSubmit) {
+        let flow = null;
         try {
-          await client.query(
-            `UPDATE "payment" SET payment_status = 31 WHERE payment_id = $1`,
-            [record_id]
-          );
+          flow = typeof existingReq.approval_flow === 'string' ? JSON.parse(existingReq.approval_flow) : JSON.parse(JSON.stringify(existingReq.approval_flow || {}));
+        } catch (e) {
+          console.warn('Error parsing approval_flow:', e);
+        }
+
+        let isTier0 = false;
+        if (flow && flow.total_levels === 0) {
+          isTier0 = true;
+        } else if (existingReq.request_type) {
+          const polRes = await client.query('SELECT approval_level FROM policy_and_program WHERE policy_id::text = $1 OR policy_name = $1', [existingReq.request_type]);
+          if (polRes.rows.length > 0 && String(polRes.rows[0].approval_level || '').toLowerCase().includes('tier 0')) {
+            isTier0 = true;
+          }
+        }
+
+        let logEntry = null;
+        if (!isTier0 && flow && flow.steps && flow.steps.length > 0) {
+          flow.current_level = 1;
+          flow.steps.forEach((step, idx) => {
+            step.status = idx === 0 ? 2 : 7;
+            step.action_by = null;
+            step.action_date = null;
+          });
+          const tzTimeStr = new Date().toISOString();
+          logEntry = { timestamp: tzTimeStr, user: user.employee_id, action: 're-submitted payment request with updated details' };
+        } else if (isTier0) {
+          if (flow) {
+            flow.total_levels = 0;
+            flow.current_level = 0;
+            flow.steps = [];
+          }
+          const tzTimeStr = new Date().toISOString();
+          logEntry = { timestamp: tzTimeStr, user: user.employee_id, action: 're-submitted and auto-approved request (Tier 0)' };
+        } else {
+          logEntry = { timestamp: new Date().toISOString(), user: user.employee_id, action: 're-submitted payment request' };
+        }
+
+        const newSrStatus = isTier0 ? 3 : 2; // 3 = Approved, 2 = Pending Approval
+        const newProcessStatus = isTier0 ? 9 : 7;
+        const payStatus = isTier0 ? 31 : 121;
+
+        await client.query(`
+          UPDATE payment 
+          SET payment_status = $1, payment_request = $2 
+          WHERE payment_id = $3
+        `, [payStatus, targetPaymentReqId, record_id]);
+
+        await client.query(`
+          UPDATE request 
+          SET description = $2,
+              sr_status = $3,
+              process_status = $4,
+              sr_submitted_date = CURRENT_TIMESTAMP,
+              approval_flow = $5,
+              log = COALESCE(log, '[]'::jsonb) || $6::jsonb,
+              process_start_date = CASE WHEN $4 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END,
+              process_end_date = CASE WHEN $4 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END
+          WHERE request_id = $1
+        `, [
+          targetPaymentReqId,
+          desc,
+          newSrStatus,
+          newProcessStatus,
+          flow ? JSON.stringify(flow) : existingReq.approval_flow,
+          JSON.stringify([logEntry])
+        ]);
+
+        try {
           broadcastSSE('db_change', {
             action: 'update',
             table: 'payment',
             id: record_id,
-            record: { payment_id: record_id, payment_status: 31, payment_request: newPaymentReqId, request: record.request, contract_id: record.contract_id }
+            record: { payment_id: record_id, payment_status: payStatus, payment_request: targetPaymentReqId, request: record.request, contract_id: record.contract_id }
           });
-        } catch (paySyncErr) {
-          console.warn('Failed to sync payment status on auto-approval:', paySyncErr);
+          broadcastSSE('db_change', {
+            action: 'update',
+            table: 'request',
+            id: targetPaymentReqId,
+            record: { ...existingReq, description: desc, sr_status: newSrStatus, process_status: newProcessStatus }
+          });
+        } catch (e) {
+          console.warn('Failed to broadcast SSE for re-submitted payment request:', e);
         }
-      }
+      } else {
+        await client.query(`
+          UPDATE payment 
+          SET payment_status = 121, payment_request = $1 
+          WHERE payment_id = $2
+        `, [targetPaymentReqId, record_id]);
 
-      try {
-        broadcastSSE('db_change', { action: 'insert', table: 'request', record: requestData });
-      } catch (e) {
-        console.warn('Failed to broadcast SSE for created request:', e);
+        try {
+          broadcastSSE('db_change', {
+            action: 'update',
+            table: 'payment',
+            id: record_id,
+            record: { payment_id: record_id, payment_status: 121, payment_request: targetPaymentReqId, request: record.request, contract_id: record.contract_id }
+          });
+        } catch (sseErr) {
+          console.warn('Failed to broadcast SSE for payment status update:', sseErr);
+        }
+
+        const requestData = {
+          request_id: targetPaymentReqId,
+          request_type: newRequestType,
+          sr_creater: user.employee_id,
+          requester: user.employee_id,
+          description: desc,
+          sr_status: 2, // Pending Approval ID
+          process_status: 7, // Not started ID
+          parent__id_request: parentReqId
+        };
+
+        const tzTimeStr = new Date().toISOString();
+        const logEntries = [
+          { timestamp: tzTimeStr, user: user.employee_id, action: 'created request' },
+          { timestamp: tzTimeStr, user: user.employee_id, action: 'submitted request' }
+        ];
+        requestData.log = JSON.stringify(logEntries);
+
+        await RequestModel.resolveApprovals(requestData, client);
+
+        const ptUpper = String(requestData.request_type || '').toUpperCase();
+        const isPay = ptUpper === '5' || ptUpper === 'RPM' || ptUpper === 'PAYMENT';
+        if (isPay && Number(requestData.sr_status) === 3) {
+          requestData.process_status = 9;
+          requestData.process_start_date = requestData.process_start_date || new Date().toISOString();
+          requestData.process_end_date = requestData.process_end_date || new Date().toISOString();
+        }
+
+        // Normalize sr_owner if present
+        if (requestData.sr_owner !== undefined && requestData.sr_owner !== null) {
+          if (Array.isArray(requestData.sr_owner)) {
+            requestData.sr_owner = requestData.sr_owner.map(s => s.trim().replace(/^\[|\]$/g, '').toLowerCase()).filter(Boolean);
+          } else if (typeof requestData.sr_owner === 'string') {
+            requestData.sr_owner = requestData.sr_owner.split(',').map(s => s.trim().replace(/^\[|\]$/g, '').toLowerCase()).filter(Boolean);
+          }
+        }
+
+        await client.query(`
+          INSERT INTO request (
+            request_id, request_type, sr_creater, requester, description, 
+            sr_status, process_status, 
+            sr_submitted_date, sr_created_date,  
+            policy_lead, sr_owner, approval_flow, approval_level, log,
+            parent__id_request,
+            process_start_date, process_end_date
+          ) VALUES (
+            $1, $2, $3, $4, $5, 
+            $6, $7, 
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 
+            $8, $9, $10, $11, $12,
+            $13,
+            CASE WHEN $7 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END,
+            CASE WHEN $7 = 9 THEN CURRENT_TIMESTAMP ELSE NULL END
+          )
+        `, [
+          requestData.request_id,
+          requestData.request_type,
+          requestData.sr_creater,
+          requestData.requester,
+          requestData.description,
+          requestData.sr_status,
+          requestData.process_status,
+          requestData.policy_lead || null,
+          requestData.sr_owner || null,
+          requestData.approval_flow || null,
+          requestData.approval_level || null,
+          requestData.log || null,
+          requestData.parent__id_request || null
+        ]);
+
+        if (isPay && Number(requestData.sr_status) === 3) {
+          try {
+            await client.query(
+              `UPDATE "payment" SET payment_status = 31 WHERE payment_id = $1`,
+              [record_id]
+            );
+            broadcastSSE('db_change', {
+              action: 'update',
+              table: 'payment',
+              id: record_id,
+              record: { payment_id: record_id, payment_status: 31, payment_request: targetPaymentReqId, request: record.request, contract_id: record.contract_id }
+            });
+          } catch (paySyncErr) {
+            console.warn('Failed to sync payment status on auto-approval:', paySyncErr);
+          }
+        }
+
+        try {
+          broadcastSSE('db_change', { action: 'insert', table: 'request', record: requestData });
+        } catch (e) {
+          console.warn('Failed to broadcast SSE for created request:', e);
+        }
       }
 
       // Generate executive summary comment for the newly created payment request
@@ -2595,12 +2743,20 @@ router.post('/execute', async (req, res) => {
           }
         }
 
+        if (isReSubmit) {
+          htmlParts.unshift(`
+            <div style="font-weight:700; color:#1E293B; margin-bottom:8px; font-size:13px; display:flex; align-items:center; gap:6px;">
+              <span>🔄</span> <span>{{msg.payment_request_reupdated::Cập nhật yêu cầu thanh toán (Re-submitted Payment Request)}}</span>
+            </div>
+          `);
+        }
+
         const summaryCommentText = htmlParts.join('').trim();
         const commId = (typeof uuidv4 === 'function' ? uuidv4() : require('crypto').randomUUID());
         await client.query(`
           INSERT INTO "comment" ("comment_id", "request", "comment", "comment_by", "comment_date")
           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-        `, [commId, newPaymentReqId, summaryCommentText, user.employee_id || user.email || 'System']);
+        `, [commId, targetPaymentReqId, summaryCommentText, user.employee_id || user.email || 'System']);
 
         try {
           broadcastSSE('db_change', {
@@ -2608,7 +2764,7 @@ router.post('/execute', async (req, res) => {
             table: 'comment',
             record: {
               comment_id: commId,
-              request: newPaymentReqId,
+              request: targetPaymentReqId,
               comment: summaryCommentText,
               comment_by: user.employee_id || user.email || 'System',
               comment_date: new Date().toISOString()
@@ -2617,6 +2773,13 @@ router.post('/execute', async (req, res) => {
         } catch (eCmtSse) {
           console.warn('Failed to broadcast SSE for summary comment:', eCmtSse);
         }
+
+        try {
+          const dynamicCrud = require('./dynamic_crud');
+          if (dynamicCrud && typeof dynamicCrud.clearUserReqIdsCache === 'function') {
+            dynamicCrud.clearUserReqIdsCache();
+          }
+        } catch(e) {}
       } catch (cmtErr) {
         console.error('Failed to create root summary comment for payment request:', cmtErr);
       }

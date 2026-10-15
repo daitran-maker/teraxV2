@@ -326,6 +326,8 @@
   "col.payment_period": "Kỳ",
   "col.period": "Kỳ",
   "col.payment_request": "Yêu cầu thanh toán",
+  "btn.request_payment_again": "Yêu cầu thanh toán lại",
+  "msg.payment_request_reupdated": "Cập nhật yêu cầu thanh toán (Re-submitted Payment Request)",
   "col.payment_selling": "Thanh toán bán ra",
   "col.payment_status": "Trạng thái thanh toán",
   "col.payment_term": "Điều kiện thanh toán",

@@ -110,7 +110,7 @@ function clearTableFacetedCache(tableName) {
       _facetedSummaryCache.delete(k);
     }
   }
-  if (tableName === 'request' || tableName === 'comment') {
+  if (tableName === 'request' || tableName === 'comment' || tableName === 'payment') {
     _userReqIdsCache.clear();
   }
 }
@@ -119,12 +119,40 @@ function clearTableFacetedCache(tableName) {
 const _userReqIdsCache = new Map();
 const USER_REQ_CACHE_TTL_MS = 30000;
 
-async function getUserAccessibleRequestIds(empId) {
+function clearUserReqIdsCache() {
+  _userReqIdsCache.clear();
+}
+
+async function getUserAccessibleRequestIds(empId, specificReqId = null) {
   if (!empId) return [];
   const normalizedId = String(empId).toLowerCase().trim();
   const cached = _userReqIdsCache.get(normalizedId);
   const now = Date.now();
   if (cached && (now - cached.time < USER_REQ_CACHE_TTL_MS)) {
+    if (specificReqId) {
+      const normSpecific = String(specificReqId).toLowerCase().trim();
+      if (!cached.ids.includes(normSpecific)) {
+        try {
+          const checkRes = await pool.query(`
+            SELECT LOWER(request_id) as id
+            FROM "request"
+            WHERE LOWER(request_id) = $1 AND (
+              LOWER(requester) = $2 OR
+              LOWER(sr_creater) = $2 OR
+              LOWER(policy_lead) = $2 OR
+              sr_owner && ARRAY[$2]::text[] OR
+              EXISTS (SELECT 1 FROM jsonb_array_elements(approval_flow->'steps') AS step WHERE LOWER(step->>'approver') = $2) OR
+              EXISTS (SELECT 1 FROM "comment" c WHERE LOWER(c.request) = LOWER(request_id) AND LOWER(c.tag) LIKE LOWER('%' || $2 || '%'))
+            ) LIMIT 1
+          `, [normSpecific, normalizedId]);
+          if (checkRes.rows.length > 0) {
+            cached.ids.push(normSpecific);
+          }
+        } catch (e) {
+          console.warn('Fallback check accessible request err:', e.message);
+        }
+      }
+    }
     return cached.ids;
   }
   try {
@@ -2126,7 +2154,8 @@ router.get('/:tableName', async (req, res) => {
             values: [accessibleReqIds, userEmpId]
           }));
         } else {
-          const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId);
+          const reqParam = req.query.request || req.query.request_id || req.query.id__request || req.query.id_request || req.query.ticket;
+          const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId, reqParam);
           let reqCol = dbCols.includes('id__request') ? 'id__request' : (dbCols.includes('id_request') ? 'id_request' : 'request');
           let extraOwnerConds = [];
           if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $2`);
@@ -5510,6 +5539,7 @@ async function maskTicketComments(rows) {
 router.cleanEmptyStringsForTable = cleanEmptyStringsForTable;
 router.convertStatusFieldsToIds = convertStatusFieldsToIds;
 router.calculateRequestFinanceSummary = calculateRequestFinanceSummary;
+router.clearUserReqIdsCache = clearUserReqIdsCache;
 
 module.exports = router;
 

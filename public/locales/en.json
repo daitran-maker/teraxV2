@@ -326,6 +326,8 @@
   "col.payment_period": "Period",
   "col.period": "Period",
   "col.payment_request": "Payment Request",
+  "btn.request_payment_again": "Request payment again",
+  "msg.payment_request_reupdated": "Re-submitted Payment Request",
   "col.payment_selling": "Payment Selling",
   "col.payment_status": "Payment Status",
   "col.payment_term": "Payment Condition",
