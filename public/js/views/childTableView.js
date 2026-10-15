@@ -1285,10 +1285,10 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             gap: 8px;
         }
         </style>
-        <div class="comments-wrapper" style="display:flex; flex-direction:column; position:relative; background: var(--bg-default); width:100%; height:100%;">
+        <div class="comments-wrapper" style="display:flex; flex-direction:column; position:relative; background: var(--bg-default, transparent); width:100%; height:100%; min-height:0; overflow:hidden;">
       `;
 
-      html += '<div class="comments-stream" style="padding: 12px; display:flex; flex-direction:column; gap:8px; flex:1; overflow-y:auto;">';
+      html += '<div class="comments-stream" style="padding: 12px; display:flex; flex-direction:column; gap:8px; flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;">';
       if (data.length === 0) {
         html += `<div style="padding:40px 20px; text-align:center; color:var(--text-muted); font-size:11px; flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
            <span class="material-symbols-rounded" style="font-size:29px; opacity:0.5; margin-bottom:8px;">forum</span>
@@ -1372,16 +1372,16 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
           const cardBorder = (childKey === 'ticket_comment') ? (isDevComment ? '#FDBA74' : '#E2E8F0') : '#E5E7EB';
           const cardAlign = (childKey === 'ticket_comment') ? (isDevComment ? 'flex-end' : 'flex-start') : 'flex-start';
           const cardWidth = (childKey === 'ticket_comment') ? 'fit-content' : '100%';
-          const cardMinWidth = (childKey === 'ticket_comment') ? '320px' : 'none';
+          const cardMinWidth = (childKey === 'ticket_comment') ? '320px' : '0';
           const cardMaxWidth = (childKey === 'ticket_comment') ? '85%' : '100%';
-          const cardPadding = (childKey === 'ticket_comment') ? '12px 16px' : '16px';
+          const cardPadding = (childKey === 'ticket_comment') ? '12px 16px' : '14px 16px';
           const cardShadow = (childKey === 'ticket_comment') ? '0 1px 2px rgba(0,0,0,0.04)' : 'none';
 
           const authorEmail = empObj ? empObj.email : (cmt.created_by && cmt.created_by.includes('@') ? cmt.created_by : '');
           const replyTagVal = authorEmail || cmt.comment_by || cmt.created_by || authorName;
 
           html += `
-              <div class="comment-card ${isMyComment ? 'my-comment' : ''}" data-comment-id="${cmt.comment_id}" style="margin-bottom:8px; background:${cardBg}; padding:${cardPadding}; border-radius:12px; border:1px solid ${cardBorder}; box-shadow:${cardShadow}; max-width:${cardMaxWidth}; align-self:${cardAlign}; width:${cardWidth}; min-width:${cardMinWidth}; overflow:hidden;">
+              <div class="comment-card ${isMyComment ? 'my-comment' : ''}" data-comment-id="${cmt.comment_id}" style="margin-bottom:8px; background:${cardBg}; padding:${cardPadding}; border-radius:12px; border:1px solid ${cardBorder}; box-shadow:${cardShadow}; max-width:${cardMaxWidth}; align-self:${cardAlign}; width:${cardWidth}; min-width:${cardMinWidth}; box-sizing:border-box; word-break:break-word;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:20px;">
                   <div style="display:flex; align-items:center; gap:10px;">
                     <div style="width:32px; height:32px; border-radius:50%; background:#F97316; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; letter-spacing:0.5px;">${displayAuthorInitial}</div>
@@ -1398,7 +1398,14 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 ${toTags}
                 ${(() => {
                   const hasTable = /<table[\s>]/i.test(content);
-                  const contentStyle = `font-size:13px; color:#374151; line-height:1.6; padding-left:42px; ${hasTable ? 'white-space:normal; overflow-x:auto; width:100%; max-width:100%; -webkit-overflow-scrolling:touch;' : 'white-space:pre-wrap;'}`;
+                  const isBlank = !content || !content.trim();
+                  if (isBlank && attachmentsHtml) {
+                    return '';
+                  }
+                  if (isBlank) {
+                    return `<div style="font-size:12px; font-style:italic; color:var(--text-muted, #94A3B8); padding-left:42px; line-height:1.6;">${typeof t === 'function' ? t('msg.no_comment_content', 'No comment content') : 'No comment content'}</div>`;
+                  }
+                  const contentStyle = `font-size:13px; color:var(--text-primary, #1E293B); line-height:1.6; padding-left:42px; box-sizing:border-box; width:100%; max-width:100%; ${hasTable ? 'white-space:normal; overflow-x:auto; -webkit-overflow-scrolling:touch; display:block;' : 'white-space:pre-wrap; word-break:break-word; display:block;'}`;
                   return `<div style="${contentStyle}">${content}</div>`;
                 })()}
                 ${attachmentsHtml}
@@ -1410,11 +1417,11 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
 
       // Render the sticky comment form at the bottom
       html += `
-        <div class="inline-comment-box" style="padding: 16px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; bottom: 0; z-index: 20; display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+        <div class="inline-comment-box" style="padding: 12px 16px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; box-sizing: border-box;">
            <!-- Tag Section -->
-           <div style="display:flex; flex-direction:column; position:relative; gap:6px; margin-bottom: 2px;">
-              <div style="display:flex; align-items:center; gap:6px; color:#475569; font-size:12px; font-weight:600;">
-                 <span class="material-symbols-rounded" style="font-size:15px; color:#9CA3AF;">sell</span>
+           <div style="display:flex; flex-direction:column; position:relative; gap:4px; margin-bottom: 2px;">
+              <div style="display:flex; align-items:center; gap:6px; color:#475569; font-size:11px; font-weight:600;">
+                 <span class="material-symbols-rounded" style="font-size:14px; color:#9CA3AF;">sell</span>
                  <span>${typeof t === 'function' ? t('msg.tag_people', 'Tag People') : 'Tag People'}</span>
               </div>
               
@@ -1422,25 +1429,25 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
               <div id="selected-tags-chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom: 2px;"></div>
               
               <div style="position:relative; width:100%;">
-                <input type="text" id="tag-search-input" class="tag-search-input" placeholder="Type name or email to tag..." oninput="window.filterInlineTags(this)" onfocus="window.filterInlineTags(this)">
+                <input type="text" id="tag-search-input" class="tag-search-input" placeholder="Type name or email to tag..." oninput="window.filterInlineTags(this)" onfocus="window.filterInlineTags(this)" style="height:34px; font-size:12px; padding:6px 10px;">
                 <!-- Dropdown menu -->
                 <div id="tag-search-dropdown" style="display:none; position:absolute; left:0; right:0; bottom:100%; margin-bottom:4px; max-height:150px; overflow-y:auto; background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); z-index:100;"></div>
               </div>
            </div>
 
            <!-- Textarea -->
-           <textarea id="inline-comment-text" style="width:100%; min-height:96px; padding:12px; resize:none; font-size:13px; border-radius:8px; border:1px solid #E5E7EB; background:#FFFFFF; color:#111827; font-family:inherit; outline:none; transition:border-color 0.2s; line-height:1.5; box-sizing:border-box;" placeholder="${t('msg.write_comment', 'Write a comment...')}" onfocusin="this.style.borderColor='#F97316'" onfocusout="this.style.borderColor='#E5E7EB'"></textarea>
+           <textarea id="inline-comment-text" style="width:100%; min-height:56px; height:56px; padding:8px 12px; resize:vertical; font-size:13px; border-radius:8px; border:1px solid #E5E7EB; background:#FFFFFF; color:#111827; font-family:inherit; outline:none; transition:border-color 0.2s; line-height:1.4; box-sizing:border-box;" placeholder="${t('msg.write_comment', 'Write a comment...')}" onfocusin="this.style.borderColor='#F97316'" onfocusout="this.style.borderColor='#E5E7EB'"></textarea>
            
            <!-- Actions Row -->
            <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
               <div style="display:flex; gap:8px; align-items:center;">
                  <input type="file" id="inline-comment-file" style="display:none;" onchange="window.handleInlineFileChange(this)">
-                 <button onclick="this.closest('.inline-comment-box').querySelector('#inline-comment-file').click()" style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px; height:40px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">attach_file</span>${t('btn.attach_file', 'Attach File')}</button>
+                 <button onclick="this.closest('.inline-comment-box').querySelector('#inline-comment-file').click()" style="display:inline-flex; align-items:center; gap:5px; padding:6px 12px; height:34px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">attach_file</span>${t('btn.attach_file', 'Attach File')}</button>
                  <input type="hidden" id="inline-comment-file-b64">
                  <span id="inline-file-name" style="font-size:11px; color:#9CA3AF; max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
-                 <button onclick="const r=this.closest('.inline-comment-box').querySelector('#inline-link-row'); r.style.display = r.style.display==='none'?'flex':'none';" style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px; height:40px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">link</span>Attached Link</button>
+                 <button onclick="const r=this.closest('.inline-comment-box').querySelector('#inline-link-row'); r.style.display = r.style.display==='none'?'flex':'none';" style="display:inline-flex; align-items:center; gap:5px; padding:6px 12px; height:34px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">link</span>Attached Link</button>
               </div>
-              <button onclick="window.submitInlineComment(this, '${parentKey}', '${parentPkVal}', '${childKey}')" style="display:inline-flex; align-items:center; gap:6px; padding:8px 20px; height:40px; border:none; border-radius:8px; background:#F97316; color:#FFFFFF; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; transition:background 0.2s; flex-shrink:0; box-sizing:border-box;" onmouseover="this.style.background='#EA580C'" onmouseout="this.style.background='#F97316'">${typeof t === 'function' ? t('btn.send', 'Send') : 'Send'} <span class="material-symbols-rounded" style="font-size:15px;">send</span></button>
+              <button onclick="window.submitInlineComment(this, '${parentKey}', '${parentPkVal}', '${childKey}')" style="display:inline-flex; align-items:center; gap:6px; padding:6px 16px; height:34px; border:none; border-radius:8px; background:#F97316; color:#FFFFFF; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:background 0.2s; flex-shrink:0; box-sizing:border-box;" onmouseover="this.style.background='#EA580C'" onmouseout="this.style.background='#F97316'">${typeof t === 'function' ? t('btn.send', 'Send') : 'Send'} <span class="material-symbols-rounded" style="font-size:15px;">send</span></button>
            </div>
            <!-- Link input row (hidden by default) -->
            <div id="inline-link-row" style="display:none; align-items:center; gap:8px;">

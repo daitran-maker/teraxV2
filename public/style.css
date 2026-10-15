@@ -2854,6 +2854,7 @@ body.setup-active .sidebar-nav .nav-item:not(#nav-setup)::after {
 
 .comments-stream {
   flex: 1 !important;
+  min-height: 0 !important;
   overflow-y: auto !important;
 }
 
@@ -2866,7 +2867,7 @@ body.setup-active .sidebar-nav .nav-item:not(#nav-setup)::after {
 }
 
 /* Child table container styling on desktop: keeps scrollbars fully contained */
-[id^="child-table-container-"]:not(#child-table-container-comment) {
+[id^="child-table-container-"]:not(#child-table-container-comment):not(#child-table-container-ticket_comment) {
   margin: 0 12px 12px 12px !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 8px !important;
@@ -2936,7 +2937,7 @@ body.setup-active .sidebar-nav .nav-item:not(#nav-setup)::after {
     overflow: visible !important;
   }
 
-  [id^="child-table-container-"]:not(#child-table-container-comment) {
+  [id^="child-table-container-"]:not(#child-table-container-comment):not(#child-table-container-ticket_comment) {
     margin: 0 !important;
     border: none !important;
     border-radius: 0 !important;
@@ -3174,7 +3175,7 @@ body.setup-active .sidebar-nav .nav-item:not(#nav-setup)::after {
 }
 
 /* Child table container for detail-view-2: clean white border */
-.detail-view-2 [id^="child-table-container-"]:not(#child-table-container-comment) {
+.detail-view-2 [id^="child-table-container-"]:not(#child-table-container-comment):not(#child-table-container-ticket_comment) {
   margin: 0 !important;
   border: 1px solid #E5E7EB !important;
   border-radius: 8px !important;
