@@ -94,20 +94,19 @@
   },
 
   opportunity_list: {
-    label: 'Opportunities',
-    subtitle: 'List of all opportunities',
+    label: 'Opportunity Processes',
+    subtitle: 'List of all opportunity processes',
     endpoint: '/policies',
     pk: 'policy_id',
     icon: '🎯',
     columns: [
-      { key: 'policy_name', label: 'Opportunity Name' },
-      { key: 'description', label: 'Description' },
+      { key: 'policy_id', label: 'ID' },
+      { key: 'policy_name', label: 'Process Name' },
+      { key: 'request_count', label: 'Requests' },
       { key: 'policy_lead', label: 'Policy Lead', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
       { key: 'sr_owner', label: 'SR Owner', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
-      { key: 'tier1_approval', label: 'Tier 1', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
-      { key: 'tier2_approval', label: 'Tier 2', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
-      { key: 'tier3_approval', label: 'Tier 3', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
-      { key: 'policy_type', label: 'Type' }
+      { key: 'approval_level', label: 'Approval Level' },
+      { key: 'description', label: 'Description' }
     ],
     fields: [],
     displayName: (r) => r.policy_name || r.policy_id,
@@ -344,6 +343,7 @@
       endpoint: '/table/oppotunity',
       pk: 'project_id',
       icon: '🎯',
+      children: ['comment', 'contract', 'payment', 'invoice', 'service', 'asset', 'expense', 'service_delivery_contract', 'logs'],
       groupBy: ['fy_recognized', 'fy_target_closed_date', 'quarter_by_closed_date', 'id__my_company', 'status', 'sale_lead'],
       columns: [
         { key: 'project_id', label: 'Project ID', hidden: true },

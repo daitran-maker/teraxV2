@@ -310,6 +310,26 @@ router.get('/:tableName', async (req, res) => {
       }
     }
     const isSuperAdmin = user && user.role && user.role.toUpperCase() === 'SUPER ADMIN';
+
+    // Safety guard: If query is for an Opportunity child slice (e.g. contract, payment) but no parent ID is provided, return empty
+    const reqSlice = String(req.query.slice || '').toLowerCase();
+    if (['oppotunity', 'opportunity', 'oppo'].includes(reqSlice) && !['oppotunity', 'opportunity', 'oppo'].includes(tableName)) {
+      const projVal = filters.project || filters.id__request || filters.request;
+      if (!projVal || String(projVal).trim() === '' || projVal === 'null' || projVal === 'undefined') {
+        return res.json({
+          data: [],
+          meta: {
+            total: 0,
+            page: parseInt(page, 10),
+            limit: parseInt(limit, 10),
+            totalPages: 0,
+            summary: {},
+            faceted_summary: {}
+          }
+        });
+      }
+    }
+
     const dbCols = await getTableColumns(tableName);
     const colTypes = await getTableColumnTypes(tableName);
 
@@ -495,7 +515,30 @@ router.get('/:tableName', async (req, res) => {
         if (key === 'my_company' || key === 'company_id') key = 'id__my_company';
       }
 
-      const specialFilters = ['employee_related', 'my_company', 'contract_owner', 'fy', 'overdue', 'request_type', 'policy_name', 'payment_id', 'status', 'country', 'policy_type', 'finance_id'];
+      // Special interceptor for opportunity filtering on expense (bidirectional link with request)
+      if ((key === 'project' || key === 'id__opportunity') && tableName === 'expense') {
+        const oppoVals = typeof value === 'string' ? value.split(',').map(s => s.trim()).filter(Boolean) : [value];
+        addFacetClause(['id__opportunity', 'project'], (idx) => {
+          const inPlaceholders = oppoVals.map((_, i) => `$${idx + i}`).join(', ');
+          return {
+            sql: `("${tableName}"."id__opportunity" IN (${inPlaceholders}) OR "${tableName}"."id__request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" IN (${inPlaceholders}) AND "id__request" IS NOT NULL))`,
+            values: oppoVals
+          };
+        });
+        continue;
+      }
+
+      if (key === 'project' && ['contract', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract'].includes(tableName)) {
+        const reqCol = tableName === 'service_delivery_contract' ? 'id__service_request' : 'request';
+        const projVal = String(value).trim();
+        addFacetClause('project', (idx) => ({
+          sql: `("${tableName}"."project" = $${idx} OR "${tableName}"."${reqCol}" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx}))`,
+          values: [projVal]
+        }));
+        continue;
+      }
+
+      const specialFilters = ['employee_related', 'my_company', 'contract_owner', 'fy', 'overdue', 'request_type', 'policy_name', 'payment_id', 'status', 'country', 'policy_type', 'finance_id', 'project', 'id__opportunity'];
       if (!dbCols.includes(key) && !specialFilters.includes(key)) {
         continue;
       }
@@ -691,6 +734,7 @@ router.get('/:tableName', async (req, res) => {
         });
         continue;
       }
+
 
       // Handle overdue filter for payment
       if (key === 'overdue' && tableName === 'payment') {
@@ -1391,6 +1435,18 @@ router.get('/:tableName', async (req, res) => {
         SELECT op.*, sc.status_key AS status_key, sc.color_code AS status_color
         FROM "oppotunity" op
         LEFT JOIN status_catalog sc ON op.status = sc.id
+      ) as "${tableName}"`;
+    } else if (tableName === 'service_delivery_contract') {
+      baseTableOrCTE = `(
+        SELECT sdc.*, sc.status_key AS status_key, sc.color_code AS status_color
+        FROM "service_delivery_contract" sdc
+        LEFT JOIN status_catalog sc ON (sdc.status::text ~ '^[0-9]+$' AND sdc.status::text::int = sc.id) OR LOWER(sdc.status::text) = LOWER(sc.status_key)
+      ) as "${tableName}"`;
+    } else if (tableName === 'service_task_request') {
+      baseTableOrCTE = `(
+        SELECT str.*, sc.status_key AS status_key, sc.color_code AS status_color
+        FROM "service_task_request" str
+        LEFT JOIN status_catalog sc ON (str.status::text ~ '^[0-9]+$' AND str.status::text::int = sc.id) OR LOWER(str.status::text) = LOWER(sc.status_key)
       ) as "${tableName}"`;
     } else if (tableName === 'my_location') {
       baseTableOrCTE = `(
@@ -2181,6 +2237,10 @@ router.get('/:tableName/:id', async (req, res) => {
         if (pRes.rows.length > 0) {
           record.policy_elements = pRes.rows[0].elements;
           record.policy_approval_level = pRes.rows[0].approval_level;
+          if (!record.elements || (Array.isArray(record.elements) && record.elements.length === 0)) {
+            const raw = pRes.rows[0].elements;
+            record.elements = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',').map(s => s.trim()).filter(Boolean) : raw);
+          }
           if (!record.approval_level) {
             record.approval_level = pRes.rows[0].approval_level;
           }
@@ -2216,6 +2276,29 @@ router.get('/:tableName/:id', async (req, res) => {
         }
       } catch (errParent) {
         console.error('Error fetching parent request:', errParent);
+      }
+    }
+
+    if (tableName === 'oppotunity' || tableName === 'opportunity') {
+      if (record && record.id__request) {
+        try {
+          const reqRes = await pool.query(
+            `SELECT r.elements, r.request_type, p.elements as policy_elements
+             FROM request r
+             LEFT JOIN policy_and_program p ON r.request_type = p.policy_id::text
+             WHERE r.request_id = $1`,
+            [record.id__request]
+          );
+          if (reqRes.rows.length > 0) {
+            const rawEl = reqRes.rows[0].elements || reqRes.rows[0].policy_elements;
+            record.elements = Array.isArray(rawEl)
+              ? rawEl
+              : (typeof rawEl === 'string' ? rawEl.split(',').map(s => s.trim().replace(/^\[|\]$/g, '')).filter(Boolean) : []);
+            record.policy_elements = reqRes.rows[0].policy_elements;
+          }
+        } catch (eOppoReq) {
+          console.error('[oppotunity] Failed to enrich elements from linked request:', eOppoReq);
+        }
       }
     }
     try {
@@ -2441,11 +2524,28 @@ router.post('/:tableName', async (req, res) => {
       }
 
 
-      const requestChildren = ['payment', 'invoice', 'service', 'asset', 'contract', 'expense', 'target_table'];
+      const requestChildren = ['payment', 'invoice', 'service', 'asset', 'contract', 'expense', 'target_table', 'service_delivery_contract'];
       if (requestChildren.includes(tableName)) {
         const userRole = req.user && req.user.role ? req.user.role : '';
-        const reqId = data.request || data.id__request || data.id_request;
+        const reqId = data.request || data.id__request || data.id_request || data.id__service_request;
         await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole, client);
+      }
+
+      // Auto-inherit Opportunity project ID if created under a Request that has an Opportunity
+      if (['contract', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract', 'expense'].includes(tableName)) {
+        const reqId = data.request || data.id__request || data.id__service_request;
+        if (reqId && (!data.project || !data.id__opportunity)) {
+          try {
+            const oppoCheck = await client.query('SELECT id__oppotunity FROM request WHERE request_id = $1', [reqId]);
+            if (oppoCheck.rows.length > 0 && oppoCheck.rows[0].id__oppotunity) {
+              if (tableName === 'expense') {
+                if (!data.id__opportunity) data.id__opportunity = oppoCheck.rows[0].id__oppotunity;
+              } else {
+                if (!data.project) data.project = oppoCheck.rows[0].id__oppotunity;
+              }
+            }
+          } catch (e) { }
+        }
       }
 
       // Validate permissions for assigned_task insert
@@ -2569,12 +2669,30 @@ router.post('/:tableName', async (req, res) => {
         if (pRes.rows.length > 0) {
           responseData.policy_elements = pRes.rows[0].elements;
           responseData.policy_approval_level = pRes.rows[0].approval_level;
+          if (!responseData.elements || (Array.isArray(responseData.elements) && responseData.elements.length === 0)) {
+            const raw = pRes.rows[0].elements;
+            responseData.elements = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',').map(s => s.trim()).filter(Boolean) : raw);
+          }
           if (!responseData.approval_level) {
             responseData.approval_level = pRes.rows[0].approval_level;
           }
         }
       } catch (errPolicy) {
         console.error('Error fetching policy elements in POST:', errPolicy);
+      }
+    }
+
+    // Auto 2-way link: When Opportunity is created with id__request, link back to request.id__oppotunity
+    if (tableName === 'oppotunity' || tableName === 'opportunity') {
+      if (responseData.id__request && responseData.project_id) {
+        try {
+          await client.query(
+            `UPDATE request SET id__oppotunity = $1 WHERE request_id = $2 AND (id__oppotunity IS NULL OR id__oppotunity = '')`,
+            [responseData.project_id, responseData.id__request]
+          );
+        } catch (e) {
+          console.error('[dynamic_crud] Failed to link oppotunity to request:', e);
+        }
       }
     }
 
@@ -3245,6 +3363,10 @@ router.put('/:tableName/:id', async (req, res) => {
         if (pRes.rows.length > 0) {
           responseData.policy_elements = pRes.rows[0].elements;
           responseData.policy_approval_level = pRes.rows[0].approval_level;
+          if (!responseData.elements || (Array.isArray(responseData.elements) && responseData.elements.length === 0)) {
+            const raw = pRes.rows[0].elements;
+            responseData.elements = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',').map(s => s.trim()).filter(Boolean) : raw);
+          }
           if (!responseData.approval_level) {
             responseData.approval_level = pRes.rows[0].approval_level;
           }

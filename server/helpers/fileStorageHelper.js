@@ -33,6 +33,7 @@ function getPrimaryKey(tableName) {
   if (['action_rules', 'exception_rules', 'customize', 'my_product_and_service', 'notification', 'cms_tenant_info'].includes(tableName)) return 'id';
   if (tableName === 'asset') return 'office_asset_id';
   if (tableName === 'mtr') return 'transaction_id';
+  if (['oppotunity', 'opportunity', 'oppo'].includes(tableName)) return 'project_id';
   return `${tableName}_id`; 
 }
 

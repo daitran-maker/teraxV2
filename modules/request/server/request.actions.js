@@ -113,8 +113,48 @@ async function updateProcessStatus({ client, record, record_id, user, action_id,
     if (!processStatusStr) throw new Error("Vui lòng cung cấp Process Status");
     const process_status = resolveStatusId('request', 'process_status', processStatusStr);
     const tzTimeStr = new Date().toISOString();
-    const logEntry = { timestamp: tzTimeStr, user: user.employee_id, action: `updated process status to ${processStatusStr}` };
     await client.query(`UPDATE request SET process_status = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE request_id = $1`, [record_id, process_status, JSON.stringify([logEntry])]);
+
+    // If updated to Processing (8), auto-check and create Opportunity if needed
+    if (process_status === 8) {
+      try {
+        let activeElements = [];
+        let elementsVal = record.elements;
+        if (!elementsVal) {
+          const polRes = await client.query('SELECT elements FROM policy_and_program WHERE policy_id = $1', [record.request_type]);
+          if (polRes.rows.length > 0) elementsVal = polRes.rows[0].elements;
+        }
+        if (elementsVal) {
+          activeElements = Array.isArray(elementsVal)
+            ? elementsVal.map(s => String(s).replace(/^\[|\]$/g, '').trim().toUpperCase())
+            : String(elementsVal).split(',').map(s => String(s).trim().replace(/^\[|\]$/g, '').toUpperCase()).filter(Boolean);
+        }
+        if (activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY')) {
+          const oppoRes = await client.query('SELECT project_id FROM oppotunity WHERE id__request = $1', [record_id]);
+          if (oppoRes.rows.length === 0 && !record.id__oppotunity) {
+            const newSeqRes = await client.query("SELECT COALESCE(MAX(project_id::int), 0) + 1 as next_id FROM oppotunity WHERE project_id ~ '^[0-9]+$'");
+            const oppoId = String(newSeqRes.rows[0]?.next_id || Date.now());
+            await client.query(`
+              INSERT INTO oppotunity (
+                project_id, project_name, id__request, id__company, id__my_company, 
+                status, create_date, log
+              ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, '[]'::jsonb)
+            `, [
+              oppoId,
+              record.description || `Opportunity for Request ${record_id}`,
+              record_id,
+              record.company_id || null,
+              record.my_company || '1',
+              52 // Open
+            ]);
+            await client.query('UPDATE request SET id__oppotunity = $1, elements = COALESCE(elements, $2) WHERE request_id = $3', [oppoId, activeElements, record_id]);
+            console.log(`[Automation] Auto-created Opportunity ${oppoId} on updateProcessStatus to Processing for request ${record_id}`);
+          }
+        }
+      } catch (errOppo) {
+        console.error('[Automation Error] Auto-create opportunity on updateProcessStatus failed:', errOppo);
+      }
+    }
 }
 
 async function submitRequest({ client, record, record_id, user, action_id, data }) {
@@ -447,6 +487,54 @@ async function approveOrRejectRequest({ client, record, record_id, user, action_
             console.error('[Automation Error] Invoice update failed:', e);
           }
         }
+
+        // Automation: Link or create Opportunity 2-way if request has OPPORTUNITY element
+        let effectiveElements = record.elements;
+        if (!effectiveElements || (Array.isArray(effectiveElements) && effectiveElements.length === 0)) {
+          try {
+            const polRes = await client.query('SELECT elements FROM policy_and_program WHERE policy_id::text = $1', [record.request_type]);
+            if (polRes.rows.length > 0 && polRes.rows[0].elements) {
+              effectiveElements = polRes.rows[0].elements;
+            }
+          } catch (ePol) {
+            console.error('[Automation] Failed to query policy elements:', ePol);
+          }
+        }
+        const elementsArr = Array.isArray(effectiveElements)
+          ? effectiveElements
+          : (typeof effectiveElements === 'string' ? effectiveElements.split(',').map(s => s.trim().replace(/^\[|\]$/g, '')) : []);
+        const hasOpportunityElement = elementsArr.some(el => String(el).toUpperCase() === 'OPPORTUNITY');
+        if (hasOpportunityElement) {
+          try {
+            const oppoRes = await client.query('SELECT project_id FROM oppotunity WHERE id__request = $1', [record.request_id]);
+            let oppoId = null;
+            if (oppoRes.rows.length > 0) {
+              oppoId = oppoRes.rows[0].project_id;
+            } else {
+              const newSeqRes = await client.query('SELECT COALESCE(MAX(project_id::int), 0) + 1 as next_id FROM oppotunity WHERE project_id ~ \'^[0-9]+$\'');
+              oppoId = String(newSeqRes.rows[0]?.next_id || Date.now());
+              await client.query(`
+                INSERT INTO oppotunity (
+                  project_id, project_name, id__request, id__company, id__my_company, 
+                  status, create_date, log
+                ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, '[]'::jsonb)
+              `, [
+                oppoId,
+                record.description || `Opportunity for Request ${record.request_id}`,
+                record.request_id,
+                record.company_id || null,
+                record.my_company || '1',
+                52 // Open
+              ]);
+            }
+            if (oppoId) {
+              updateClauses.push(`id__oppotunity = $${valIdx++}`);
+              values.push(oppoId);
+            }
+          } catch (oppoErr) {
+            console.error('[Automation Error] Linking opportunity failed:', oppoErr);
+          }
+        }
       }
 
       if (dateUpdates.length > 0) {
@@ -625,6 +713,48 @@ async function startRequest({ client, record, record_id, user, action_id, data }
         activeElements = elementsVal.map(s => String(s).replace(/^\[|\]$/g, '').trim().toUpperCase());
       } else if (typeof elementsVal === 'string') {
         activeElements = elementsVal.split(',').map(s => String(s).trim().replace(/^\[|\]$/g, '').toUpperCase()).filter(Boolean);
+      }
+    }
+
+    // AUTOMATION: If request has OPPORTUNITY element, auto-create Opportunity with sequential incrementing ID
+    if (activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY')) {
+      try {
+        const oppoRes = await client.query('SELECT project_id FROM oppotunity WHERE id__request = $1', [record_id]);
+        let oppoId = null;
+        if (oppoRes.rows.length > 0) {
+          oppoId = oppoRes.rows[0].project_id;
+        } else if (record.id__oppotunity) {
+          oppoId = record.id__oppotunity;
+          await client.query(
+            `UPDATE oppotunity SET id__request = $1 WHERE project_id = $2 AND (id__request IS NULL OR id__request = '')`,
+            [record_id, oppoId]
+          );
+        } else {
+          const newSeqRes = await client.query("SELECT COALESCE(MAX(project_id::int), 0) + 1 as next_id FROM oppotunity WHERE project_id ~ '^[0-9]+$'");
+          oppoId = String(newSeqRes.rows[0]?.next_id || Date.now());
+          await client.query(`
+            INSERT INTO oppotunity (
+              project_id, project_name, id__request, id__company, id__my_company, 
+              status, create_date, log
+            ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, '[]'::jsonb)
+          `, [
+            oppoId,
+            record.description || `Opportunity for Request ${record_id}`,
+            record_id,
+            record.company_id || null,
+            record.my_company || '1',
+            52 // Open
+          ]);
+          console.log(`[Automation] Auto-created Opportunity ${oppoId} for started request ${record_id}`);
+        }
+        if (oppoId) {
+          await client.query(
+            'UPDATE request SET id__oppotunity = $1, elements = COALESCE(elements, $2) WHERE request_id = $3',
+            [oppoId, activeElements, record_id]
+          );
+        }
+      } catch (oppoErr) {
+        console.error('[Automation Error] Auto-creating opportunity on startRequest failed:', oppoErr);
       }
     }
 

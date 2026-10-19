@@ -24,7 +24,7 @@ window.isActionAllowed = function (viewName, actionId) {
     if (actId === 'add' || actId === 'edit') return true;
     if (actId === 'delete') return false;
   }
-  if (viewKey === 'oppotunity' || viewKey === 'oppo' || viewKey === 'opportunity') {
+  if (['oppotunity', 'oppo', 'opportunity', 'service_delivery_contract', 'service_task_request'].includes(viewKey)) {
     if (actId === 'add' || actId === 'edit' || actId === 'delete') return true;
   }
 
@@ -155,7 +155,12 @@ window.isChildTableActionAllowed = function (childKey, actionId, parentKey = cur
       'my_process_owner',
       'my_task',
       'my_team',
-      'contract'
+      'contract',
+      'oppotunity',
+      'opportunity',
+      'oppo',
+      'service_delivery_contract',
+      'service_task_request'
     ];
     const parentCandidates = [effectiveView, normalizedParentKey, hashModule, currentModule]
       .filter(Boolean)
@@ -187,7 +192,12 @@ window.isChildTableActionAllowed = function (childKey, actionId, parentKey = cur
         }
       }
       if (activeElements.includes('CONTRACT')) {
-        return false;
+        // If request has Opportunity element, payments and invoices can be added directly without depending on contract
+        if (activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || (activeRecord && activeRecord.id__oppotunity)) {
+          // Allow adding payment/invoice
+        } else {
+          return false;
+        }
       }
     }
   }

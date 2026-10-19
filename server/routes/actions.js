@@ -55,7 +55,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
     if (tableName === 'task_subtask') pkColumn = 'subtask_id';
     if (tableName === 'mtr') pkColumn = 'transaction_id';
     if (tableName === 'oppotunity' || tableName === 'opportunity') pkColumn = 'project_id';
-    if (['expense', 'column_permissions', 'exception_rules', 'action_rules', 'uploaded_files', 'permission_positions', 'permission_roles', 'permission_exceptions'].includes(tableName)) pkColumn = 'id';
+    if (['expense', 'column_permissions', 'exception_rules', 'action_rules', 'uploaded_files', 'permission_positions', 'permission_roles', 'permission_exceptions', 'service_delivery_contract', 'service_task_request'].includes(tableName)) pkColumn = 'id';
 
     // Fetch the record
     const rawRecordId = String(recordId);
@@ -627,7 +627,7 @@ router.post('/execute', async (req, res) => {
     if (table_name === 'task_subtask') pkColumn = 'subtask_id';
     if (table_name === 'mtr') pkColumn = 'transaction_id';
     if (table_name === 'oppotunity' || table_name === 'opportunity') pkColumn = 'project_id';
-    if (['expense', 'column_permissions', 'exception_rules', 'action_rules', 'uploaded_files', 'permission_positions', 'permission_roles', 'permission_exceptions'].includes(table_name)) pkColumn = 'id';
+    if (['expense', 'column_permissions', 'exception_rules', 'action_rules', 'uploaded_files', 'permission_positions', 'permission_roles', 'permission_exceptions', 'service_delivery_contract', 'service_task_request'].includes(table_name)) pkColumn = 'id';
 
     // Verify record exists
     const rawRecordId = String(record_id);

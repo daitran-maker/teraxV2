@@ -384,7 +384,8 @@ const ALLOWED_TABLES = [
   'ticket', 'ticket_comment', 'ticket_type',
   'v_finance', 'finance',
   'v_department', 'v_department_select', 'target_table',
-  'assigned_task', 'task_subtask', 'request_rating', 'expense', 'status_catalog'
+  'assigned_task', 'task_subtask', 'request_rating', 'expense', 'status_catalog',
+  'service_delivery_contract', 'service_task_request'
 ];
 
 // Middleware to extract user from headers (assuming JWT or simplified for now)
@@ -402,9 +403,10 @@ function getPrimaryKey(tableName) {
   if (tableName === 'ticket_type') return 'ticket_type_id';
   if (tableName === 'comment' || tableName === 'ticket_comment') return 'comment_id';
   if (tableName === 'column_permissions' || tableName === 'finance' || tableName === 'v_finance') return 'id';
-  if (['expense', 'action_rules', 'exception_rules', 'customize', 'my_product_and_service', 'notification', 'cms_tenant_info'].includes(tableName)) return 'id';
+  if (['expense', 'action_rules', 'exception_rules', 'customize', 'my_product_and_service', 'notification', 'cms_tenant_info', 'service_delivery_contract', 'service_task_request'].includes(tableName)) return 'id';
   if (tableName === 'asset') return 'office_asset_id';
   if (tableName === 'mtr') return 'transaction_id';
+  if (['oppotunity', 'opportunity', 'oppo'].includes(tableName)) return 'project_id';
   if (tableName === 'assigned_task') return 'task_id';
   if (tableName === 'task_subtask') return 'subtask_id';
   return `${tableName}_id`;

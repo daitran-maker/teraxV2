@@ -21,6 +21,10 @@ const tableConfigs = {
   asset: { pk: 'office_asset_id', prefix: '', regex: /^(?:AST-)?(\d+)$/i },
   assigned_task: { pk: 'task_id', prefix: 'TSK-', regex: /^(?:TSK-)?(\d+)$/i, padding: 3 },
   task_subtask: { pk: 'subtask_id', prefix: 'SUB-', regex: /^(?:SUB-)?(\d+)$/i, padding: 3 },
+  service_delivery_contract: { pk: 'id', prefix: 'SD-', regex: /^(?:SD-)?(\d+)$/i, padding: 4 },
+  service_task_request: { pk: 'id', prefix: 'STR-', regex: /^(?:STR-)?(\d+)$/i, padding: 4 },
+  oppotunity: { pk: 'project_id', prefix: '', regex: /^(\d+)$/i },
+  opportunity: { pk: 'project_id', prefix: '', regex: /^(\d+)$/i },
 };
 
 /**

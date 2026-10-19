@@ -93,7 +93,7 @@ function formatFilteredRecords(filtered, total, start, end) {
 }
 window.formatFilteredRecords = formatFilteredRecords;
 
-const SERVER_SEARCH_MODULES = new Set(['employee', 'employee_active', 'payment', 'expense', 'invoice', 'request', 'service', 'asset', 'mtr', 'account', 'request_activity_log', 'finance', 'contract', 'action_rules']);
+const SERVER_SEARCH_MODULES = new Set(['employee', 'employee_active', 'payment', 'expense', 'invoice', 'request', 'service', 'asset', 'mtr', 'account', 'request_activity_log', 'finance', 'contract', 'action_rules', 'service_delivery_contract', 'service_task_request', 'oppotunity']);
 
 function isServerSearchModule(moduleKey) {
   return SERVER_SEARCH_MODULES.has(moduleKey);
@@ -132,7 +132,8 @@ window.sortFilterEntries = sortFilterEntries;
 const QUICK_MENU_MODULES = [
   'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team',
   'contract', 'invoice', 'payment', 'expense', 'asset', 'service',
-  'permissions', 'action_rules', 'exception_rules'
+  'permissions', 'action_rules', 'exception_rules',
+  'service_delivery_contract', 'service_task_request'
 ];
 window.QUICK_MENU_MODULES = QUICK_MENU_MODULES;
 
@@ -143,6 +144,8 @@ function isColumnPinned(moduleKey, columnKey) {
   if ((moduleKey === 'employee' || moduleKey === 'employee_active') && columnKey === 'full_name') return true;
   if (moduleKey === 'payment' && columnKey === 'payment_description') return true;
   if (moduleKey === 'contract' && (columnKey === 'contract_label' || columnKey === 'contract_name_or_description')) return true;
+  if (moduleKey === 'service_delivery_contract' && columnKey === 'id') return true;
+  if (moduleKey === 'service_task_request' && columnKey === 'title') return true;
   if (moduleKey === 'invoice' && columnKey === 'invoice_no') return true;
   if (moduleKey === 'finance' && columnKey === 'process') return true;
   const leftPinnedColumns = {

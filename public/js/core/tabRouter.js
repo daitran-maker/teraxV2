@@ -740,6 +740,9 @@ async function handleHashChange() {
     }
   } else if (MODULES[moduleKey]) {
     if (pkVal) {
+      if (moduleKey === 'opportunity_list') {
+        return openDetailInternal('oppotunity', pkVal);
+      }
       // Record ID provided -> Open Detail View
       openDetailInternal(moduleKey, pkVal);
     } else if (moduleKey === 'cms_tenant_info') {

@@ -64,7 +64,8 @@ const TABLE_DETAIL_MODULES = [
   'policy', 'opportunity_list', 'request', 'my_request', 'my_approval', 'my_process_owner',
   'my_task', 'my_team', 'contract', 'support', 'expense', 'payment', 'invoice', 'mtr',
   'account', 'target_table', 'service', 'asset', 'my_location',
-  'assigned_task', 'oppotunity', 'oppo', 'opportunity'
+  'assigned_task', 'oppotunity', 'oppo', 'opportunity',
+  'service_delivery_contract', 'service_task_request'
 ];
 
 TABLE_DETAIL_MODULES.forEach(modKey => {

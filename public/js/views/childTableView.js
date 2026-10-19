@@ -294,7 +294,7 @@ window.filterChildTableSearch = function (childKey, parentKey, parentPkVal, quer
   loadChildTable(childKey, parentKey, parentPkVal, filteredData);
 };
 
-const REQUEST_CHILD_RELOAD_MODULES = ['request', 'service', 'payment', 'expense', 'asset', 'comment', 'contract', 'invoice'];
+const REQUEST_CHILD_RELOAD_MODULES = ['request', 'service', 'payment', 'expense', 'asset', 'comment', 'contract', 'invoice', 'oppotunity', 'service_delivery_contract', 'service_task_request'];
 
 function getActiveHashModule() {
   return (window.location.hash || '').replace('#', '').split('/')[0] || currentModule;
@@ -964,7 +964,16 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
   let fkCol = parentKey === 'contract' ? 'contract_id' : parentKey;
   if (parentKey === 'request') {
     if (childKey === 'assigned_task' || childKey === 'request_rating') fkCol = 'request_id';
-    else if (childKey === 'expense') fkCol = 'id__request';
+    else if (childKey === 'expense' || childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') fkCol = 'id__request';
+    else if (childKey === 'service_delivery_contract') fkCol = 'id__service_request';
+  } else if (['oppotunity', 'opportunity', 'oppo'].includes(parentKey)) {
+    if (['contract', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract'].includes(childKey)) {
+      fkCol = 'project';
+    } else if (childKey === 'expense') {
+      fkCol = 'id__opportunity';
+    }
+  } else if (parentKey === 'service_delivery_contract') {
+    if (childKey === 'service_task_request') fkCol = 'service_delivery';
   }
   let fkVal = parentPkVal;
   if (parentKey === 'my_company') {
@@ -1003,7 +1012,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
     fkCol = 'task_id';
   }
   else if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentKey)) {
-    fkCol = (childKey === 'assigned_task' || childKey === 'request_rating') ? 'request_id' : (childKey === 'expense' ? 'id__request' : 'request');
+    fkCol = (childKey === 'assigned_task' || childKey === 'request_rating') ? 'request_id' 
+      : ((childKey === 'expense' || childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') ? 'id__request' 
+      : (childKey === 'service_delivery_contract' ? 'id__service_request' : 'request'));
   }
   else if (parentKey === 'employee' || parentKey === 'employee_active') {
     if (childKey === 'request') fkCol = 'employee_related';
@@ -1025,9 +1036,13 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
       data = sortChildRowsNewestFirst(childKey, [...customData]);
       empOpts = selectCache['employee'] || [];
     } else {
-      if (parentKey === 'payment' && childKey === 'mtr' && (!fkVal || fkVal === 'null')) {
+      if (['oppotunity', 'opportunity', 'oppo'].includes(parentKey) && (!fkVal || fkVal === 'null' || fkVal === 'undefined')) {
         data = [];
-      } else if (childKey === 'opportunity_list' && parentPkVal === 'VIRTUAL_OPPORTUNITY') {
+        lastRes = { data: [], meta: { total: 0 } };
+      } else if (parentKey === 'payment' && childKey === 'mtr' && (!fkVal || fkVal === 'null')) {
+        data = [];
+        lastRes = { data: [], meta: { total: 0 } };
+      } else if (childKey === 'opportunity_list') {
         const res = await apiGet('/policies');
         lastRes = res;
         const allPol = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
@@ -1037,12 +1052,15 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
         // with email fallback and silently re-render names when employee data arrives
         let queryCol = fkCol;
         if (childKey === 'ticket_comment') queryCol = 'ticket';
-        const url = (queryCol && fkVal)
-          ? `${mod.endpoint}?${queryCol}=${fkVal}&slice=${normalizedParentKey}&summary=false&limit=1000`
-          : `${mod.endpoint}?slice=${normalizedParentKey}&summary=false&limit=1000`;
-        const res = await apiGet(url);
-        lastRes = res;
-        data = sortChildRowsNewestFirst(childKey, res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []));
+        if (!fkVal || fkVal === 'null' || fkVal === 'undefined') {
+          data = [];
+          lastRes = { data: [], meta: { total: 0 } };
+        } else {
+          const url = `${mod.endpoint}?${queryCol}=${encodeURIComponent(fkVal)}&slice=${normalizedParentKey}&summary=false&limit=1000`;
+          const res = await apiGet(url);
+          lastRes = res;
+          data = sortChildRowsNewestFirst(childKey, res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []));
+        }
         // Use cached employees immediately if available
         empOpts = selectCache['employee'] || [];
         // Kick off employee fetch in background if not cached
@@ -1057,12 +1075,15 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
           }).catch(() => { });
         }
       } else {
-        const url = (fkCol && fkVal)
-          ? `${mod.endpoint}?${fkCol}=${fkVal}&slice=${normalizedParentKey}&summary=false&limit=1000`
-          : `${mod.endpoint}?slice=${normalizedParentKey}&summary=false&limit=1000`;
-        const res = await apiGet(url);
-        lastRes = res;
-        data = sortChildRowsNewestFirst(childKey, res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []));
+        if (!fkVal || fkVal === 'null' || fkVal === 'undefined') {
+          data = [];
+          lastRes = { data: [], meta: { total: 0 } };
+        } else {
+          const url = `${mod.endpoint}?${fkCol}=${encodeURIComponent(fkVal)}&slice=${normalizedParentKey}&summary=false&limit=1000`;
+          const res = await apiGet(url);
+          lastRes = res;
+          data = sortChildRowsNewestFirst(childKey, res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []));
+        }
       }
       window.childTableRawData = window.childTableRawData || {};
       window.childTableRawData[cacheKey] = data;
@@ -1074,7 +1095,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
     }
 
     // Update count in tab header button and sum span
-    const count = (lastRes && lastRes.meta && typeof lastRes.meta.total !== 'undefined' && !customData) ? lastRes.meta.total : data.length;
+    const count = (childKey === 'opportunity_list' || !lastRes?.meta?.total || customData) ? data.length : lastRes.meta.total;
     if (!customData) {
       const tabBtn = contentPane.querySelector(`#tab-btn-${childKey}`);
       if (tabBtn) {
@@ -1470,7 +1491,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
 
       // Handlers are defined globally
     } else {
-      const isDetail2 = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'payment', 'asset', 'account', 'service', 'employee', 'request', 'contract'].includes(parentKey);
+      const isDetail2 = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'payment', 'asset', 'account', 'service', 'employee', 'request', 'contract', 'policy', 'opportunity_list'].includes(parentKey);
       let html = '';
       if (data.length === 0) {
         html = isDetail2 ? `

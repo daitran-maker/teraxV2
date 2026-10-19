@@ -126,6 +126,29 @@ async function openAddModal(moduleKey, initialData = null) {
 
     if (!initialData) initialData = {};
 
+    // Instant modal opening with spinner to eliminate perceived lag
+    const titleText = moduleKey === 'support' ? 'New Support Ticket' : `${t('form.add_title', 'Add')} ${getModuleMeta(moduleKey).title}`;
+    const modalTitleEl = document.getElementById('form-modal-title');
+    if (modalTitleEl) modalTitleEl.textContent = titleText;
+    const modalBodyEl = document.getElementById('form-modal-body');
+    if (modalBodyEl && (!formModalEl || !formModalEl.classList.contains('active'))) {
+      modalBodyEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 0; gap:12px; color:var(--text-secondary);">
+          <span class="material-symbols-rounded" style="font-size:32px; animation:spin 1s linear infinite; color:var(--primary);">progress_activity</span>
+          <span style="font-size:13px; font-weight:500;">${typeof t === 'function' ? t('common.loading', 'Loading...') : 'Loading...'}</span>
+        </div>
+      `;
+      openModal('form-modal');
+    }
+
+    // Parallel pre-warm/fetch of all required lookup select options to avoid sequential blocking
+    if (mod && Array.isArray(mod.fields)) {
+      const lookupKeys = [...new Set(mod.fields.filter(f => f && f.optionsFrom && !f.hidden && !f.createHidden).map(f => f.optionsFrom))];
+      if (lookupKeys.length > 0) {
+        await Promise.all(lookupKeys.map(k => getSelectOptions(k).catch(() => [])));
+      }
+    }
+
     // Auto-inject and lock company field when adding child records under My Company or Company
     if (initialData._lock_company || (window.location.hash && (window.location.hash.startsWith('#my_company/') || window.location.hash.startsWith('#company/')))) {
       initialData._lock_company = true;
@@ -309,6 +332,34 @@ async function openAddModal(moduleKey, initialData = null) {
     }
   }
 
+  // Auto-inject FY for service_delivery_contract from Opportunity
+  if (moduleKey === 'service_delivery_contract') {
+    if (!initialData.fy && initialData.project) {
+      const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
+      const matchedOpp = oppCache.find(o => String(o.project_id) === String(initialData.project));
+      if (matchedOpp && typeof window.extractFiscalYearFromOpportunity === 'function') {
+        initialData.fy = window.extractFiscalYearFromOpportunity(matchedOpp);
+      }
+    }
+  }
+
+  // Auto-inject FY for service_task_request from Service Delivery Contract
+  if (moduleKey === 'service_task_request') {
+    if (!initialData.fy && initialData.service_delivery) {
+      const sdCache = (window.selectCache && window.selectCache['service_delivery_contract']) || [];
+      const matchedSd = sdCache.find(s => String(s.id) === String(initialData.service_delivery));
+      if (matchedSd) {
+        let taskFy = matchedSd.fy;
+        if (!taskFy && matchedSd.project && typeof window.extractFiscalYearFromOpportunity === 'function') {
+          const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
+          const matchedOpp = oppCache.find(o => String(o.project_id) === String(matchedSd.project));
+          if (matchedOpp) taskFy = window.extractFiscalYearFromOpportunity(matchedOpp);
+        }
+        if (taskFy) initialData.fy = taskFy;
+      }
+    }
+  }
+
   if (moduleKey === 'support') {
     document.getElementById('form-modal-title').textContent = 'New Support Ticket';
   } else {
@@ -317,6 +368,65 @@ async function openAddModal(moduleKey, initialData = null) {
   const body = await buildFormHTML(moduleKey, initialData);
   document.getElementById('form-modal-body').innerHTML = body;
   initializeSearchableDropdowns(document.getElementById('form-modal-body'));
+
+  // Bind dynamic auto-calculation of FY when Opportunity is selected in Service Delivery Contract
+  if (moduleKey === 'service_delivery_contract') {
+    const projSelect = document.getElementById('f-project');
+    if (projSelect) {
+      projSelect.addEventListener('change', () => {
+        const pVal = projSelect.value;
+        const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
+        const matchedOpp = oppCache.find(o => String(o.project_id) === String(pVal));
+        if (matchedOpp && typeof window.extractFiscalYearFromOpportunity === 'function') {
+          const calcFy = window.extractFiscalYearFromOpportunity(matchedOpp);
+          const fyInp = document.getElementById('f-fy');
+          if (fyInp && calcFy) {
+            fyInp.value = calcFy;
+            fyInp.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      });
+    }
+  }
+
+  // Bind dynamic auto-calculation of FY, Service, Coordinator when SD Contract is selected in Service Task Request
+  if (moduleKey === 'service_task_request') {
+    const sdSelect = document.getElementById('f-service_delivery');
+    if (sdSelect) {
+      sdSelect.addEventListener('change', () => {
+        const sdVal = sdSelect.value;
+        const sdCache = (window.selectCache && window.selectCache['service_delivery_contract']) || [];
+        const matchedSd = sdCache.find(s => String(s.id) === String(sdVal));
+        if (matchedSd) {
+          let calcFy = matchedSd.fy;
+          if (!calcFy && matchedSd.project && typeof window.extractFiscalYearFromOpportunity === 'function') {
+            const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
+            const matchedOpp = oppCache.find(o => String(o.project_id) === String(matchedSd.project));
+            if (matchedOpp) calcFy = window.extractFiscalYearFromOpportunity(matchedOpp);
+          }
+          const fyInp = document.getElementById('f-fy');
+          if (fyInp && calcFy) {
+            fyInp.value = calcFy;
+            fyInp.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          if (matchedSd.service) {
+            const sInp = document.getElementById('f-service');
+            if (sInp && !sInp.value) {
+              sInp.value = matchedSd.service;
+              sInp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+          if (matchedSd.coordinator__employee) {
+            const cInp = document.getElementById('f-service_coordinator__employee');
+            if (cInp && !cInp.value) {
+              cInp.value = matchedSd.coordinator__employee;
+              cInp.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        }
+      });
+    }
+  }
   if (moduleKey === 'operation_program') {
     await initFinanceMappingsEditor();
     const companySelect = document.getElementById('f-company_id');
@@ -565,10 +675,10 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
   if (record) {
     const parentKey = record._parent_foreign_key;
     const parentMod = record._parent_module;
-    if (parentKey && field.key === parentKey) {
+    if (parentKey && field.key === parentKey && !(record._lock_service_delivery && field.key === 'service_delivery')) {
       field.hidden = true;
     }
-    if (parentMod && (field.key === parentMod || field.key === `${parentMod}_id` || field.key === `id__${parentMod}`)) {
+    if (parentMod && (field.key === parentMod || field.key === `${parentMod}_id` || field.key === `id__${parentMod}`) && !(record._lock_service_delivery && field.key === 'service_delivery')) {
       field.hidden = true;
     }
     if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(parentMod)) {
@@ -672,7 +782,7 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
     }
   }
 
-  const isProtected = (!isEdit && field.createReadonly) || (isEdit && field.editReadonly) || isUnderContract || isSellingContractPayment || isPaymentTypeContract || isContractPaymentCounterParty || (record && record._lock_company && (field.key === 'company_id' || field.key === 'my_company' || field.key === 'company_entity' || field.optionsFrom === 'my_company' || field.optionsFrom === 'company'));
+  const isProtected = (!isEdit && field.createReadonly) || (isEdit && field.editReadonly) || isUnderContract || isSellingContractPayment || isPaymentTypeContract || isContractPaymentCounterParty || (record && record._lock_company && (field.key === 'company_id' || field.key === 'my_company' || field.key === 'company_entity' || field.optionsFrom === 'my_company' || field.optionsFrom === 'company')) || (record && record._lock_service_delivery && field.key === 'service_delivery');
   if (isProtected) {
     if (isSellingContractPayment) {
       val = '';
@@ -1163,6 +1273,8 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
           ol = MODULES[sourceKey].displayName(o);
         } else if (sourceKey === 'oppotunity' || sourceKey === 'opportunity') {
           ol = window.formatOpportunityLabel ? window.formatOpportunityLabel(o) : (MODULES.oppotunity && MODULES.oppotunity.displayName ? MODULES.oppotunity.displayName(o) : ol);
+        } else if (sourceKey === 'service_delivery_contract') {
+          ol = window.formatServiceDeliveryContractLabel ? window.formatServiceDeliveryContractLabel(o) : (MODULES.service_delivery_contract && MODULES.service_delivery_contract.displayName ? MODULES.service_delivery_contract.displayName(o) : ol);
         }
         let typeAttrs = '';
         if (sourceKey === 'policy' || sourceKey === 'helpdesk_policy') {
@@ -1183,6 +1295,9 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         } else if (sourceKey === 'oppotunity' || sourceKey === 'opportunity') {
           const opp = opts.find(x => String(x.project_id).toLowerCase() === String(val).toLowerCase());
           if (opp) resolvedDisplay = window.formatOpportunityLabel ? window.formatOpportunityLabel(opp) : (opp.project_name || val);
+        } else if (sourceKey === 'service_delivery_contract') {
+          const sdc = opts.find(x => String(x.id).toLowerCase() === String(val).toLowerCase());
+          if (sdc) resolvedDisplay = window.formatServiceDeliveryContractLabel ? window.formatServiceDeliveryContractLabel(sdc) : (MODULES.service_delivery_contract && MODULES.service_delivery_contract.displayName ? MODULES.service_delivery_contract.displayName(sdc) : val);
         } else if (typeof resolveSelectDisplayVal === 'function') {
           resolvedDisplay = resolveSelectDisplayVal(field.optionsFrom, val) || val;
         }
@@ -3009,7 +3124,7 @@ async function submitAdd(moduleKey, extraData = {}) {
   const mod = MODULES[moduleKey];
   const data = { ...collectFormData(moduleKey), ...extraData };
   const activeHashModule = getActiveHashModule();
-  const isRequestChildAdd = (REQUEST_CHILD_RELOAD_MODULES.includes(moduleKey) || ['payment', 'expense', 'invoice', 'service', 'asset', 'contract', 'assigned_task', 'target_table', 'comment'].includes(moduleKey)) && currentView === 'detail' && currentModule && currentRecord;
+  const isRequestChildAdd = (REQUEST_CHILD_RELOAD_MODULES.includes(moduleKey) || ['payment', 'expense', 'invoice', 'service', 'asset', 'contract', 'assigned_task', 'target_table', 'comment', 'service_delivery_contract', 'service_task_request'].includes(moduleKey)) && currentView === 'detail' && currentModule && currentRecord;
   const parentModuleKeyForAdd = isRequestChildAdd ? currentModule : null;
   const parentModForAdd = parentModuleKeyForAdd ? (MODULES[parentModuleKeyForAdd] || (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentModuleKeyForAdd) ? MODULES['request'] : null)) : null;
   const parentPkFieldForAdd = parentModForAdd ? parentModForAdd.pk : 'request_id';

@@ -24,6 +24,14 @@ async function initDb() {
     // ── ALWAYS execute incremental migrations on startup ──
     await runIncrementalMigrations(pool, seeds);
 
+    // ── Service Delivery Extension Installer ──
+    try {
+      const installServiceDelivery = require('../../modules/service_delivery/install');
+      await installServiceDelivery(pool);
+    } catch (extErr) {
+      console.warn('[Extension] Service delivery install error:', extErr.message);
+    }
+
     const checkRes = await pool.query(`SELECT 1 FROM public.app_migration_meta WHERE key = 'schema_v1_completed'`);
     if (checkRes.rows.length > 0) {
       return;

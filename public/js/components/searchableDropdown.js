@@ -474,7 +474,11 @@ window.initializeSearchableDropdowns = function (container = document) {
           return;
         }
 
-        filtered.forEach((opt) => {
+        const MAX_SUGGESTIONS = 150;
+        const displayList = filtered.slice(0, MAX_SUGGESTIONS);
+        const fragment = document.createDocumentFragment();
+
+        displayList.forEach((opt) => {
           const item = document.createElement('div');
           item.className = 'searchable-dropdown-item';
 
@@ -494,8 +498,20 @@ window.initializeSearchableDropdowns = function (container = document) {
             list.style.display = 'none'; // Close list on item selection
           });
 
-          list.appendChild(item);
+          fragment.appendChild(item);
         });
+
+        if (filtered.length > MAX_SUGGESTIONS) {
+          const moreItem = document.createElement('div');
+          moreItem.className = 'searchable-dropdown-no-results';
+          moreItem.style.padding = '6px 12px';
+          moreItem.style.fontSize = '11px';
+          moreItem.style.color = '#9ca3af';
+          moreItem.textContent = `... and ${filtered.length - MAX_SUGGESTIONS} more (type to search)`;
+          fragment.appendChild(moreItem);
+        }
+
+        list.appendChild(fragment);
       };
 
       // On focus/click: show full list immediately (all options)

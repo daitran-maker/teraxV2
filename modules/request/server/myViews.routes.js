@@ -342,7 +342,7 @@ router.get('/:viewType', async (req, res) => {
             r.parent__id_request, 
             (SELECT COALESCE(p.request, c.request) FROM payment p LEFT JOIN contract c ON p.contract_id = c.contract_id WHERE p.payment_request = r.request_id AND (p.request IS NOT NULL OR c.request IS NOT NULL) LIMIT 1)
           ) AS parent_request_id,
-          mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla 
+          mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla, p.elements as policy_elements 
         FROM request r
         LEFT JOIN employee e ON r.requester = e.employee_id
         LEFT JOIN my_company mc ON e.company_id = mc.my_company_id
@@ -364,7 +364,7 @@ router.get('/:viewType', async (req, res) => {
             r.parent__id_request, 
             (SELECT COALESCE(p.request, c.request) FROM payment p LEFT JOIN contract c ON p.contract_id = c.contract_id WHERE p.payment_request = r.request_id AND (p.request IS NOT NULL OR c.request IS NOT NULL) LIMIT 1)
           ) AS parent_request_id,
-          mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla 
+          mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla, p.elements as policy_elements 
         FROM request r
         LEFT JOIN employee e ON r.requester = e.employee_id
         LEFT JOIN my_company mc ON e.company_id = mc.my_company_id
@@ -389,7 +389,7 @@ router.get('/:viewType', async (req, res) => {
     } else if (viewType === 'my-process-owner' || viewType === 'my_process_owner' || viewType === 'my-task' || viewType === 'my_task') {
       // My Process Owner: user is in sr_owner (ID or Email) and request is Approved (3) or Closed (5)
       query = `
-        SELECT r.*, mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla 
+        SELECT r.*, mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla, p.elements as policy_elements 
         FROM request r
         LEFT JOIN employee e ON r.requester = e.employee_id
         LEFT JOIN my_company mc ON e.company_id = mc.my_company_id
@@ -406,7 +406,7 @@ router.get('/:viewType', async (req, res) => {
     } else if (viewType === 'my-team' || viewType === 'my_team') {
       // My Process / My Team: user is policy lead (ID or Email), prior steps Approved, excludes Draft (1), Rejected (4), Cancelled (6)
       query = `
-        SELECT r.*, mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla 
+        SELECT r.*, mc.company_shortname as company_id, p.policy_name, p.sla as policy_sla, p.elements as policy_elements 
         FROM request r
         LEFT JOIN employee e ON r.requester = e.employee_id
         LEFT JOIN my_company mc ON e.company_id = mc.my_company_id
@@ -470,6 +470,13 @@ router.get('/:viewType', async (req, res) => {
     // No post-processing filter needed as database query pre-filters duplicates and tier rejections
 
     data.forEach(r => {
+      if (!r.elements || (Array.isArray(r.elements) && r.elements.length === 0)) {
+        if (r.policy_elements) {
+          r.elements = Array.isArray(r.policy_elements)
+            ? r.policy_elements
+            : String(r.policy_elements).split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
       RequestModel.enrichRequest(r);
       enrichRecordWithStatusCatalog('request', r);
     });

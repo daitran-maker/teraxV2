@@ -169,6 +169,55 @@ const taskSubtaskSchema = z.object({
   log: z.any().optional()
 }).passthrough();
 
+// Schema for Service Delivery Contract validation
+const serviceDeliveryContractSchema = z.object({
+  id: z.string().optional().nullable(),
+  id__service_request: z.string().optional().nullable(),
+  project: z.string().optional().nullable(),
+  start_date: z.string().min(1, 'Ngày bắt đầu là bắt buộc'),
+  end_date: z.string().min(1, 'Ngày kết thúc là bắt buộc'),
+  service_scope: z.string().min(1, 'Phạm vi dịch vụ (Service Scope) là bắt buộc'),
+  coordinator__employee: z.string().min(1, 'Điều phối viên là bắt buộc'),
+  sd_old_id: z.string().optional().nullable(),
+  id__sla_completed_time: z.string().optional().nullable(),
+  id__sla_response_time: z.string().optional().nullable(),
+  service: z.string().optional().nullable(),
+  status: z.union([z.number(), z.string()]).optional().nullable(),
+  fy: z.string().optional().nullable(),
+  note: z.string().optional().nullable()
+}).passthrough();
+
+// Schema for Service Task Request validation
+const serviceTaskRequestSchema = z.object({
+  id: z.string().optional().nullable(),
+  task_id_view: z.string().optional().nullable(),
+  title: z.string().min(1, 'Tiêu đề là bắt buộc'),
+  description: z.string().optional().nullable(),
+  service_delivery: z.string().min(1, 'Hợp đồng dịch vụ là bắt buộc'),
+  request_source: z.string().optional().nullable(),
+  tier1_engineer__employee: z.string().optional().nullable(),
+  service_coordinator__employee: z.string().optional().nullable(),
+  method: z.string().optional().nullable(),
+  type: z.string().optional().nullable(),
+  delivery_onsite: z.union([z.boolean(), z.string(), z.number()]).optional().nullable(),
+  severity_level: z.string().optional().nullable(),
+  started_date: z.string().optional().nullable(),
+  end_date: z.string().optional().nullable(),
+  service: z.string().optional().nullable(),
+  report: z.string().optional().nullable(),
+  report_template: z.string().optional().nullable(),
+  report_status_app: z.string().optional().nullable(),
+  report_status: z.string().optional().nullable(),
+  report_content: z.string().optional().nullable(),
+  status: z.union([z.number(), z.string()]).optional().nullable(),
+  id__support_ticket: z.string().optional().nullable(),
+  id__contact: z.string().optional().nullable(),
+  id__engineer_request: z.string().optional().nullable(),
+  id__sc_request: z.string().optional().nullable(),
+  id__hc_review_request: z.string().optional().nullable(),
+  fy: z.string().optional().nullable()
+}).passthrough();
+
 // Table Schemas Mapping
 const tableSchemas = {
   employee: employeeSchema,
@@ -182,7 +231,9 @@ const tableSchemas = {
   my_company: myCompanySchema,
   target_table: targetTableSchema,
   assigned_task: assignedTaskSchema,
-  task_subtask: taskSubtaskSchema
+  task_subtask: taskSubtaskSchema,
+  service_delivery_contract: serviceDeliveryContractSchema,
+  service_task_request: serviceTaskRequestSchema
 };
 
 function validateTableData(tableName, data, isUpdate = false) {

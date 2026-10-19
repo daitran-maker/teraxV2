@@ -229,7 +229,7 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
       const modHasSidebar = mod && mod.children && (mod.children.includes('comment') || mod.children.includes('ticket_comment'));
       let baseChildren = [];
       if (modHasRealChildren || modHasSidebar) {
-        baseChildren = (moduleKey === 'policy' && pkVal === 'VIRTUAL_OPPORTUNITY') ? ['opportunity_list', 'request'] : (mod.children || []);
+        baseChildren = (moduleKey === 'policy' && String(pkVal) === 'VIRTUAL_OPPORTUNITY') ? ['opportunity_list', 'request'] : (mod.children || []);
         if (!baseChildren.includes('logs')) {
           baseChildren = [...baseChildren, 'logs'];
         }
@@ -2661,7 +2661,9 @@ function buildDetailViewHTML(moduleKey, record) {
         if (!allChildren.includes('logs')) allChildren.push('logs');
       } else {
         let childrenToPush = [];
-        if (mod.children) {
+        if (moduleKey === 'policy' && String(pkVal) === 'VIRTUAL_OPPORTUNITY') {
+          childrenToPush = ['opportunity_list', 'request'];
+        } else if (mod.children) {
           childrenToPush = mod.children.filter(k => k !== 'comment' && k !== 'ticket_comment');
         }
         if (!childrenToPush.includes('logs')) {
@@ -2687,11 +2689,13 @@ function buildDetailViewHTML(moduleKey, record) {
           }
         }
 
+        const isRequest = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
+        const isOpportunity = ['oppotunity', 'opportunity', 'oppo'].includes(moduleKey);
+
         childrenToPush = childrenToPush.filter(childKey => {
           if (childKey === 'logs') return true;
           if (!['target_table', 'assigned_task'].includes(childKey) && !canShowDetailChildren) return false;
 
-          const isRequest = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
           if (isRequest) {
             if (childKey === 'payment') return activeElements.includes('PAYMENT');
             if (childKey === 'expense') return activeElements.includes('EXPENSE');
@@ -2701,16 +2705,36 @@ function buildDetailViewHTML(moduleKey, record) {
             if (childKey === 'invoice') return activeElements.includes('INVOICE');
             if (childKey === 'target_table') return activeElements.includes('TARGET TABLE') || activeElements.includes('TARGET_TABLE');
             if (childKey === 'assigned_task') return activeElements.includes('ASSIGN_TASK') || activeElements.includes('ASSIGN TASK');
+            if (childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') {
+              return activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || !!record.id__oppotunity;
+            }
+            if (childKey === 'service_delivery_contract') {
+              return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY');
+            }
             if (childKey === 'request_rating') return true;
             return false;
           }
+
+          if (isOpportunity && activeElements.length > 0) {
+            if (childKey === 'contract') return activeElements.includes('CONTRACT');
+            if (childKey === 'payment') return activeElements.includes('PAYMENT');
+            if (childKey === 'invoice') return activeElements.includes('INVOICE');
+            if (childKey === 'service') return activeElements.includes('SERVICE');
+            if (childKey === 'asset') return activeElements.includes('ASSET');
+            if (childKey === 'expense') return activeElements.includes('EXPENSE');
+            if (childKey === 'service_delivery_contract') {
+              return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY');
+            }
+            return true;
+          }
+
           return true;
         });
         allChildren.push(...childrenToPush);
-        // Add Finance summary tab if request has financial elements or element FINANCE is active
-        const isRequestParent = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
+        // Add Finance summary tab if request or opportunity has financial elements or element FINANCE is active
+        const isRequestOrOppo = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'oppotunity', 'opportunity', 'oppo'].includes(moduleKey);
         const hasFinancialData = childrenToPush.includes('payment') || childrenToPush.includes('expense') || childrenToPush.includes('invoice') || activeElements.includes('FINANCE');
-        if (isRequestParent && hasFinancialData && isStatusAllowed) {
+        if (isRequestOrOppo && hasFinancialData && (isRequest ? isStatusAllowed : true)) {
           allChildren.push('finance');
         }
       }
@@ -3571,6 +3595,9 @@ function buildDetailViewHTML(moduleKey, record) {
         if (childKey === 'assigned_task') {
           label = typeof t === 'function' ? t('module.assigned_task.tab_title', 'Assign task') : 'Assign task';
         }
+        if (childKey === 'opportunity_list') {
+          label = typeof t === 'function' ? t('module.opportunity_list.title', 'Opportunity Processes') : 'Opportunity Processes';
+        }
         html += `
           <button class="detail-tab ${idx === 0 ? 'active' : ''}" onclick="switchTab(this, '${childKey}')" id="tab-btn-${childKey}" style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
             ${label} <span id="tab-count-${childKey}" style="font-size:11px; font-weight:500; color:#F97316;"></span>
@@ -3617,7 +3644,11 @@ function buildDetailViewHTML(moduleKey, record) {
         if (!childMod) continue;
         const isComment = childKey === 'comment' || childKey === 'ticket_comment';
 
-        let foreignKey = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'request'].includes(moduleKey) ? ((childKey === 'assigned_task' || childKey === 'request_rating') ? 'request_id' : (childKey === 'expense' ? 'id__request' : 'request')) : (moduleKey === 'contract' ? 'contract_id' : moduleKey);
+        let foreignKey = ['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'request'].includes(moduleKey) 
+          ? ((childKey === 'assigned_task' || childKey === 'request_rating') ? 'request_id' 
+            : ((childKey === 'expense' || childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') ? 'id__request' 
+            : (childKey === 'service_delivery_contract' ? 'id__service_request' : 'request'))) 
+          : (moduleKey === 'contract' ? 'contract_id' : moduleKey);
         if (moduleKey === 'assigned_task') foreignKey = 'task_id';
         if (childKey === 'ticket_comment') foreignKey = 'ticket';
         if ((moduleKey === 'employee' || moduleKey === 'employee_active') && childKey === 'request') foreignKey = 'requester';
@@ -3687,6 +3718,71 @@ function buildDetailViewHTML(moduleKey, record) {
             }
           }
         }
+        if (['oppotunity', 'opportunity', 'oppo'].includes(moduleKey)) {
+          if (['contract', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract'].includes(childKey)) {
+            foreignKey = 'project';
+          } else if (childKey === 'expense') {
+            foreignKey = 'id__opportunity';
+          }
+          initialObj.project = pkVal;
+          initialObj.id__opportunity = pkVal;
+          initialObj._parent_foreign_key = foreignKey;
+          if (record) {
+            if (record.id__request) {
+              initialObj.request = record.id__request;
+              initialObj.id__request = record.id__request;
+              initialObj.id__service_request = record.id__request;
+            }
+            if (record.id__company) initialObj.id__company = record.id__company;
+            if (record.id__my_company) initialObj.my_company = record.id__my_company;
+            if (record.currency) initialObj.currency = record.currency;
+            if (childKey === 'service_delivery_contract') {
+              let oppFy = record.fy;
+              if (!oppFy && typeof window.extractFiscalYearFromOpportunity === 'function') {
+                oppFy = window.extractFiscalYearFromOpportunity(record);
+              }
+              if (oppFy) initialObj.fy = oppFy;
+            }
+          }
+        }
+        if (moduleKey === 'service_delivery_contract') {
+          if (childKey === 'service_task_request') {
+            foreignKey = 'service_delivery';
+            initialObj.service_delivery = pkVal;
+            initialObj._parent_module = 'service_delivery_contract';
+            initialObj._parent_foreign_key = 'service_delivery';
+            initialObj._lock_service_delivery = true;
+            if (record) {
+              let taskFy = record.fy;
+              if (!taskFy && record.project && typeof window.extractFiscalYearFromOpportunity === 'function') {
+                const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
+                const matchedOpp = oppCache.find(o => String(o.project_id) === String(record.project));
+                if (matchedOpp) taskFy = window.extractFiscalYearFromOpportunity(matchedOpp);
+              }
+              if (taskFy) initialObj.fy = taskFy;
+              if (record.service) initialObj.service = record.service;
+              if (record.coordinator__employee) initialObj.service_coordinator__employee = record.coordinator__employee;
+            }
+          }
+        }
+        if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey)) {
+          if (childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') {
+            foreignKey = 'id__request';
+            initialObj.id__request = pkVal;
+            initialObj._parent_foreign_key = 'id__request';
+            initialObj.project_name = record ? (record.description || `Opportunity for Request ${pkVal}`) : '';
+            if (record && record.company_id) initialObj.id__company = record.company_id;
+            if (record && record.my_company) initialObj.id__my_company = record.my_company;
+          } else if (childKey === 'service_delivery_contract') {
+            foreignKey = 'id__service_request';
+            initialObj.id__service_request = pkVal;
+            initialObj._parent_foreign_key = 'id__service_request';
+            if (record && record.id__oppotunity) initialObj.project = record.id__oppotunity;
+          }
+          if (record && record.id__oppotunity) {
+            initialObj.project = record.id__oppotunity;
+          }
+        }
         const initialDataStr = encodeURI(JSON.stringify(initialObj));
         const displayStyle = childKey === allChildren[0] ? 'flex' : 'none';
         const hashModule = window.location.hash.replace('#', '').split('/')[0];
@@ -3702,7 +3798,12 @@ function buildDetailViewHTML(moduleKey, record) {
           'my_process_owner',
           'my_task',
           'my_team',
-          'contract'
+          'contract',
+          'oppotunity',
+          'opportunity',
+          'oppo',
+          'service_delivery_contract',
+          'service_task_request'
         ];
         const isParentAllowedToAddChild = allowedParentModulesForChildAdd.includes(effectiveParentView)
           || allowedParentModulesForChildAdd.includes(moduleKey);
@@ -3810,7 +3911,8 @@ window.switchTab = function (btnOrKey, childKey) {
       const hash = pane ? (pane.dataset.hash || '') : '';
       const [path] = hash.split('&');
       const [resolvedModule, resolvedPkVal] = path.split('/');
-      if (resolvedModule && resolvedPkVal) {
+      const validResolvedPk = resolvedPkVal && resolvedPkVal !== 'undefined' && resolvedPkVal !== 'null';
+      if (resolvedModule && validResolvedPk) {
         if (isCommentTab && typeof clearChildTableCache === 'function') {
           clearChildTableCache(key, resolvedModule, resolvedPkVal);
         }

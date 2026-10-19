@@ -67,7 +67,7 @@ async function getSelectOptions(moduleKey) {
   if (!mod) return [];
 
   let endpointUrl = mod.endpoint;
-  if (['company', 'employee', 'my_company', 'department', 'policy', 'operation_program', 'account', 'cms_currency'].includes(moduleKey)) {
+  if (['company', 'employee', 'my_company', 'department', 'policy', 'operation_program', 'account', 'cms_currency', 'oppotunity', 'opportunity', 'service_delivery_contract', 'service_task_request', 'service'].includes(moduleKey)) {
     endpointUrl += (endpointUrl.includes('?') ? '&' : '?') + 'limit=10000';
   }
   // Always skip heavy faceted summary and counts when loading lookup select options!
@@ -82,6 +82,10 @@ async function getSelectOptions(moduleKey) {
           .map(s => String(s || '').trim())
           .filter(Boolean)
           .join(' • ');
+      });
+    } else if (moduleKey === 'service_delivery_contract') {
+      data.forEach(r => {
+        r.service_delivery_label = window.formatServiceDeliveryContractLabel ? window.formatServiceDeliveryContractLabel(r) : `${r.id} | ${r.service_scope || r.note || ''}`;
       });
     }
     selectCache[moduleKey] = data;
@@ -495,6 +499,35 @@ window.formatCompanyLabel = function (r) {
 window.formatOpportunityLabel = function (r) {
   if (!r) return '';
   return r.project_label || [r.project_id, r.project_name].filter(Boolean).join(' - ') || r.project_name || String(r.project_id || '');
+};
+
+window.formatServiceDeliveryContractLabel = function (r) {
+  if (!r) return '';
+  const id = r.id || '';
+  const desc = r.service_scope || r.note || r.description || '';
+  return desc ? `${id} | ${desc}` : String(id);
+};
+
+window.extractFiscalYearFromOpportunity = function (opp) {
+  if (!opp) return '';
+  if (opp.fy) return String(opp.fy);
+  // Check regex in project_name e.g. "FY 2026", "FY26", "FY 2020"
+  if (opp.project_name) {
+    const m = opp.project_name.match(/\bFY\s*(\d{2,4})\b/i);
+    if (m) {
+      const numStr = m[1];
+      if (numStr.length === 2) return `FY${numStr}`;
+      if (numStr.length === 4) return `FY${numStr.slice(-2)}`;
+    }
+  }
+  const dateVal = opp.close_date || opp.create_date;
+  if (dateVal) {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getFullYear())) {
+      return `FY${String(d.getFullYear()).slice(-2)}`;
+    }
+  }
+  return '';
 };
 
 window.formatPaymentLabel = function (r) {
@@ -913,6 +946,20 @@ function resolveLookupValue(moduleKey, fieldKey, val) {
         if (typeof window.formatOpportunityLabel === 'function') return window.formatOpportunityLabel(match);
         if (MODULES.oppotunity && MODULES.oppotunity.displayName) return MODULES.oppotunity.displayName(match);
         return match.project_label || match.project_name || val;
+      }
+    }
+  }
+
+  // --- OVERRIDE FOR SERVICE DELIVERY CONTRACT ---
+  const isSdField = ['service_delivery', 'service_delivery_contract', 'sd_contract'].includes(fieldKey) || topOptionsFrom === 'service_delivery_contract';
+  if (isSdField) {
+    const sdCache = selectCache['service_delivery_contract'];
+    if (sdCache) {
+      const match = sdCache.find(x => String(x.id).trim().toLowerCase() === String(val).trim().toLowerCase());
+      if (match) {
+        if (typeof window.formatServiceDeliveryContractLabel === 'function') return window.formatServiceDeliveryContractLabel(match);
+        if (MODULES.service_delivery_contract && MODULES.service_delivery_contract.displayName) return MODULES.service_delivery_contract.displayName(match);
+        return match.service_delivery_label || (match.service_scope ? `${match.id} | ${match.service_scope}` : val);
       }
     }
   }

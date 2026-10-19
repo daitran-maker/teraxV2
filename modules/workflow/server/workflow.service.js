@@ -1,4 +1,4 @@
-﻿const pool = require('../../../server/db');
+const pool = require('../../../server/db');
 const hashidHelper = require('../../../server/helpers/hashidHelper');
 const { STATUS, getRecordStatusId, enrichRecordWithStatusCatalog } = require('../../../server/helpers/statuses');
 const { ACTION_LOGIC, isRequestParticipant, getBaseTable, isValidTable } = require('./workflow.rules');
@@ -19,7 +19,7 @@ class WorkflowService {
     if (tableName === 'task_subtask') return 'subtask_id';
     if (tableName === 'mtr') return 'transaction_id';
     if (['oppotunity', 'opportunity'].includes(tableName)) return 'project_id';
-    if (['expense', 'column_permissions', 'exception_rules', 'action_rules', 'uploaded_files', 'permission_positions', 'permission_roles', 'permission_exceptions'].includes(tableName)) return 'id';
+    if (['expense', 'column_permissions', 'exception_rules', 'action_rules', 'uploaded_files', 'permission_positions', 'permission_roles', 'permission_exceptions', 'service_delivery_contract', 'service_task_request'].includes(tableName)) return 'id';
     return `${tableName}_id`;
   }
 
