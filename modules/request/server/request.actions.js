@@ -5,6 +5,7 @@ const { ratingsDataSchema, processBase64Fields } = require('../../workflow/serve
 const { broadcastSSE } = require('../../../server/helpers/sseHelper');
 const { createNotification } = require('../../../server/helpers/notificationHelper');
 const { generateSequentialId } = require('../../../server/helpers/idGenerator');
+const sdcApproval = require('../../service_delivery/server/service_delivery.actions');
 
 async function changeSrOwner({ client, record, record_id, user, action_id, data }) {
     const { sr_owner } = data || {};
@@ -212,6 +213,9 @@ async function submitRequest({ client, record, record_id, user, action_id, data 
       [record_id, flow ? JSON.stringify(flow) : record.approval_flow, newSrStatus, newProcessStatus, JSON.stringify([logEntry])]
     );
 
+    // Service Delivery Contract approval request (RSDC_service_delivery): sync contract status
+    await sdcApproval.onRequestSubmitted({ client, record, user, autoApproved: isTier0 });
+
     // If this is a Payment Request (type 5 or RPM or PAYMENT), update linked payments back to 121 (or 31 if Tier 0)
     const reqTypeUpper = String(record.request_type || '').toUpperCase();
     if (reqTypeUpper === '5' || reqTypeUpper === 'RPM' || reqTypeUpper === 'PAYMENT' || String(record_id).startsWith('5-')) {
@@ -288,6 +292,9 @@ async function withdrawRequest({ client, record, record_id, user, action_id, dat
         JSON.stringify([logEntry])
       ]
     );
+
+    // Service Delivery Contract approval request: contract goes back to Draft
+    await sdcApproval.onRequestWithdrawn({ client, record, user });
 
     // Reset linked payments back to Draft (30) so they can be edited again
     try {
@@ -431,7 +438,7 @@ async function approveOrRejectRequest({ client, record, record_id, user, action_
         const isPaymentReq = reqTypeStr === '5' || reqTypeStr.toUpperCase() === 'RPM' || reqTypeStr.toUpperCase() === 'PAYMENT';
 
         // Approval-only requests (like Payment Request): auto-complete without requiring manual Start -> Completed
-        if (isPaymentReq && Number(finalSrStatusId) === 3) {
+        if ((isPaymentReq || sdcApproval.isSdcApprovalRequest(record)) && Number(finalSrStatusId) === 3) {
           updateClauses.push(`process_status = 9`); // 9 = Completed
           updateClauses.push(`process_start_date = COALESCE(process_start_date, CURRENT_TIMESTAMP)`);
           updateClauses.push(`process_end_date = CURRENT_TIMESTAMP`);
@@ -548,6 +555,11 @@ async function approveOrRejectRequest({ client, record, record_id, user, action_
 
       await client.query(`UPDATE request SET ${updateClauses.join(', ')} WHERE request_id = $1`, values);
 
+      // Service Delivery Contract approval request fully approved: activate contract by its start/end date
+      if (finalSrStatus) {
+        await sdcApproval.onRequestApproved({ client, record, user });
+      }
+
     } else { // Reject
       const level = flow.current_level;
       const stepIdx = level - 1;
@@ -583,6 +595,9 @@ async function approveOrRejectRequest({ client, record, record_id, user, action_
         `UPDATE request SET ${updateClauses.join(', ')} WHERE request_id = $1`,
         rejectValues
       );
+
+      // Service Delivery Contract approval request rejected: contract goes back to Draft
+      await sdcApproval.onRequestRejected({ client, record, user });
 
       // If Payment Request is rejected, revert linked payment back to Draft (30) and clear payment_request so user can edit and re-submit
       const reqTypeStr = String(record.request_type || '');
@@ -620,6 +635,9 @@ async function cancelRequest({ client, record, record_id, user, action_id, data 
       `UPDATE request SET sr_status = 5, process_status = 117, sr_close_date = CURRENT_TIMESTAMP, log = COALESCE(log, '[]'::jsonb) || $2::jsonb WHERE request_id = $1`,
       [record_id, JSON.stringify([logEntry])]
     );
+
+    // Service Delivery Contract approval request cancelled: contract goes back to Draft (link cleared)
+    await sdcApproval.onRequestCancelled({ client, record, user });
 
     // If Payment Request is cancelled, revert linked payment back to Draft (30) and clear payment_request
     const reqTypeStr = String(record.request_type || '');

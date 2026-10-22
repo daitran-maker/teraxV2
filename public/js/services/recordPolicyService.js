@@ -217,7 +217,20 @@ function getAllowedDetailChildModules(moduleKey, record, childModules) {
   );
 }
 
+// Service Delivery Contract is locked (no Service Task Request may be added) until it is approved:
+// 10 = Draft, 11 = Waiting for approval.
+function isServiceDeliveryContractLocked(record) {
+  if (!record) return false;
+  const st = Number(record.status);
+  return st === 10 || st === 11;
+}
+window.isServiceDeliveryContractLocked = isServiceDeliveryContractLocked;
+
 function canUserEditRecord(moduleKey, record) {
+  if (moduleKey === 'service_delivery_contract' && record && authUser) {
+    if (authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN') return true;
+    if (Number(record.status) !== 10) return false; // SDC can only be edited while Draft
+  }
   if (!authUser) return false;
   if (moduleKey === 'my_approval') {
     return false; // Edit not shown in My Approval view
@@ -380,6 +393,10 @@ function canUserEditRecord(moduleKey, record) {
 }
 
 function canUserDeleteRecord(moduleKey, record) {
+  if (moduleKey === 'service_delivery_contract' && record && authUser) {
+    if (authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN') return true;
+    if (Number(record.status) !== 10) return false; // SDC can only be deleted while Draft
+  }
   if (!authUser) return false;
   if (moduleKey === 'my_approval') {
     return false; // Delete not allowed in My Approval view

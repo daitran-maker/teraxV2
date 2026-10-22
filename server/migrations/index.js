@@ -32,6 +32,24 @@ async function initDb() {
       console.warn('[Extension] Service delivery install error:', extErr.message);
     }
 
+    // ── Status Catalog for Opportunity & Service Delivery ──
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const catSqlPath = path.join(__dirname, '../../migrations/2026-10-19_status_catalog_oppo_service_delivery.sql');
+      if (fs.existsSync(catSqlPath)) {
+        const catSql = fs.readFileSync(catSqlPath, 'utf8');
+        await pool.query(catSql);
+        await pool.query(`
+          INSERT INTO public.app_migration_meta (key, applied_at)
+          VALUES ('status_catalog_oppo_service_delivery_v1', CURRENT_TIMESTAMP)
+          ON CONFLICT (key) DO UPDATE SET applied_at = CURRENT_TIMESTAMP;
+        `);
+      }
+    } catch (catErr) {
+      console.warn('[Migration] Status catalog oppo/sd install error:', catErr.message);
+    }
+
     const checkRes = await pool.query(`SELECT 1 FROM public.app_migration_meta WHERE key = 'schema_v1_completed'`);
     if (checkRes.rows.length > 0) {
       return;

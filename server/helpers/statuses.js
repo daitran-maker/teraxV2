@@ -144,9 +144,150 @@ const STATUS = {
   },
   oppotunity: {
     status: {
-      open: 52,
-      closed_won: 53,
-      closed_lost: 54
+      cancel: 1,
+      closed: 2,
+      commit: 3,
+      internal: 4,
+      lost: 5,
+      open: 6,
+      pending: 7,
+      pendind: 7,
+      won: 8,
+      upside: 9,
+      at_risk: 10,
+      // Backward compatibility aliases
+      closed_won: 8,
+      closed_lost: 5
+    },
+    type: {
+      netnew: 1,
+      renewal: 2
+    }
+  },
+  opportunity: {
+    status: {
+      cancel: 1,
+      closed: 2,
+      commit: 3,
+      internal: 4,
+      lost: 5,
+      open: 6,
+      pending: 7,
+      pendind: 7,
+      won: 8,
+      upside: 9,
+      at_risk: 10,
+      closed_won: 8,
+      closed_lost: 5
+    },
+    type: {
+      netnew: 1,
+      renewal: 2
+    }
+  },
+  service_delivery_contract: {
+    status: {
+      not_started_yet: 1,
+      not_started: 1,
+      on_going: 2,
+      ongoing: 2,
+      in_progress: 2,
+      going_to_expire: 3,
+      going_to_expired: 3,
+      completed: 4,
+      expired: 5,
+      no_task_created: 6,
+      canceled: 7,
+      cancelled: 7,
+      draft: 10,
+      waiting_for_approval: 11,
+      on_hold: 22
+    },
+    id__sla_response_time: {
+      '30_days_from_start_date': 1,
+      'equal_to_end_date': 2,
+      '21_days_from_start_date': 3,
+      '14_days_from_start_date': 4
+    },
+    id__sla_completed_time: {
+      '30_days_from_start_date': 1,
+      'equal_to_end_date': 2,
+      '21_days_from_start_date': 3,
+      '14_days_from_start_date': 4
+    },
+    service: {
+      'oracle_premier_support_for_system': 1,
+      'ps': 1,
+      'oracle_license_support_and_update': 2,
+      'lsu': 2,
+      'managed_service': 3,
+      'ms': 3,
+      'implementation': 4,
+      'ip': 4,
+      'health_check': 5,
+      'hc': 5,
+      'mps_technical_support': 6,
+      'mts': 6,
+      'implementation_technical_support': 7,
+      'ipts': 7,
+      'leasing': 8,
+      'ls': 8,
+      'training': 9,
+      'tn': 9,
+      'report_training_other': 10,
+      'rto': 10,
+      'technical_support_for_application': 11,
+      'tsa': 11,
+      'implementation_application_and_ai': 12,
+      'ipa': 12,
+      'yeu_cau_1_kiem_tra_dinh_ky': 13,
+      'yc1': 13,
+      'yeu_cau_2_cap_nhat_cac_ban_va_ban_sua_loi_csdl': 14,
+      'yc2': 14,
+      'yeu_cau_3_nang_cap_phien_ban_csdl': 15,
+      'yc3': 15,
+      'yeu_cau_4_toi_uu_csdl': 16,
+      'yc4': 16,
+      'yeu_cau_5_phuc_hoi_du_lieu': 17,
+      'yc5': 17,
+      'yeu_cau_6_di_chuyen_csdl': 18,
+      'yc6': 18,
+      'yeu_cau_7_ra_soat_toan_bo_cau_hinh_bao_mat_csdl': 19,
+      'yc7': 19,
+      'yeu_cau_8_xay_dung_chuan_hoa_cac_tai_lieu_quy_trinh': 20,
+      'yc8': 20,
+      'yeu_cau_9_thuc_hien_khac_phuc_cac_van_de_nghiem_trong_phuc_tap_cua_csdl': 21,
+      'yc9': 21,
+      'yeu_cau_10_tong_hop_bao_cao_dinh_ky': 22,
+      'yc10': 22
+    }
+  },
+  service_task_request: {
+    status: {
+      not_started_yet: 1,
+      not_started: 1,
+      processing: 2,
+      customer_review: 3,
+      completed: 4,
+      closed: 5,
+      pending: 6,
+      spare_in_custom: 7,
+      monitoring: 8,
+      canceled: 9,
+      cancelled: 9
+    },
+    delivery_onsite: {
+      onsite: 1,
+      remote: 2
+    },
+    service: {
+      oracle_premier_support_for_system: 1,
+      implementation: 2,
+      health_check: 3,
+      mps_technical_support: 4,
+      implementation_technical_support: 5,
+      technical_support_for_application: 6,
+      other: 7
     }
   },
   mtr: {
@@ -216,7 +357,7 @@ function resolveStatusId(tableName, columnName, value) {
     return parseInt(strVal, 10);
   }
 
-  const table = normalizeKey(tableName);
+  const table = normalizeTableName(tableName);
   const col = normalizeKey(columnName);
   const normalizedVal = normalizeKey(value);
 
@@ -225,7 +366,8 @@ function resolveStatusId(tableName, columnName, value) {
   if (lookupVal === 'pending') {
     if (col === 'sr_status' && table === 'request') lookupVal = 'pending_approval';
   } else if (lookupVal === 'not_started_yet' || lookupVal === 'not_started') {
-    lookupVal = 'not_started';
+    if (col === 'status' && (table === 'service_delivery_contract' || table === 'service_task_request')) lookupVal = 'not_started_yet';
+    else lookupVal = 'not_started';
   } else if (lookupVal === 'submit' || lookupVal === 'submitted' || lookupVal === 'submit_request') {
     if (col === 'sr_status') lookupVal = 'pending_approval';
   } else if (lookupVal === 'open') {
@@ -252,6 +394,11 @@ function resolveStatusId(tableName, columnName, value) {
       return mapping[lookupVal];
     }
   }
+
+  // Dynamic catalog check
+  if (catalogByTableColKey && catalogByTableColKey.has(`${table}::${col}::${lookupVal}`)) {
+    return catalogByTableColKey.get(`${table}::${col}::${lookupVal}`).status_value;
+  }
   return null;
 }
 
@@ -259,7 +406,7 @@ function resolveStatusId(tableName, columnName, value) {
  * Resolves a status ID to its string key.
  */
 function getStatusKey(tableName, columnName, id) {
-  const table = normalizeKey(tableName);
+  const table = normalizeTableName(tableName);
   const col = normalizeKey(columnName);
   
   const mapping = STATUS[table] && STATUS[table][col];
@@ -270,6 +417,10 @@ function getStatusKey(tableName, columnName, id) {
         return key;
       }
     }
+  }
+
+  if (catalogByTableColVal && catalogByTableColVal.has(`${table}::${col}::${id}`)) {
+    return catalogByTableColVal.get(`${table}::${col}::${id}`).key;
   }
   return null;
 }
@@ -451,19 +602,29 @@ const fallbackCatalog = {
 };
 
 let catalogCache = { ...fallbackCatalog };
+let catalogByTableColVal = new Map();
+let catalogByTableColKey = new Map();
 let isLoaded = false;
 
 async function loadStatusCatalog() {
   if (isLoaded) return;
   try {
-    const res = await pool.query('SELECT id, table_name, column_name, status_key, color_code FROM public.status_catalog');
+    const res = await pool.query('SELECT id, status_value, table_name, column_name, status_key, color_code FROM public.status_catalog');
     res.rows.forEach(r => {
-      catalogCache[r.id] = {
+      const sVal = r.status_value !== null && r.status_value !== undefined ? r.status_value : r.id;
+      const item = {
+        id: r.id,
+        status_value: sVal,
         key: r.status_key,
         color: r.color_code,
         table: r.table_name,
         column: r.column_name
       };
+      catalogCache[r.id] = item;
+      const tNorm = normalizeTableName(r.table_name);
+      const cNorm = normalizeKey(r.column_name);
+      catalogByTableColVal.set(`${tNorm}::${cNorm}::${sVal}`, item);
+      catalogByTableColKey.set(`${tNorm}::${cNorm}::${r.status_key}`, item);
     });
     isLoaded = true;
   } catch (err) {
@@ -476,7 +637,11 @@ loadStatusCatalog();
 
 function normalizeTableName(name) {
   if (!name) return '';
-  return name.toLowerCase().replace(/_active$/, '').replace(/_complete$/, '');
+  const clean = name.toLowerCase().replace(/_active$/, '').replace(/_complete$/, '');
+  if (clean === 'opportunity' || clean === 'oppo') return 'oppotunity';
+  if (clean === 'service_delivery' || clean === 'sd') return 'service_delivery_contract';
+  if (clean === 'service_task' || clean === 'str') return 'service_task_request';
+  return clean;
 }
 
 /**
@@ -489,18 +654,32 @@ function enrichRecordWithStatusCatalog(tableName, record) {
 
   for (const [col, val] of Object.entries(record)) {
     if (val !== undefined && val !== null) {
-      const id = parseInt(val, 10);
-      if (!isNaN(id) && catalogCache[id]) {
-        const item = catalogCache[id];
-        const itemTable = normalizeTableName(item.table);
-        
-        // Match table name and column name
-        if (itemTable === table || (table === 'assigned_task' && itemTable === 'request')) {
-          if (item.column === col) {
-            record[`${col}_key`] = item.key;
-            record[`${col}_color`] = item.color;
+      const cNorm = normalizeKey(col);
+      // Try table::col::val match first (exact per-table catalog)
+      let item = catalogByTableColVal.get(`${table}::${cNorm}::${val}`);
+      
+      // Fallback: assigned_task can inherit from request
+      if (!item && table === 'assigned_task') {
+        item = catalogByTableColVal.get(`request::${cNorm}::${val}`);
+      }
+
+      // Legacy fallback: match by global catalogCache[id]
+      if (!item) {
+        const id = parseInt(val, 10);
+        if (!isNaN(id) && catalogCache[id]) {
+          const cached = catalogCache[id];
+          const itemTable = normalizeTableName(cached.table);
+          if (itemTable === table || (table === 'assigned_task' && itemTable === 'request')) {
+            if (cached.column === col) {
+              item = cached;
+            }
           }
         }
+      }
+
+      if (item) {
+        record[`${col}_key`] = item.key;
+        record[`${col}_color`] = item.color;
       }
     }
   }
@@ -573,5 +752,6 @@ module.exports = {
   getRecordStatusId,
   getRecordStatusKey,
   enrichRecordWithStatusKeys,
-  enrichRecordWithStatusCatalog
+  enrichRecordWithStatusCatalog,
+  loadStatusCatalog
 };

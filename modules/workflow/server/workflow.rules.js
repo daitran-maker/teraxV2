@@ -299,6 +299,16 @@ const ACTION_LOGIC = {
     }
   },
 
+  // --- SERVICE DELIVERY CONTRACT ACTIONS ---
+  'sdc_submit': {
+    label: 'Submit for approval', color: 'var(--accent)',
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+    when: (r) => {
+      const st = getRecordStatusId(r, 'service_delivery_contract', 'status');
+      return Number(st != null ? st : r.status) === 10; // 10=Draft: not submitted yet
+    }
+  },
+
   // --- PAYMENT ACTIONS ---
   'payment_req_outgoing': {
     label: 'Submit for payment', color: 'var(--accent)',

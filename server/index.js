@@ -490,6 +490,14 @@ pool.query(`
   ON CONFLICT (action_id) DO NOTHING
 `).catch(err => console.error('Failed to seed action rule for payment_change_mtr:', err.message));
 
+require('../modules/service_delivery/server/service_delivery.cron');
+
+pool.query(`
+  INSERT INTO action_rules (action_id, view_name, roles, description, display_name, display)
+  VALUES ('sdc_submit', 'service_delivery_contract', '[request.sr_owner],[request.policy_lead],[request.requester],[request.sr_creater],[coordinator__employee],[created_by]', 'Gửi Service Delivery Contract để phê duyệt (RSDC_service_delivery).', 'Submit for approval', true)
+  ON CONFLICT (action_id) DO NOTHING
+`).catch(err => console.error('Failed to seed action rule for sdc_submit:', err.message));
+
 app.listen(PORT, () => {
   console.log(`✅ CRC App Server running on http://localhost:${PORT}`);
 });

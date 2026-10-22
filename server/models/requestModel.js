@@ -212,7 +212,7 @@ class RequestModel {
 
       // Calculate current_level based on step statuses
       const reqTypeStr = String(data.request_type || '').toUpperCase();
-      const isPaymentReq = reqTypeStr === '5' || reqTypeStr === 'RPM' || reqTypeStr === 'PAYMENT';
+      const isPaymentReq = reqTypeStr === '5' || reqTypeStr === 'RPM' || reqTypeStr === 'PAYMENT' || reqTypeStr === 'RSDC_SERVICE_DELIVERY'; // approval-only requests (Payment, Service Delivery Contract approval)
 
       let currentLevel = 1;
       if (max_tiers === 0) {

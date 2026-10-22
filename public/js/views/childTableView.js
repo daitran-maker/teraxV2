@@ -1776,7 +1776,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 if (childKey === 'target_table' && ['target', 'record_ids'].includes(c.key)) {
                   cellContentHTML = val !== undefined && val !== null ? String(val) : '';
                 } else if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
-                  let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
+                  let translatedVal = (typeof t_val === 'function') ? t_val(val, childKey, c.key) : String(val);
                   if (c.key === 'payment_status' && (val === 121 || val === '121' || String(val) === '121')) {
                     translatedVal = typeof t === 'function' ? t('val.submitted_for_payment', 'Submitted for Payment') : 'Submitted for Payment';
                   } else if (c.key === 'payment_type') {
@@ -2023,7 +2023,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                 }
 
                 if ((c.badge || ['status', 'payment_status', 'invoice_status', 'sr_status', 'process_status', 'account_status', 'payment_type'].includes(c.key)) && val !== undefined && val !== null && val !== '') {
-                  let translatedVal = (typeof t_val === 'function') ? t_val(val) : String(val);
+                  let translatedVal = (typeof t_val === 'function') ? t_val(val, childKey, c.key) : String(val);
                   if (c.key === 'payment_status' && (val === 121 || val === '121' || String(val) === '121')) {
                     translatedVal = typeof t === 'function' ? t('val.submitted_for_payment', 'Submitted for Payment') : 'Submitted for Payment';
                   } else if (c.key === 'payment_type') {

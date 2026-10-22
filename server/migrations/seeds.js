@@ -58,6 +58,19 @@ async function ensureSystemPoliciesSeed(client = pool) {
         policy_lead: defaultEmp,
         sr_owner: defaultEmp,
         elements: 'ASSIGN_TASK'
+      },
+      {
+        // Approval-only process for Service Delivery Contract (no elements, summary comment only)
+        policy_id: 'RSDC_service_delivery',
+        policy_type: 'Service Delivery',
+        policy_name: 'Service Delivery Contract Approval',
+        description: 'Yêu cầu phê duyệt Service Delivery Contract (Service Delivery Contract Approval)',
+        approval_level: 'Tier 1',
+        tier1_approval: defaultEmp,
+        tier2_approval: null,
+        policy_lead: defaultEmp,
+        sr_owner: defaultEmp,
+        elements: null
       }
     ];
 

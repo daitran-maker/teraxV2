@@ -84,10 +84,42 @@ function t(key, fallback) {
  * Usage: t_val('Active')  →  "Đang hoạt động" (vi)
  *        t_val('Male')    →  "Nam" (vi)
  */
-function t_val(value) {
+function t_val(value, moduleKey, colKey) {
   if (value === null || value === undefined || value === '') return '';
   const cleanVal = String(value).trim().replace(/^\[|\]$/g, '');
   if (!cleanVal) return '';
+
+  // 1. Dynamic Check via MODULES[moduleKey] fields/columns options if moduleKey/colKey provided
+  if (moduleKey && colKey && typeof window !== 'undefined' && window.MODULES && window.MODULES[moduleKey]) {
+    const mod = window.MODULES[moduleKey];
+    const fieldDef = (mod.fields && mod.fields.find(f => f.key === colKey)) ||
+      (mod.columns && mod.columns.find(c => c.key === colKey)) ||
+      (mod.detailFields && mod.detailFields.find(f => f.key === colKey));
+    if (fieldDef && fieldDef.options && Array.isArray(fieldDef.options)) {
+      const opt = fieldDef.options.find(o => 
+        (typeof o === 'object' && String(o.value) === cleanVal) || (String(o) === cleanVal)
+      );
+      if (opt) {
+        const label = typeof opt === 'object' ? (opt.label || opt.value) : opt;
+        const key = 'val.' + String(label).toLowerCase().replace(/\s+/g, '_');
+        if (_translations[key]) return _translations[key];
+        return typeof t === 'function' ? t(key, label) : label;
+      }
+    }
+  }
+
+  // 2. Dynamic Check via selectCache['status_catalog']
+  if (moduleKey && colKey && typeof selectCache !== 'undefined' && selectCache['status_catalog']) {
+    const rawNum = Number(cleanVal);
+    const normMod = (moduleKey === 'opportunity' || moduleKey === 'oppo') ? 'oppotunity' : moduleKey;
+    const match = selectCache['status_catalog'].find(s => 
+      s.table_name === normMod && s.column_name === colKey && (s.status_value === rawNum || s.id === rawNum || String(s.status_key) === cleanVal)
+    );
+    if (match) {
+      if (typeof currentLang !== 'undefined' && currentLang === 'vi' && match.display_name_vi) return match.display_name_vi;
+      return match.display_name_en || match.display_name_vi || match.status_key;
+    }
+  }
   const idToKey = {
     // request.sr_status
     '1': 'draft', '2': 'pending_approval', '3': 'approved', '4': 'rejected', '5': 'closed', '6': 'cancelled',

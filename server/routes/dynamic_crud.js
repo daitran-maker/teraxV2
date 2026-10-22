@@ -18,6 +18,8 @@ tableRegistry.register(['contract'], contractHandler);
 tableRegistry.register(['asset'], assetHandler);
 tableRegistry.register(['service'], serviceHandler);
 tableRegistry.register(['target_table'], targetTableHandler);
+const serviceDeliveryModule = require('../../modules/service_delivery/server');
+tableRegistry.register(['service_delivery_contract', 'service_task_request'], serviceDeliveryModule.serviceDeliveryHandler);
 const queryBuilder = require('../core/queryBuilder');
 const { eventBus, EVENTS } = require('../core/events');
 const express = require('express');
@@ -1440,13 +1442,13 @@ router.get('/:tableName', async (req, res) => {
       baseTableOrCTE = `(
         SELECT sdc.*, sc.status_key AS status_key, sc.color_code AS status_color
         FROM "service_delivery_contract" sdc
-        LEFT JOIN status_catalog sc ON (sdc.status::text ~ '^[0-9]+$' AND sdc.status::text::int = sc.id) OR LOWER(sdc.status::text) = LOWER(sc.status_key)
+        LEFT JOIN status_catalog sc ON sc.table_name = 'service_delivery_contract' AND sc.column_name = 'status' AND ((sdc.status::text ~ '^[0-9]+$' AND sdc.status::text::int = sc.status_value) OR LOWER(sdc.status::text) = LOWER(sc.status_key))
       ) as "${tableName}"`;
     } else if (tableName === 'service_task_request') {
       baseTableOrCTE = `(
         SELECT str.*, sc.status_key AS status_key, sc.color_code AS status_color
         FROM "service_task_request" str
-        LEFT JOIN status_catalog sc ON (str.status::text ~ '^[0-9]+$' AND str.status::text::int = sc.id) OR LOWER(str.status::text) = LOWER(sc.status_key)
+        LEFT JOIN status_catalog sc ON sc.table_name = 'service_task_request' AND sc.column_name = 'status' AND ((str.status::text ~ '^[0-9]+$' AND str.status::text::int = sc.status_value) OR LOWER(str.status::text) = LOWER(sc.status_key))
       ) as "${tableName}"`;
     } else if (tableName === 'my_location') {
       baseTableOrCTE = `(
@@ -3660,6 +3662,16 @@ router.delete('/:tableName/:id', async (req, res) => {
         } catch (authErr) {
           return res.status(403).json({ error: authErr.message });
         }
+      }
+    }
+    if (tableName === 'service_delivery_contract' && String(userRole || '').toUpperCase() !== 'SUPER ADMIN') {
+      try {
+        const sdcRes = await pool.query(`SELECT status FROM service_delivery_contract WHERE id::text = $1 AND deleted_at IS NULL`, [id]);
+        if (sdcRes.rows.length > 0 && !serviceDeliveryModule.isEditableStatus(sdcRes.rows[0].status)) {
+          return res.status(400).json({ error: 'Chỉ được xóa Service Delivery Contract khi ở trạng thái Draft.' });
+        }
+      } catch (sdcErr) {
+        console.error('[service_delivery_contract delete guard error]', sdcErr);
       }
     }
     let query;

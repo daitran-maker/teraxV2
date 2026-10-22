@@ -25,6 +25,30 @@ async function install(externalPool = null) {
       console.log('✓ Database schema & status catalogs created successfully.');
     }
 
+    // 1b. Approval request link (RSDC_service_delivery) for Service Delivery Contract
+    await client.query(`
+      ALTER TABLE public.service_delivery_contract ADD COLUMN IF NOT EXISTS id__approval_request VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS idx_sd_contract_approval_request ON public.service_delivery_contract(id__approval_request);
+    `);
+    console.log('✓ service_delivery_contract.id__approval_request ensured.');
+
+    // 1c. Seed action rule "Submit for approval" (only if the action framework table already exists)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF to_regclass('public.action_rules') IS NOT NULL THEN
+          INSERT INTO public.action_rules (action_id, view_name, roles, description, display_name, display)
+          VALUES (
+            'sdc_submit', 'service_delivery_contract',
+            '[request.sr_owner],[request.policy_lead],[request.requester],[request.sr_creater],[coordinator__employee],[created_by]',
+            'Gửi Service Delivery Contract để phê duyệt (RSDC_service_delivery).',
+            'Submit for approval', true
+          )
+          ON CONFLICT (action_id) DO NOTHING;
+        END IF;
+      END $$;
+    `);
+
     // 2. Register migration meta
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.app_migration_meta (

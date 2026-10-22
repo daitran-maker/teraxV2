@@ -41,7 +41,9 @@ function getRestoreStatusVal(tableName, colName, defaultVal) {
   if (table === 'account' && col === 'account_status') return 19; // active
   if (table === 'service' && col === 'status') return 26; // draft
   if (table === 'asset' && col === 'status') return 21; // draft
-  if (table === 'oppotunity' && col === 'status') return 52; // open
+  if ((table === 'oppotunity' || table === 'opportunity' || table === 'oppo') && col === 'status') return 6; // open
+  if (table === 'service_delivery_contract' && col === 'status') return 1; // not started yet
+  if (table === 'service_task_request' && col === 'status') return 1; // not started yet
 
   return defaultVal;
 }

@@ -118,28 +118,37 @@ BEGIN
   CREATE INDEX IF NOT EXISTS idx_str_coordinator ON public.service_task_request(service_coordinator__employee);
   CREATE INDEX IF NOT EXISTS idx_str_fy ON public.service_task_request(fy);
 
-  -- 5. Seed Status Catalog cho service_delivery_contract (Dải ID: 140 - 149)
-  INSERT INTO public.status_catalog (id, table_name, column_name, status_key, display_name_en, display_name_vi, color_code)
+  -- 5. Seed Status Catalog cho service_delivery_contract
+  INSERT INTO public.status_catalog (id, status_value, table_name, column_name, status_key, display_name_en, display_name_vi, color_code)
   VALUES 
-    (140, 'service_delivery_contract', 'status', 'active', 'Active', 'Đang hiệu lực', '#10B981'),
-    (141, 'service_delivery_contract', 'status', 'pending', 'Pending', 'Chờ xử lý', '#3B82F6'),
-    (142, 'service_delivery_contract', 'status', 'expired', 'Expired', 'Hết hạn', '#EF4444'),
-    (143, 'service_delivery_contract', 'status', 'terminated', 'Terminated', 'Chấm dứt', '#64748B')
-  ON CONFLICT (id) DO UPDATE SET 
+    (261, 1, 'service_delivery_contract', 'status', 'not_started_yet', 'Not started yet', 'Chưa bắt đầu', '#64748B'),
+    (262, 2, 'service_delivery_contract', 'status', 'on_going', 'On going', 'Đang thực hiện', '#3B82F6'),
+    (263, 3, 'service_delivery_contract', 'status', 'going_to_expire', 'Going to expire', 'Sắp hết hạn', '#F59E0B'),
+    (264, 4, 'service_delivery_contract', 'status', 'completed', 'Completed', 'Đã hoàn thành', '#10B981'),
+    (265, 5, 'service_delivery_contract', 'status', 'expired', 'Expired', 'Đã hết hạn', '#DC2626'),
+    (266, 6, 'service_delivery_contract', 'status', 'no_task_created', 'No task created', 'Chưa tạo task', '#94A3B8'),
+    (267, 7, 'service_delivery_contract', 'status', 'canceled', 'Canceled', 'Đã hủy', '#EF4444'),
+    (268, 22, 'service_delivery_contract', 'status', 'on_hold', 'On hold', 'Tạm dừng', '#8B5CF6')
+  ON CONFLICT (table_name, column_name, status_key) DO UPDATE SET 
+    status_value = EXCLUDED.status_value,
     display_name_en = EXCLUDED.display_name_en,
     display_name_vi = EXCLUDED.display_name_vi,
     color_code = EXCLUDED.color_code;
 
-  -- 6. Seed Status Catalog cho service_task_request (Dải ID: 150 - 159)
-  INSERT INTO public.status_catalog (id, table_name, column_name, status_key, display_name_en, display_name_vi, color_code)
+  -- 6. Seed Status Catalog cho service_task_request
+  INSERT INTO public.status_catalog (id, status_value, table_name, column_name, status_key, display_name_en, display_name_vi, color_code)
   VALUES 
-    (150, 'service_task_request', 'status', 'new', 'New', 'Mới', '#3B82F6'),
-    (151, 'service_task_request', 'status', 'in_progress', 'In Progress', 'Đang xử lý', '#F59E0B'),
-    (152, 'service_task_request', 'status', 'pending_customer', 'Pending Customer', 'Chờ khách hàng', '#8B5CF6'),
-    (153, 'service_task_request', 'status', 'resolved', 'Resolved', 'Đã xử lý xong', '#10B981'),
-    (154, 'service_task_request', 'status', 'closed', 'Closed', 'Đã đóng', '#64748B'),
-    (155, 'service_task_request', 'status', 'cancelled', 'Cancelled', 'Đã hủy', '#EF4444')
-  ON CONFLICT (id) DO UPDATE SET 
+    (281, 1, 'service_task_request', 'status', 'not_started_yet', 'Not started yet', 'Chưa bắt đầu', '#64748B'),
+    (282, 2, 'service_task_request', 'status', 'processing', 'Processing', 'Đang xử lý', '#3B82F6'),
+    (283, 3, 'service_task_request', 'status', 'customer_review', 'Customer review', 'Khách hàng đánh giá', '#F59E0B'),
+    (284, 4, 'service_task_request', 'status', 'completed', 'Completed', 'Đã hoàn thành', '#10B981'),
+    (285, 5, 'service_task_request', 'status', 'closed', 'Closed', 'Đã đóng', '#475569'),
+    (286, 6, 'service_task_request', 'status', 'pending', 'Pending', 'Chờ xử lý', '#EC4899'),
+    (287, 7, 'service_task_request', 'status', 'spare_in_custom', 'Spare in custom', 'Linh kiện hải quan', '#8B5CF6'),
+    (288, 8, 'service_task_request', 'status', 'monitoring', 'Monitoring', 'Đang theo dõi', '#06B6D4'),
+    (289, 9, 'service_task_request', 'status', 'canceled', 'Canceled', 'Đã hủy', '#EF4444')
+  ON CONFLICT (table_name, column_name, status_key) DO UPDATE SET 
+    status_value = EXCLUDED.status_value,
     display_name_en = EXCLUDED.display_name_en,
     display_name_vi = EXCLUDED.display_name_vi,
     color_code = EXCLUDED.color_code;

@@ -3680,7 +3680,7 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
             return (typeof t === 'function' ? t('val.submitted_for_payment', 'Submitted for Payment') : 'Submitted for Payment');
           }
         }
-        return (typeof t_val === 'function') ? t_val(part) : String(part);
+        return (typeof t_val === 'function') ? t_val(part, moduleKey, col.key) : String(part);
       }).join(', ');
       return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" title="${escapeHTML(translated)}" style="${tdStyle}">${escapeHTML(translated)}</td>`;
     }

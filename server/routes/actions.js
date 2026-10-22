@@ -19,6 +19,7 @@ const {
 } = require('../../modules/workflow/server/actions.helpers');
 const requestActions = require('../../modules/request/server/request.actions');
 const paymentActions = require('../../modules/payment/server/payment.actions');
+const sdcActions = require('../../modules/service_delivery/server/service_delivery.actions');
 const supportActions = require('../../modules/support/server/support.actions');
 const { broadcastSSE } = require('../helpers/sseHelper');
 const { triggerNotifications, createNotification } = require('../helpers/notificationHelper');
@@ -72,6 +73,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
     if (recordResult.rows.length === 0) return res.status(404).json({ error: 'Record not found' });
     const record = recordResult.rows[0];
     enrichRecordWithStatusCatalog(tableName, record);
+    if (tableName === 'service_delivery_contract') await sdcActions.attachRootRequest(getPoolForTable(tableName), record);
 
     // Fetch action rules for this table or view
     const viewName = req.query.view || tableName;
@@ -644,6 +646,7 @@ router.post('/execute', async (req, res) => {
     if (recordRes.rows.length === 0) throw new Error('Record not found');
     const record = recordRes.rows[0];
     enrichRecordWithStatusCatalog(table_name, record);
+    if (table_name === 'service_delivery_contract') await sdcActions.attachRootRequest(client, record);
 
     // ✅ SECURITY: Only allow rating, cancel, and withdraw actions for tickets in App Dev client portal
     const allowedTicketActions = ['ACT-TICKET-03', 'ACT-TICKET-03-RE', 'ACT-TICKET-05', 'withdraw_ticket'];
@@ -827,6 +830,8 @@ router.post('/execute', async (req, res) => {
       await supportActions.cancelTicket({ client, record, record_id, user, action_id, data: req.body.data });
     } else if (action_id === 'withdraw_ticket') {
       await supportActions.withdrawTicket({ client, record, record_id, user, action_id, data: req.body.data });
+    } else if (action_id === 'sdc_submit') {
+      await sdcActions.submitSdc({ client, record, record_id, user, action_id, data: req.body.data });
     } else {
       // Default: Log action or ignore if no logic yet
       console.log(`Action ${action_id} executed with no specific handler`);

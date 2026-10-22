@@ -3818,6 +3818,10 @@ function buildDetailViewHTML(moduleKey, record) {
         let showChildAddButton = isParentAllowedToAddChild
           && !hideAddInNonProcessRequestChildren
           && isChildTableActionAllowed(childKey, 'add', effectiveParentView);
+        if (moduleKey === 'service_delivery_contract' && childKey === 'service_task_request'
+          && typeof window.isServiceDeliveryContractLocked === 'function' && window.isServiceDeliveryContractLocked(record)) {
+          showChildAddButton = false; // SDC must be approved before adding Service Task Requests
+        }
         if (['logs', 'request_activity_log', 'history', 'request_rating', 'rating', 'feedback', 'comment', 'ticket_comment', 'finance'].includes(childKey)) {
           showChildAddButton = false;
         }
