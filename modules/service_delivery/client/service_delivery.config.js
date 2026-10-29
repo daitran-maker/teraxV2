@@ -3,6 +3,16 @@
  * Domain: service_delivery
  */
 (function() {
+  const oppoNum = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+  const oppoEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const oppoFmt = (n) => Math.round(n || 0).toLocaleString('en-US');
+  const oppoFmtFull = oppoFmt;
+
+  window.oppoNum = oppoNum;
+  window.oppoEsc = oppoEsc;
+  window.oppoFmt = oppoFmt;
+  window.oppoFmtFull = oppoFmtFull;
+
   window.__MODULE_EXTENSIONS__ = window.__MODULE_EXTENSIONS__ || [];
   window.__MODULE_EXTENSIONS__.push(function(MODULES) {
 
@@ -675,9 +685,6 @@
     document.head.appendChild(st);
   })();
 
-  const oppoNum = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-  const oppoEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const oppoFmtFull = (n) => Math.round(n || 0).toLocaleString('en-US');
 
   window.oppoSegHover = function(el, lbl, isDark) {
     var b = el && el.closest ? el.closest('.oppo-bar') : null;
