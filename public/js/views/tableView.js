@@ -498,6 +498,10 @@ window.updateGlobalStatusCards = function (html) {
 };
 
 function buildTableStatusCards(moduleKey, data) {
+  // Generic hook: modules can opt out of the badge cards or provide their own builder (see module config).
+  const cardsMod = (typeof MODULES !== 'undefined' && MODULES) ? MODULES[moduleKey] : null;
+  if (cardsMod && cardsMod.statusCards === false) return '';
+  if (cardsMod && typeof cardsMod.buildStatusCards === 'function') return cardsMod.buildStatusCards(data) || '';
   if (moduleKey === 'contract') {
     let totalContracts = typeof currentTableTotal !== 'undefined' ? currentTableTotal : data.length;
     const baseCurr = (typeof window.getActiveBaseCurrency === 'function' ? window.getActiveBaseCurrency() : 'VND') || 'VND';
@@ -2856,6 +2860,8 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
         fireAndForgetPromises.push(getSelectOptions('company').catch(() => []));
       } else if (['account', 'mtr', 'asset', 'service', 'expense'].includes(moduleKey)) {
         fireAndForgetPromises.push(getSelectOptions('my_company').catch(() => []));
+      } else if (moduleKey === 'service_task_request') {
+        fireAndForgetPromises.push(getSelectOptions('service_delivery_contract').catch(() => []));
       }
 
       Promise.all(fireAndForgetPromises).then(() => {
@@ -3683,6 +3689,12 @@ function buildSingleRowHTML(moduleKey, row, parentGroupId = '', visibleCols = nu
         return (typeof t_val === 'function') ? t_val(part, moduleKey, col.key) : String(part);
       }).join(', ');
       return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label)}" title="${escapeHTML(translated)}" style="${tdStyle}">${escapeHTML(translated)}</td>`;
+    }
+
+    if (typeof col.renderCell === 'function') {
+      // Generic extension hook: a module can render a custom cell (HTML must be escaped by the module)
+      const tdStyle = getStickyTableColumnStyle(moduleKey, col.key, false, mod);
+      return `<td class="col-${col.key}${pinnedClass}" data-label="${escapeHTML(col.label || '')}" style="${tdStyle} vertical-align:middle; min-width:170px;">${col.renderCell(row, col)}</td>`;
     }
 
     if (col.type === 'child_count') {

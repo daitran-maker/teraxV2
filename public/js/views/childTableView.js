@@ -1726,6 +1726,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                              ` : `<td style="padding: 6px 14px; text-align: center;"></td>`}
                              ` : ''}
                              ${cols.map((c, colIdx) => {
+                if (typeof c.renderCell === 'function') {
+                  return `<td style="padding: 12px 14px; min-width: 170px; vertical-align: middle;">${c.renderCell(row, c)}</td>`;
+                }
                 let val = resolvedRow[c.key];
                 if (val === null || val === undefined) val = '';
                 const k = String(c.key).toLowerCase();
@@ -1982,6 +1985,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                              <tr onclick="window.location.hash = '${rowClickTarget}/${pkVal}'" style="cursor: pointer; border-bottom: 1px solid var(--border-light); transition: background 0.15s;" class="child-table-row">
 
                                ${cols.map(c => {
+                if (typeof c.renderCell === 'function') {
+                  return `<td style="padding: 10px 14px; min-width: 170px; vertical-align: middle;">${c.renderCell(row, c)}</td>`;
+                }
                 let val = resolvedRow[c.key];
                 if (val === null || val === undefined) val = '';
                 const k = String(c.key).toLowerCase();

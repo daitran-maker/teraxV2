@@ -144,7 +144,7 @@ function isColumnPinned(moduleKey, columnKey) {
   if ((moduleKey === 'employee' || moduleKey === 'employee_active') && columnKey === 'full_name') return true;
   if (moduleKey === 'payment' && columnKey === 'payment_description') return true;
   if (moduleKey === 'contract' && (columnKey === 'contract_label' || columnKey === 'contract_name_or_description')) return true;
-  if (moduleKey === 'service_delivery_contract' && columnKey === 'id') return true;
+  if (moduleKey === 'service_delivery_contract' && (columnKey === 'service_scope' || columnKey === 'description')) return true;
   if (moduleKey === 'service_task_request' && columnKey === 'title') return true;
   if (moduleKey === 'invoice' && columnKey === 'invoice_no') return true;
   if (moduleKey === 'finance' && columnKey === 'process') return true;
@@ -156,7 +156,9 @@ function isColumnPinned(moduleKey, columnKey) {
     oppotunity: 'project_label',
     opportunity: 'project_label',
     finance: 'process',
-    expense: 'description'
+    expense: 'description',
+    service_delivery_contract: 'service_scope',
+    service_task_request: 'title'
   };
   return leftPinnedColumns[moduleKey] === columnKey;
 }

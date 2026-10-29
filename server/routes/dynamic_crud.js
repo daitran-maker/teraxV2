@@ -20,6 +20,7 @@ tableRegistry.register(['service'], serviceHandler);
 tableRegistry.register(['target_table'], targetTableHandler);
 const serviceDeliveryModule = require('../../modules/service_delivery/server');
 tableRegistry.register(['service_delivery_contract', 'service_task_request'], serviceDeliveryModule.serviceDeliveryHandler);
+serviceDeliveryModule.registerMetrics(tableRegistry);
 const queryBuilder = require('../core/queryBuilder');
 const { eventBus, EVENTS } = require('../core/events');
 const express = require('express');
@@ -527,6 +528,17 @@ router.get('/:tableName', async (req, res) => {
             values: oppoVals
           };
         });
+        continue;
+      }
+
+      if (key === 'oppotunity' && tableName === 'comment') { // oppotunity_comment_link
+        // A comment written on an Opportunity is stored on its Request (see POST); the Opportunity lists every
+        // comment of that Request, so Request and Opportunity share one thread.
+        const oppoVal = String(value).trim();
+        addFacetClause('oppotunity', (idx) => ({
+          sql: `("comment"."request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id"::text = $${idx} AND "id__request" IS NOT NULL) OR "comment"."request" IN (SELECT "request_id" FROM "request" WHERE "id__oppotunity"::text = $${idx}))`,
+          values: [oppoVal]
+        }));
         continue;
       }
 
@@ -1440,7 +1452,7 @@ router.get('/:tableName', async (req, res) => {
       ) as "${tableName}"`;
     } else if (tableName === 'service_delivery_contract') {
       baseTableOrCTE = `(
-        SELECT sdc.*, sc.status_key AS status_key, sc.color_code AS status_color
+        SELECT sdc.*, COALESCE(sdc.service_scope, sdc.sd_old_id, sdc.id::text) AS service_delivery_label, sc.status_key AS status_key, sc.color_code AS status_color
         FROM "service_delivery_contract" sdc
         LEFT JOIN status_catalog sc ON sc.table_name = 'service_delivery_contract' AND sc.column_name = 'status' AND ((sdc.status::text ~ '^[0-9]+$' AND sdc.status::text::int = sc.status_value) OR LOWER(sdc.status::text) = LOWER(sc.status_key))
       ) as "${tableName}"`;
@@ -1479,6 +1491,9 @@ router.get('/:tableName', async (req, res) => {
         LEFT JOIN status_catalog sc_sub ON (ti.subscription_status::text ~ '^[0-9]+$' AND ti.subscription_status::text::int = sc_sub.id) OR LOWER(ti.subscription_status::text) = LOWER(sc_sub.status_key)
       ) as "${tableName}"`;
     }
+
+    // Computed columns contributed by modules (list extensions)
+    baseTableOrCTE = tableRegistry.applyListExtension(tableName, baseTableOrCTE);
 
     const countTarget = (tableName === 'finance' || tableName === 'v_finance') ? baseTableOrCTE : `"${tableName}"`;
     const countQuery = `SELECT COUNT(*) FROM ${countTarget} ${whereStr}`;
@@ -1539,7 +1554,7 @@ router.get('/:tableName', async (req, res) => {
           'vat_buying_contract', 'payment_buying', 'paid_buying', 'expense_value'
         ]
       };
-      const customCols = customColsMap[tableName] || [];
+      const customCols = [...(customColsMap[tableName] || []), ...tableRegistry.getListExtensionColumns(tableName)];
       const allowedSortColumns = [...dbCols, ...customCols];
       if (allowedSortColumns.includes(sort_by)) {
         const dir = (sort_dir && sort_dir.toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
@@ -2591,6 +2606,22 @@ router.post('/:tableName', async (req, res) => {
     const colUpdatedBy = findCol('updated_by');
     const colUpdatedDate = findCol('updated_date');
     const colLog = findCol('logs') || findCol('log');
+
+    if (tableName === 'comment' && data.oppotunity !== undefined) { // oppotunity_comment_link
+      // Comment written on an Opportunity => counted as a comment of the Opportunity's Request.
+      if (!data.request) {
+        const oppoReq = await client.query(
+          `SELECT COALESCE(NULLIF(o.id__request, ''), (SELECT r.request_id FROM request r WHERE r.id__oppotunity::text = o.project_id::text LIMIT 1)) AS request_id
+           FROM oppotunity o WHERE o.project_id::text = $1::text AND o.deleted_at IS NULL LIMIT 1`,
+          [String(data.oppotunity)]
+        );
+        if (!oppoReq.rows.length || !oppoReq.rows[0].request_id) {
+          return res.status(400).json({ error: 'Opportunity chưa liên kết Request nên chưa thể bình luận.' });
+        }
+        data.request = oppoReq.rows[0].request_id;
+      }
+      delete data.oppotunity;
+    }
 
     if (tableName === 'comment' || tableName === 'ticket_comment') {
       if (!data.comment_by) data.comment_by = userEmployeeId;

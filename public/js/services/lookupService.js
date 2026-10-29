@@ -85,7 +85,7 @@ async function getSelectOptions(moduleKey) {
       });
     } else if (moduleKey === 'service_delivery_contract') {
       data.forEach(r => {
-        r.service_delivery_label = window.formatServiceDeliveryContractLabel ? window.formatServiceDeliveryContractLabel(r) : `${r.id} | ${r.service_scope || r.note || ''}`;
+        r.service_delivery_label = window.formatServiceDeliveryContractLabel ? window.formatServiceDeliveryContractLabel(r) : (r.service_scope || r.sd_old_id || r.note || r.description || String(r.id || ''));
       });
     }
     selectCache[moduleKey] = data;
@@ -503,9 +503,7 @@ window.formatOpportunityLabel = function (r) {
 
 window.formatServiceDeliveryContractLabel = function (r) {
   if (!r) return '';
-  const id = r.id || '';
-  const desc = r.service_scope || r.note || r.description || '';
-  return desc ? `${id} | ${desc}` : String(id);
+  return r.service_scope || r.sd_old_id || r.note || r.description || String(r.id || '');
 };
 
 window.extractFiscalYearFromOpportunity = function (opp) {
@@ -959,7 +957,7 @@ function resolveLookupValue(moduleKey, fieldKey, val) {
       if (match) {
         if (typeof window.formatServiceDeliveryContractLabel === 'function') return window.formatServiceDeliveryContractLabel(match);
         if (MODULES.service_delivery_contract && MODULES.service_delivery_contract.displayName) return MODULES.service_delivery_contract.displayName(match);
-        return match.service_delivery_label || (match.service_scope ? `${match.id} | ${match.service_scope}` : val);
+        return match.service_delivery_label || match.service_scope || match.sd_old_id || match.note || val;
       }
     }
   }
