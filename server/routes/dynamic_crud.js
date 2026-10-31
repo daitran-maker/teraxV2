@@ -1547,8 +1547,11 @@ router.get('/:tableName', async (req, res) => {
         WHERE p.deleted_at IS NULL
       ) as "${tableName}"`;
     } else if (tableName === 'oppotunity') {
+      const fyRecExpr = dbCols.includes('fy_recognized') ? '' : ", to_char(op.create_date::date, 'YYYY') AS fy_recognized";
+      const fyTargetExpr = dbCols.includes('fy_target_closed_date') ? '' : ", to_char(op.close_date::date, 'YYYY') AS fy_target_closed_date";
+      const qExpr = dbCols.includes('quarter_by_closed_date') ? '' : ", ('Q' || to_char(op.close_date::date, 'Q')) AS quarter_by_closed_date";
       baseTableOrCTE = `(
-        SELECT op.*, sc.status_key AS status_key, sc.color_code AS status_color
+        SELECT op.*${fyRecExpr}${fyTargetExpr}${qExpr}, sc.status_key AS status_key, sc.color_code AS status_color
         FROM "oppotunity" op
         LEFT JOIN status_catalog sc ON op.status = sc.id
       ) as "${tableName}"`;
@@ -1615,7 +1618,9 @@ router.get('/:tableName', async (req, res) => {
     let orderBy = dbCols.includes('created_date') ? 'created_date DESC NULLS LAST' : '1 DESC';
 
     if (tableName === 'oppotunity' || tableName === 'opportunity') {
-      orderBy = 'fy_recognized DESC NULLS LAST, create_date DESC NULLS LAST';
+      orderBy = dbCols.includes('fy_recognized')
+        ? 'fy_recognized DESC NULLS LAST, create_date DESC NULLS LAST'
+        : (dbCols.includes('create_date') ? 'create_date DESC NULLS LAST' : '1 DESC');
     } else if (tableName === 'payment') {
       orderBy = 'due_date DESC NULLS LAST, payment_id DESC';
 

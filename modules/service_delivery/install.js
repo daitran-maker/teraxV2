@@ -15,7 +15,27 @@ async function install(externalPool = null) {
   console.log('=== [Service Delivery Extension] Starting Installation ===');
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    // 0. Ensure status_catalog schema prerequisites
+    await client.query(`
+      DO $$
+      BEGIN
+        IF to_regclass('public.status_catalog') IS NOT NULL THEN
+          ALTER TABLE public.status_catalog ADD COLUMN IF NOT EXISTS status_value INTEGER;
+          UPDATE public.status_catalog SET status_value = id WHERE status_value IS NULL;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'status_catalog_tbl_col_key_uq'
+          ) AND NOT EXISTS (
+            SELECT 1 FROM pg_indexes WHERE tablename = 'status_catalog' AND indexdef LIKE '%(table_name, column_name, status_key)%'
+          ) THEN
+            BEGIN
+              ALTER TABLE public.status_catalog ADD CONSTRAINT status_catalog_tbl_col_key_uq UNIQUE (table_name, column_name, status_key);
+            EXCEPTION WHEN duplicate_table OR duplicate_object THEN
+              NULL;
+            END;
+          END IF;
+        END IF;
+      END $$;
+    `);
 
     // 1. Run SQL Migration
     const sqlPath = path.join(__dirname, '../../migrations/2026-10-18_service_delivery_module.sql');
@@ -44,6 +64,60 @@ async function install(externalPool = null) {
       ALTER TABLE public.contract ADD COLUMN IF NOT EXISTS sc_product VARCHAR(255);
       ALTER TABLE public.service_delivery_contract ADD COLUMN IF NOT EXISTS id__contract VARCHAR(255);
       CREATE INDEX IF NOT EXISTS idx_sdc_id__contract ON public.service_delivery_contract(id__contract);
+
+      -- Relaxation of non-null constraints on service delivery tables
+      ALTER TABLE public.service_delivery_contract ALTER COLUMN service_scope DROP NOT NULL;
+      ALTER TABLE public.service_delivery_contract ALTER COLUMN coordinator__employee DROP NOT NULL;
+      ALTER TABLE public.service_task_request ALTER COLUMN service_delivery DROP NOT NULL;
+      ALTER TABLE public.service_task_request ALTER COLUMN title DROP NOT NULL;
+      ALTER TABLE public.service_task_request ALTER COLUMN title TYPE TEXT;
+
+      -- Columns for oppotunity (fy_recognized, fy_target_closed_date, quarter_by_closed_date)
+      IF to_regclass('public.oppotunity') IS NOT NULL THEN
+        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_recognized VARCHAR(20);
+        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_target_closed_date VARCHAR(20);
+        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS quarter_by_closed_date VARCHAR(20);
+
+        UPDATE public.oppotunity
+        SET fy_recognized = to_char(create_date::date, 'YYYY')
+        WHERE create_date IS NOT NULL AND (fy_recognized IS NULL OR fy_recognized = '');
+
+        UPDATE public.oppotunity
+        SET fy_target_closed_date = to_char(close_date::date, 'YYYY')
+        WHERE close_date IS NOT NULL AND (fy_target_closed_date IS NULL OR fy_target_closed_date = '');
+
+        UPDATE public.oppotunity
+        SET quarter_by_closed_date = 'Q' || to_char(close_date::date, 'Q')
+        WHERE close_date IS NOT NULL AND (quarter_by_closed_date IS NULL OR quarter_by_closed_date = '');
+      END IF;
+
+      -- Ensure service_contract table
+      CREATE TABLE IF NOT EXISTS public.service_contract (
+        id VARCHAR(50) PRIMARY KEY,
+        id__contract VARCHAR(50),
+        id__my_service INTEGER,
+        id__contract_service_type INTEGER,
+        end_user__company VARCHAR(50),
+        description TEXT,
+        value_before_vat NUMERIC,
+        vat_value NUMERIC,
+        total_value NUMERIC,
+        id__currency INTEGER,
+        currency VARCHAR(10),
+        exchange_rate NUMERIC,
+        value_before_vat_in_vnd NUMERIC,
+        vat_value_in_vnd NUMERIC,
+        total_value_in_vnd NUMERIC,
+        updated_by__employee VARCHAR(255),
+        updated_date TIMESTAMP WITHOUT TIME ZONE,
+        created_by__employee VARCHAR(255),
+        created_date TIMESTAMP WITHOUT TIME ZONE,
+        old_id VARCHAR(50),
+        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_service_contract_id__contract ON public.service_contract(id__contract);
+      CREATE INDEX IF NOT EXISTS idx_service_contract_end_user ON public.service_contract(end_user__company);
     `);
     console.log('✓ contract.sc_* and service_delivery_contract.id__contract ensured.');
 
@@ -127,7 +201,7 @@ async function install(externalPool = null) {
     `);
     console.log('✓ Dashboard metric indexes ensured.');
 
-    // 1c. Seed action rule "Submit for approval" (only if the action framework table already exists)
+    // 1c. Seed action rule "Submit for approval" & Opportunity action rules
     await client.query(`
       DO $$
       BEGIN
@@ -140,6 +214,36 @@ async function install(externalPool = null) {
             'Submit for approval', true
           )
           ON CONFLICT (action_id) DO NOTHING;
+
+          -- Opportunity action rules for child views / tabs under request
+          INSERT INTO public.action_rules (action_id, view_name, roles, description, display_name, display)
+          VALUES
+            ('add_oppotunity', 'request,oppotunity,opportunity,oppo', NULL, 'Add Opportunity records', 'Add Opportunity', true),
+            ('edit_oppotunity', 'request,oppotunity,opportunity,oppo', NULL, 'Edit Opportunity records', 'Edit Opportunity', true),
+            ('delete_oppotunity', 'request,oppotunity,opportunity,oppo', NULL, 'Delete Opportunity records', 'Delete Opportunity', true)
+          ON CONFLICT (action_id) DO UPDATE SET
+            view_name = EXCLUDED.view_name,
+            display = true;
+
+          -- ACT-REQUEST-02 is only allowed in my_process_owner, my_task, my_team
+          UPDATE public.action_rules
+          SET view_name = 'my_process_owner,my_task,my_team', roles = '[POLICY LEAD],[sr_owner]'
+          WHERE action_id = 'ACT-REQUEST-02';
+        END IF;
+
+        IF to_regclass('public.policy_and_program') IS NOT NULL THEN
+          UPDATE public.policy_and_program
+          SET elements = 'CONTRACT, SERVICE, ASSET, OPPORTUNITY, EXPENSE, FINANCE'
+          WHERE policy_name ILIKE '%opportunity%' AND (elements IS NULL OR elements = '');
+        END IF;
+
+        IF to_regclass('public.request') IS NOT NULL AND to_regclass('public.policy_and_program') IS NOT NULL THEN
+          UPDATE public.request r
+          SET elements = ARRAY['CONTRACT', 'SERVICE', 'ASSET', 'OPPORTUNITY', 'EXPENSE', 'FINANCE']
+          FROM public.policy_and_program p
+          WHERE r.request_type::text = p.policy_id::text
+            AND p.policy_name ILIKE '%opportunity%'
+            AND (r.elements IS NULL OR r.elements = '{}');
         END IF;
       END $$;
     `);

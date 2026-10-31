@@ -275,10 +275,39 @@ async function ensureActionRulesSeed() {
       VALUES
         ('add_my_process_owner',   'my_process_owner', NULL, 'Add Request (My Process Owner)',   'Add request from My Process Owner view',    true),
         ('edit_my_process_owner',  'my_process_owner', NULL, 'Edit Request (My Process Owner)',  'Edit request in My Process Owner view',     true),
-        ('delete_my_process_owner','my_process_owner', NULL, 'Delete Request (My Process Owner)','Delete request in My Process Owner view', true)
+        ('delete_my_process_owner','my_process_owner', NULL, 'Delete Request (My Process Owner)','Delete request in My Process Owner view', true),
+        ('add_oppotunity',         'request,oppotunity,opportunity,oppo', NULL, 'Add Opportunity',    'Add new opportunity records',       true),
+        ('edit_oppotunity',        'request,oppotunity,opportunity,oppo', NULL, 'Edit Opportunity',   'Edit opportunity records',          true),
+        ('delete_oppotunity',      'request,oppotunity,opportunity,oppo', NULL, 'Delete Opportunity', 'Delete opportunity records',        true)
       ON CONFLICT (action_id) DO UPDATE SET
         view_name = EXCLUDED.view_name,
         display = true;
+
+      -- Ensure opportunity policy templates have elements
+      IF to_regclass('public.policy_and_program') IS NOT NULL THEN
+        UPDATE public.policy_and_program
+        SET elements = 'CONTRACT, SERVICE, ASSET, OPPORTUNITY, EXPENSE, FINANCE'
+        WHERE policy_name ILIKE '%opportunity%' AND (elements IS NULL OR elements = '');
+      END IF;
+
+      -- Ensure oppotunity columns (fy_recognized, fy_target_closed_date, quarter_by_closed_date)
+      IF to_regclass('public.oppotunity') IS NOT NULL THEN
+        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_recognized VARCHAR(20);
+        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_target_closed_date VARCHAR(20);
+        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS quarter_by_closed_date VARCHAR(20);
+
+        UPDATE public.oppotunity
+        SET fy_recognized = to_char(create_date::date, 'YYYY')
+        WHERE create_date IS NOT NULL AND (fy_recognized IS NULL OR fy_recognized = '');
+
+        UPDATE public.oppotunity
+        SET fy_target_closed_date = to_char(close_date::date, 'YYYY')
+        WHERE close_date IS NOT NULL AND (fy_target_closed_date IS NULL OR fy_target_closed_date = '');
+
+        UPDATE public.oppotunity
+        SET quarter_by_closed_date = 'Q' || to_char(close_date::date, 'Q')
+        WHERE close_date IS NOT NULL AND (quarter_by_closed_date IS NULL OR quarter_by_closed_date = '');
+      END IF;
 
       -- Sync exception_rules so my_task does not block users who have access to my_process_owner
       UPDATE exception_rules

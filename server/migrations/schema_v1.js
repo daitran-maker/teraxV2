@@ -1157,6 +1157,10 @@ async function runSchemaV1(pool, seeds) {
     ('edit_opportunity_list', 'opportunity_list', NULL, 'Edit Opportunity', 'Edit opportunity records'),
     ('delete_opportunity_list', 'opportunity_list', NULL, 'Delete Opportunity', 'Delete opportunity records'),
 
+    ('add_oppotunity', 'request,oppotunity,opportunity,oppo', NULL, 'Add Opportunity', 'Add new opportunity records'),
+    ('edit_oppotunity', 'request,oppotunity,opportunity,oppo', NULL, 'Edit Opportunity', 'Edit opportunity records'),
+    ('delete_oppotunity', 'request,oppotunity,opportunity,oppo', NULL, 'Delete Opportunity', 'Delete opportunity records'),
+
     ('add_contact', 'contact', NULL, 'Add Contact', 'Add new contact records'),
     ('edit_contact', 'contact', NULL, 'Edit Contact', 'Edit contact records'),
     ('delete_contact', 'contact', NULL, 'Delete Contact', 'Delete contact records'),

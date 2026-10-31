@@ -1808,7 +1808,7 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
     const isOppoAction = actionId === 'ACT-OPPO-02' || ['oppotunity', 'opportunity', 'oppo'].includes(moduleKey);
     const availableElements = isOppoAction
       ? ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Service Delivery Contract', 'Finance']
-      : ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Target table', 'Assign task', 'Opportunity', 'Finance'];
+      : ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Target table', 'Assign task', 'Opportunity', 'Service Delivery Contract', 'Finance'];
     if (!fieldConfig) {
       fieldConfig = {
         key: 'elements',
@@ -2719,7 +2719,8 @@ function buildDetailViewHTML(moduleKey, record) {
             if (childKey === 'target_table') return activeElements.includes('TARGET TABLE') || activeElements.includes('TARGET_TABLE');
             if (childKey === 'assigned_task') return activeElements.includes('ASSIGN_TASK') || activeElements.includes('ASSIGN TASK');
             if (childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') {
-              return activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || !!record.id__oppotunity;
+              const reqType = String(record.request_type_name || record.policy_name || '').toUpperCase();
+              return activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || !!record.id__oppotunity || reqType.startsWith('OPPORTUNITY');
             }
             if (childKey === 'service_delivery_contract') {
               return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || !!record.id__oppotunity || activeElements.includes('CONTRACT') || activeElements.includes('SERVICE');
@@ -3861,7 +3862,7 @@ function buildDetailViewHTML(moduleKey, record) {
 
         const isRequestParent = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(effectiveParentView)
           || ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
-        const isSpecialChild = ['target_table', 'assigned_task'].includes(childKey);
+        const isSpecialChild = ['target_table', 'assigned_task', 'oppotunity', 'opportunity', 'oppo'].includes(childKey);
         const hideAddInNonProcessRequestChildren = isRequestParent && (
           effectiveParentView === 'my_approval' ||
           (!['my_process_owner', 'my_task', 'my_team'].includes(effectiveParentView) && !(isSpecialChild && ['my_request', 'request'].includes(effectiveParentView)))

@@ -46,7 +46,7 @@
       { key: 'process_type_description', label: 'PROCESS TYPE DESCRIPTION', type: 'textarea', createReadonly: true, editReadonly: true, full: true },
       { key: 'description', label: 'DESCRIPTION', type: 'textarea', full: true, required: true },
       { section: 'request detail' },
-      { key: 'elements', label: 'ELEMENTS', labelKey: 'col.elements', type: 'multiselect', options: ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Target table', 'Assign task', 'Opportunity', 'Service Delivery Contract', 'Finance'], createHidden: true, editReadonly: true, full: true },
+      { key: 'elements', label: 'ELEMENTS', labelKey: 'col.elements', type: 'multiselect', options: ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Target table', 'Assign task', 'Opportunity', 'Service Delivery Contract', 'Finance'], createHidden: true, full: true },
       { key: 'comment', label: 'COMMENT', type: 'textarea', full: true },
       { key: 'file', label: 'FILE', type: 'file', full: true },
     ],
