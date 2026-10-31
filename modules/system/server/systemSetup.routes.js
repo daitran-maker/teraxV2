@@ -25,6 +25,11 @@ function cmsGet(path) {
 }
 
 const cmsLookups = require('./cmsLookups.routes');
+const { requireRoles } = require('../../../server/middleware/security');
+
+// Read-only lookups stay open to any logged-in user; every write needs an admin role.
+const setupAdmin = requireRoles('Super Admin', 'Admin', 'Administrator');
+router.use((req, res, next) => (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' ? next() : setupAdmin(req, res, next)));
 
 const POPULAR_5_COUNTRIES = ['VN', 'US', 'SG', 'JP', 'KR'];
 const POPULAR_5_CURRENCIES = ['VND', 'USD', 'EUR', 'SGD', 'JPY'];
@@ -1078,7 +1083,7 @@ router.post('/complete', async (req, res) => {
 });
 
 // POST /api/system-setup/reset (For developer/testing use)
-router.post('/reset', async (req, res) => {
+router.post('/reset', requireRoles('Super Admin'), async (req, res) => {
   try {
     await ensureSetupTable();
     await pool.query(`

@@ -175,4 +175,35 @@ function clearPermissionCache() {
   console.log('[permissionHelper] Rule cache cleared.');
 }
 
-module.exports = { checkPermission, clearPermissionCache };
+/**
+ * Hard delete permission, driven by action rule `hard_delete_<table>`.
+ *  - no rule for the table  -> Super Admin only (previous behaviour);
+ *  - rule(s) exist          -> at least one enabled rule must match the user (Super Admin passes any enabled rule;
+ *                              a rule with display=false disables hard delete for everybody).
+ * view_name is ignored on purpose: the rule is looked up by table so it can't fall into the permissive default.
+ */
+async function canHardDelete(user, tableName) {
+  const isSuper = !!(user && user.role && String(user.role).toUpperCase() === 'SUPER ADMIN');
+  if (!user) return false;
+  try {
+    const rows = await getRuleFromCache('action_rules', 'action_id', `hard_delete_${String(tableName).toLowerCase()}`);
+    if (rows.length === 0) return isSuper;
+    const enabled = rows.filter(r => !(r.display === false || String(r.display).toLowerCase() === 'false'));
+    if (enabled.length === 0) return false;
+    if (isSuper) return true;
+    const list = (v) => (!v ? [] : (Array.isArray(v) ? v : String(v).split(',')))
+      .map(s => String(s).trim().replace(/^\[|\]$/g, '').toLowerCase()).filter(Boolean);
+    const ids = [user.email, user.employee_id, user.username].filter(Boolean).map(s => String(s).trim().toLowerCase());
+    return enabled.some(r =>
+      list(r.exceptions).some(x => ids.includes(x)) ||
+      list(r.roles).includes(String(user.role || '').trim().toLowerCase()) ||
+      list(r.levels).includes(String(user.employee_level || '').trim().toLowerCase()) ||
+      list(r.positions).includes(String(user.position || '').trim().toLowerCase())
+    );
+  } catch (err) {
+    console.error('canHardDelete failed:', err);
+    return isSuper;
+  }
+}
+
+module.exports = { checkPermission, clearPermissionCache, canHardDelete };

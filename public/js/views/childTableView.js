@@ -961,8 +961,11 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
     return;
   }
 
-  let fkCol = parentKey === 'contract' ? 'contract_id' : parentKey;
-  if (parentKey === 'request') {
+  let fkCol = (parentKey === 'contract' || parentKey === 'service_contract' || parentKey === 'service_contracts') ? 'contract_id' : parentKey;
+  if (['contract', 'service_contract', 'service_contracts'].includes(parentKey)) {
+    if (childKey === 'service_delivery_contract') fkCol = 'id__contract';
+    else fkCol = 'contract_id';
+  } else if (parentKey === 'request') {
     if (childKey === 'assigned_task' || childKey === 'request_rating') fkCol = 'request_id';
     else if (childKey === 'expense' || childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') fkCol = 'id__request';
     else if (childKey === 'service_delivery_contract') fkCol = 'id__service_request';
@@ -1067,10 +1070,11 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
         if (!selectCache['employee']) {
           getSelectOptions('employee').then(opts => {
             empOpts = opts;
+            window.inlineEmpOpts = opts;
             // Re-render comment names once employees arrive (if container still exists)
             const cont = contentPane.querySelector(`#child-table-container-${childKey}`);
             if (cont && opts.length > 0) {
-              loadChildTable(childKey, parentKey, parentPkVal);
+              loadChildTable(childKey, parentKey, parentPkVal, data);
             }
           }).catch(() => { });
         }
@@ -1215,7 +1219,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
         }
       }
       window.inlineEmpOpts = empOpts;
-      contentPane.selectedInlineTags = [];
+      // Note: Preserve contentPane.selectedInlineTags and inline comment box tags across reloads
 
       const empMap = {};
       empOpts.forEach(o => {
@@ -1225,93 +1229,9 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
 
       sortChildRowsNewestFirst(childKey, data);
 
-      let html = `
-        <style>
-        .modern-tag-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 16px;
-            background: rgba(2, 132, 199, 0.1);
-            color: #0284c7;
-            font-size:10px;
-            font-weight: 600;
-            margin: 2px;
-            border: 1px solid rgba(2, 132, 199, 0.2);
-        }
-        .modern-tag-chip .remove-btn {
-            cursor: pointer;
-            font-size:13px;
-            font-weight: bold;
-            opacity: 0.6;
-            transition: opacity 0.2s;
-        }
-        .modern-tag-chip .remove-btn:hover {
-            opacity: 1;
-        }
-        .tag-dropdown-item {
-            padding: 8px 12px;
-            cursor: pointer;
-            font-size:11px;
-            transition: background 0.2s;
-            color: var(--text-primary);
-            border-bottom: 1px solid var(--border-light);
-        }
-        .tag-dropdown-item:last-child {
-            border-bottom: none;
-        }
-        .tag-dropdown-item:hover {
-            background: var(--bg-hover);
-        }
-        .btn-send-modern {
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-size:10px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-send-modern:hover {
-            transform: translateY(-1px);
-        }
-        .btn-send-modern:active {
-            transform: scale(0.98);
-        }
-        .tag-search-input {
-            width: 100%; height: 40px; border-radius: 8px; 
-            padding: 8px 12px; font-size:13px; 
-            border: 1px solid #E5E7EB; 
-            background: #FFFFFF; 
-            color: #111827; outline: none; 
-            transition: all 0.2s ease;
-            box-sizing: border-box;
-        }
-        .tag-search-input:focus {
-            border-color: var(--accent);
-        }
-        .inline-comment-box {
-            padding: 12px; 
-            background: var(--bg-card); 
-            border-top: 1px solid var(--border);
-            border-radius: 0 0 12px 12px;
-            box-shadow: 0 -4px 15px rgba(0,0,0,0.03);
-            position: sticky;
-            bottom: 0;
-            z-index: 20;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        </style>
-        <div class="comments-wrapper" style="display:flex; flex-direction:column; position:relative; background: var(--bg-default, transparent); width:100%; height:100%; min-height:0; overflow:hidden;">
-      `;
-
-      html += '<div class="comments-stream" style="padding: 12px; display:flex; flex-direction:column; gap:8px; flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;">';
+      let streamHtml = '';
       if (data.length === 0) {
-        html += `<div style="padding:40px 20px; text-align:center; color:var(--text-muted); font-size:11px; flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+        streamHtml += `<div style="padding:40px 20px; text-align:center; color:var(--text-muted); font-size:11px; flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
            <span class="material-symbols-rounded" style="font-size:29px; opacity:0.5; margin-bottom:8px;">forum</span>
            <div>${typeof t === 'function' ? t('detail.no_related', 'No related records found.') : 'No related records found.'}</div>
          </div>`;
@@ -1401,7 +1321,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
           const authorEmail = empObj ? empObj.email : (cmt.created_by && cmt.created_by.includes('@') ? cmt.created_by : '');
           const replyTagVal = authorEmail || cmt.comment_by || cmt.created_by || authorName;
 
-          html += `
+          streamHtml += `
               <div class="comment-card ${isMyComment ? 'my-comment' : ''}" data-comment-id="${cmt.comment_id}" style="margin-bottom:8px; background:${cardBg}; padding:${cardPadding}; border-radius:12px; border:1px solid ${cardBorder}; box-shadow:${cardShadow}; max-width:${cardMaxWidth}; align-self:${cardAlign}; width:${cardWidth}; min-width:${cardMinWidth}; box-sizing:border-box; word-break:break-word;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; gap:20px;">
                   <div style="display:flex; align-items:center; gap:10px;">
@@ -1434,59 +1354,188 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             `;
         });
       }
-      html += '</div>'; // End comments-stream
 
-      // Render the sticky comment form at the bottom
-      html += `
-        <div class="inline-comment-box" style="padding: 12px 16px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; box-sizing: border-box;">
-           <!-- Tag Section -->
-           <div style="display:flex; flex-direction:column; position:relative; gap:4px; margin-bottom: 2px;">
-              <div style="display:flex; align-items:center; gap:6px; color:#475569; font-size:11px; font-weight:600;">
-                 <span class="material-symbols-rounded" style="font-size:14px; color:#9CA3AF;">sell</span>
-                 <span>${typeof t === 'function' ? t('msg.tag_people', 'Tag People') : 'Tag People'}</span>
-              </div>
-              
-              <!-- Chips container -->
-              <div id="selected-tags-chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom: 2px;"></div>
-              
-              <div style="position:relative; width:100%;">
-                <input type="text" id="tag-search-input" class="tag-search-input" placeholder="Type name or email to tag..." oninput="window.filterInlineTags(this)" onfocus="window.filterInlineTags(this)" style="height:34px; font-size:12px; padding:6px 10px;">
-                <!-- Dropdown menu -->
-                <div id="tag-search-dropdown" style="display:none; position:absolute; left:0; right:0; bottom:100%; margin-bottom:4px; max-height:150px; overflow-y:auto; background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); z-index:100;"></div>
-              </div>
-           </div>
-
-           <!-- Textarea -->
-           <textarea id="inline-comment-text" style="width:100%; min-height:56px; height:56px; padding:8px 12px; resize:vertical; font-size:13px; border-radius:8px; border:1px solid #E5E7EB; background:#FFFFFF; color:#111827; font-family:inherit; outline:none; transition:border-color 0.2s; line-height:1.4; box-sizing:border-box;" placeholder="${t('msg.write_comment', 'Write a comment...')}" onfocusin="this.style.borderColor='#F97316'" onfocusout="this.style.borderColor='#E5E7EB'"></textarea>
-           
-           <!-- Actions Row -->
-           <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
-              <div style="display:flex; gap:8px; align-items:center;">
-                 <input type="file" id="inline-comment-file" style="display:none;" onchange="window.handleInlineFileChange(this)">
-                 <button onclick="this.closest('.inline-comment-box').querySelector('#inline-comment-file').click()" style="display:inline-flex; align-items:center; gap:5px; padding:6px 12px; height:34px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">attach_file</span>${t('btn.attach_file', 'Attach File')}</button>
-                 <input type="hidden" id="inline-comment-file-b64">
-                 <span id="inline-file-name" style="font-size:11px; color:#9CA3AF; max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
-                 <button onclick="const r=this.closest('.inline-comment-box').querySelector('#inline-link-row'); r.style.display = r.style.display==='none'?'flex':'none';" style="display:inline-flex; align-items:center; gap:5px; padding:6px 12px; height:34px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">link</span>Attached Link</button>
-              </div>
-              <button onclick="window.submitInlineComment(this, '${parentKey}', '${parentPkVal}', '${childKey}')" style="display:inline-flex; align-items:center; gap:6px; padding:6px 16px; height:34px; border:none; border-radius:8px; background:#F97316; color:#FFFFFF; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:background 0.2s; flex-shrink:0; box-sizing:border-box;" onmouseover="this.style.background='#EA580C'" onmouseout="this.style.background='#F97316'">${typeof t === 'function' ? t('btn.send', 'Send') : 'Send'} <span class="material-symbols-rounded" style="font-size:15px;">send</span></button>
-           </div>
-           <!-- Link input row (hidden by default) -->
-           <div id="inline-link-row" style="display:none; align-items:center; gap:8px;">
-             <span class="material-symbols-rounded" style="font-size:15px; color:#9CA3AF;">link</span>
-             <input type="text" id="inline-comment-link" style="flex:1; height:34px; border:1px solid #E5E7EB; border-radius:6px; padding:4px 12px; font-size:12px; background:#FFFFFF; color:#111827; font-family:inherit; outline:none;" placeholder="🔗 ${t('msg.attached_link', 'Paste a link...')}">
-           </div>
-        </div>
-      `;
-      html += '</div>'; // End flex container
       const activeContainerComment = contentPane.querySelector(`#child-table-container-${childKey}`) || container;
       if (activeContainerComment) {
-        activeContainerComment.innerHTML = html;
-        const box = activeContainerComment.querySelector('.inline-comment-box');
-        if (box) box.selectedInlineTags = [];
-        setTimeout(() => {
-          const stream = activeContainerComment.querySelector('.comments-stream');
-          if (stream) stream.scrollTop = 0;
-        }, 50);
+        const existingStream = activeContainerComment.querySelector('.comments-stream');
+        const existingBox = activeContainerComment.querySelector('.inline-comment-box');
+
+        if (existingStream && existingBox) {
+          // Stream already exists - update comment stream only so user's active typing/draft is never lost!
+          existingStream.innerHTML = streamHtml;
+        } else {
+          // Initial mount: capture any draft if present
+          const savedDraft = existingBox ? {
+            text: existingBox.querySelector('#inline-comment-text')?.value || '',
+            link: existingBox.querySelector('#inline-comment-link')?.value || '',
+            fileB64: existingBox.querySelector('#inline-comment-file-b64')?.value || '',
+            fileName: existingBox.querySelector('#inline-file-name')?.textContent || '',
+            tags: existingBox.selectedInlineTags ? [...existingBox.selectedInlineTags] : [],
+            isFocused: document.activeElement === existingBox.querySelector('#inline-comment-text'),
+            selStart: existingBox.querySelector('#inline-comment-text')?.selectionStart,
+            selEnd: existingBox.querySelector('#inline-comment-text')?.selectionEnd,
+            linkOpen: existingBox.querySelector('#inline-link-row')?.style.display !== 'none',
+            progressHtml: existingBox.querySelector('#inline-file-progress')?.innerHTML || ''
+          } : null;
+
+          let html = `
+            <style>
+            .modern-tag-chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 10px;
+                border-radius: 16px;
+                background: rgba(2, 132, 199, 0.1);
+                color: #0284c7;
+                font-size:10px;
+                font-weight: 600;
+                margin: 2px;
+                border: 1px solid rgba(2, 132, 199, 0.2);
+            }
+            .modern-tag-chip .remove-btn {
+                cursor: pointer;
+                font-size:13px;
+                font-weight: bold;
+                opacity: 0.6;
+                transition: opacity 0.2s;
+            }
+            .modern-tag-chip .remove-btn:hover {
+                opacity: 1;
+            }
+            .tag-dropdown-item {
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size:11px;
+                transition: background 0.2s;
+                color: var(--text-primary);
+                border-bottom: 1px solid var(--border-light);
+            }
+            .tag-dropdown-item:last-child {
+                border-bottom: none;
+            }
+            .tag-dropdown-item:hover {
+                background: var(--bg-hover);
+            }
+            .btn-send-modern {
+                padding: 6px 14px;
+                border-radius: 8px;
+                font-size:10px;
+                font-weight: 600;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .btn-send-modern:hover {
+                transform: translateY(-1px);
+            }
+            .btn-send-modern:active {
+                transform: scale(0.98);
+            }
+            .tag-search-input {
+                width: 100%; height: 40px; border-radius: 8px; 
+                padding: 8px 12px; font-size:13px; 
+                border: 1px solid #E5E7EB; 
+                background: #FFFFFF; 
+                color: #111827; outline: none; 
+                transition: all 0.2s ease;
+                box-sizing: border-box;
+            }
+            .tag-search-input:focus {
+                border-color: var(--accent);
+            }
+            .inline-comment-box {
+                padding: 12px; 
+                background: var(--bg-card); 
+                border-top: 1px solid var(--border);
+                border-radius: 0 0 12px 12px;
+                box-shadow: 0 -4px 15px rgba(0,0,0,0.03);
+                position: sticky;
+                bottom: 0;
+                z-index: 20;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            </style>
+            <div class="comments-wrapper" style="display:flex; flex-direction:column; position:relative; background: var(--bg-default, transparent); width:100%; height:100%; min-height:0; overflow:hidden;">
+              <div class="comments-stream" style="padding: 12px; display:flex; flex-direction:column; gap:8px; flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;">
+                ${streamHtml}
+              </div>
+              <div class="inline-comment-box" style="padding: 12px 16px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; box-sizing: border-box;">
+                 <!-- Tag Section -->
+                 <div style="display:flex; flex-direction:column; position:relative; gap:4px; margin-bottom: 2px;">
+                    <div style="display:flex; align-items:center; gap:6px; color:#475569; font-size:11px; font-weight:600;">
+                       <span class="material-symbols-rounded" style="font-size:14px; color:#9CA3AF;">sell</span>
+                       <span>${typeof t === 'function' ? t('msg.tag_people', 'Tag People') : 'Tag People'}</span>
+                    </div>
+                    
+                    <!-- Chips container -->
+                    <div id="selected-tags-chips" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom: 2px;"></div>
+                    
+                    <div style="position:relative; width:100%;">
+                      <input type="text" id="tag-search-input" class="tag-search-input" placeholder="Type name or email to tag..." oninput="window.filterInlineTags(this)" onfocus="window.filterInlineTags(this)" style="height:34px; font-size:12px; padding:6px 10px;">
+                      <!-- Dropdown menu -->
+                      <div id="tag-search-dropdown" style="display:none; position:absolute; left:0; right:0; bottom:100%; margin-bottom:4px; max-height:150px; overflow-y:auto; background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); z-index:100;"></div>
+                    </div>
+                 </div>
+
+                 <!-- Textarea -->
+                 <textarea id="inline-comment-text" style="width:100%; min-height:56px; height:56px; padding:8px 12px; resize:vertical; font-size:13px; border-radius:8px; border:1px solid #E5E7EB; background:#FFFFFF; color:#111827; font-family:inherit; outline:none; transition:border-color 0.2s; line-height:1.4; box-sizing:border-box;" placeholder="${t('msg.write_comment', 'Write a comment...')}" onfocusin="this.style.borderColor='#F97316'" onfocusout="this.style.borderColor='#E5E7EB'"></textarea>
+                 
+                 <!-- Actions Row -->
+                 <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                       <input type="file" id="inline-comment-file" style="display:none;" onchange="window.handleInlineFileChange(this)">
+                       <button onclick="this.closest('.inline-comment-box').querySelector('#inline-comment-file').click()" style="display:inline-flex; align-items:center; gap:5px; padding:6px 12px; height:34px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">attach_file</span>${t('btn.attach_file', 'Attach File')}</button>
+                       <input type="hidden" id="inline-comment-file-b64">
+                       <span id="inline-file-name" style="font-size:11px; color:#9CA3AF; max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                       <button onclick="const r=this.closest('.inline-comment-box').querySelector('#inline-link-row'); r.style.display = r.style.display==='none'?'flex':'none';" style="display:inline-flex; align-items:center; gap:5px; padding:6px 12px; height:34px; border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.2s; white-space:nowrap; box-sizing:border-box;" onmouseover="this.style.borderColor='#F97316'; this.style.color='#F97316';" onmouseout="this.style.borderColor='#E5E7EB'; this.style.color='#475569';"><span class="material-symbols-rounded" style="font-size:15px;">link</span>Attached Link</button>
+                    </div>
+                    <button onclick="window.submitInlineComment(this, '${parentKey}', '${parentPkVal}', '${childKey}')" style="display:inline-flex; align-items:center; gap:6px; padding:6px 16px; height:34px; border:none; border-radius:8px; background:#F97316; color:#FFFFFF; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:background 0.2s; flex-shrink:0; box-sizing:border-box;" onmouseover="this.style.background='#EA580C'" onmouseout="this.style.background='#F97316'">${typeof t === 'function' ? t('btn.send', 'Send') : 'Send'} <span class="material-symbols-rounded" style="font-size:15px;">send</span></button>
+                 </div>
+                 <!-- Link input row (hidden by default) -->
+                 <div id="inline-link-row" style="display:none; align-items:center; gap:8px;">
+                   <span class="material-symbols-rounded" style="font-size:15px; color:#9CA3AF;">link</span>
+                   <input type="text" id="inline-comment-link" style="flex:1; height:34px; border:1px solid #E5E7EB; border-radius:6px; padding:4px 12px; font-size:12px; background:#FFFFFF; color:#111827; font-family:inherit; outline:none;" placeholder="🔗 ${t('msg.attached_link', 'Paste a link...')}">
+                 </div>
+              </div>
+            </div>
+          `;
+
+          activeContainerComment.innerHTML = html;
+          const box = activeContainerComment.querySelector('.inline-comment-box');
+          if (box) {
+            box.selectedInlineTags = savedDraft?.tags || [];
+            if (savedDraft) {
+              const textEl = box.querySelector('#inline-comment-text');
+              const linkEl = box.querySelector('#inline-comment-link');
+              const fileEl = box.querySelector('#inline-comment-file-b64');
+              const nameEl = box.querySelector('#inline-file-name');
+              const linkRow = box.querySelector('#inline-link-row');
+              const progEl = box.querySelector('#inline-file-progress');
+
+              if (textEl && savedDraft.text) textEl.value = savedDraft.text;
+              if (linkEl && savedDraft.link) linkEl.value = savedDraft.link;
+              if (fileEl && savedDraft.fileB64) fileEl.value = savedDraft.fileB64;
+              if (nameEl && savedDraft.fileName) nameEl.textContent = savedDraft.fileName;
+              if (linkRow && savedDraft.linkOpen) linkRow.style.display = 'flex';
+              if (progEl && savedDraft.progressHtml) progEl.innerHTML = savedDraft.progressHtml;
+              if (typeof window.renderSelectedTags === 'function') window.renderSelectedTags(box);
+              if (savedDraft.isFocused && textEl) {
+                textEl.focus();
+                if (savedDraft.selStart != null && savedDraft.selEnd != null) {
+                  textEl.setSelectionRange(savedDraft.selStart, savedDraft.selEnd);
+                }
+              }
+            }
+          }
+          setTimeout(() => {
+            const stream = activeContainerComment.querySelector('.comments-stream');
+            if (stream) stream.scrollTop = 0;
+          }, 50);
+        }
       }
 
       // Handlers are defined globally
@@ -1550,7 +1599,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
             || ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(parentKey);
           const allowChildActions = !['logs', 'request_activity_log', 'history', 'finance', 'target_table'].includes(childKey) && (isReqParent
             ? isChildTableActionAllowed(childKey, 'edit', effectiveParentKey)
-            : (parentKey === 'contract' ? ['payment', 'invoice'].includes(childKey) : (parentKey === 'account' ? childKey === 'mtr' : (parentKey === 'my_company' ? true : (parentKey === 'company' ? (childKey === 'contact' && isChildTableActionAllowed(childKey, 'edit', parentKey)) : false)))));
+            : (['contract', 'service_contract', 'service_contracts'].includes(parentKey) ? ['payment', 'invoice', 'service_delivery_contract'].includes(childKey) : (parentKey === 'account' ? childKey === 'mtr' : (parentKey === 'my_company' ? true : (parentKey === 'company' ? (childKey === 'contact' && isChildTableActionAllowed(childKey, 'edit', parentKey)) : false)))));
 
           const isAmountColumnKey = (k) => {
             const key = String(k || '').toLowerCase();
@@ -1727,7 +1776,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
                              ` : ''}
                              ${cols.map((c, colIdx) => {
                 if (typeof c.renderCell === 'function') {
-                  return `<td style="padding: 12px 14px; min-width: 170px; vertical-align: middle;">${c.renderCell(row, c)}</td>`;
+                  return `<td style="padding: 12px 14px; min-width: 170px; vertical-align: middle; font-size: 13px; color: #334155;">${c.renderCell(row, c)}</td>`;
                 }
                 let val = resolvedRow[c.key];
                 if (val === null || val === undefined) val = '';
@@ -1986,7 +2035,7 @@ async function loadChildTable(childKey, parentKey, parentPkVal, customData) {
 
                                ${cols.map(c => {
                 if (typeof c.renderCell === 'function') {
-                  return `<td style="padding: 10px 14px; min-width: 170px; vertical-align: middle;">${c.renderCell(row, c)}</td>`;
+                  return `<td style="padding: 10px 14px; min-width: 170px; vertical-align: middle; font-size: 12px; color: var(--text-primary);">${c.renderCell(row, c)}</td>`;
                 }
                 let val = resolvedRow[c.key];
                 if (val === null || val === undefined) val = '';

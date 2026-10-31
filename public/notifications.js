@@ -125,7 +125,7 @@ function updatePaginationControls() {
             if (startPage > 2) {
                 const dots = document.createElement('span');
                 dots.textContent = '...';
-                dots.style.color = 'var(--text-muted)';
+                dots.style.color = '#4B5563';
                 dots.style.padding = '0 2px';
                 pageInfo.appendChild(dots);
             }
@@ -140,7 +140,7 @@ function updatePaginationControls() {
             if (endPage < notificationTotalPages - 1) {
                 const dots = document.createElement('span');
                 dots.textContent = '...';
-                dots.style.color = 'var(--text-muted)';
+                dots.style.color = '#4B5563';
                 dots.style.padding = '0 2px';
                 pageInfo.appendChild(dots);
             }
@@ -150,12 +150,12 @@ function updatePaginationControls() {
     }
     if (prevBtn) {
         prevBtn.disabled = notificationPage <= 1;
-        prevBtn.style.opacity = notificationPage <= 1 ? '0.5' : '1';
+        prevBtn.style.opacity = notificationPage <= 1 ? '0.45' : '1';
         prevBtn.style.cursor = notificationPage <= 1 ? 'not-allowed' : 'pointer';
     }
     if (nextBtn) {
         nextBtn.disabled = notificationPage >= notificationTotalPages;
-        nextBtn.style.opacity = notificationPage >= notificationTotalPages ? '0.5' : '1';
+        nextBtn.style.opacity = notificationPage >= notificationTotalPages ? '0.45' : '1';
         nextBtn.style.cursor = notificationPage >= notificationTotalPages ? 'not-allowed' : 'pointer';
     }
 }
@@ -163,7 +163,7 @@ function updatePaginationControls() {
 function createPageButton(pageNum, isActive) {
     const btn = document.createElement('button');
     btn.textContent = pageNum;
-    btn.className = 'btn btn-sm';
+    btn.className = 'btn btn-sm notif-page-btn';
     btn.style.cssText = `
         height: 24px;
         width: 24px;
@@ -173,13 +173,13 @@ function createPageButton(pageNum, isActive) {
         align-items: center;
         justify-content: center;
         font-size: 11px;
-        border: 1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
+        border: 1px solid ${isActive ? '#9CA3AF' : '#D1D5DB'};
         border-radius: 4px;
-        background: ${isActive ? 'rgba(249, 115, 22, 0.1)' : 'transparent'};
-        color: ${isActive ? 'var(--accent)' : 'var(--text)'};
+        background: ${isActive ? '#E5E7EB' : '#FFFFFF'};
+        color: ${isActive ? '#111827' : '#374151'};
         font-weight: ${isActive ? '700' : '500'};
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.15s ease;
     `;
     btn.onclick = async () => {
         if (pageNum !== notificationPage) {
@@ -203,7 +203,7 @@ function renderNotifications() {
     listEl.innerHTML = '';
 
     if (notificationsList.length === 0) {
-        listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;">No notifications yet</div>';
+        listEl.innerHTML = '<div style="padding:24px 20px; text-align:center; color:#4B5563; font-size:13px; font-weight:500;" data-i18n="dash.noti.empty">No notifications yet</div>';
         return;
     }
 
@@ -215,25 +215,28 @@ function renderNotifications() {
 
     sorted.forEach(n => {
         const item = document.createElement('div');
-        item.style.padding = '12px 15px';
-        item.style.borderBottom = '1px solid var(--border)';
+        item.style.padding = '12px 16px';
+        item.style.borderBottom = '1px solid #E5E7EB';
         item.style.cursor = 'pointer';
-        item.style.transition = 'background 0.2s';
-        item.style.background = n.is_read ? 'transparent' : 'rgba(249, 115, 22, 0.05)';
+        item.style.transition = 'background 0.15s ease';
+        item.style.background = n.is_read ? '#FFFFFF' : '#F8FAFC';
         item.style.display = 'flex';
         item.style.flexDirection = 'column';
         item.style.gap = '4px';
 
-        item.onmouseenter = () => item.style.background = n.is_read ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.1)';
-        item.onmouseleave = () => item.style.background = n.is_read ? 'transparent' : 'rgba(249, 115, 22, 0.05)';
+        item.onmouseenter = () => item.style.background = '#F1F5F9';
+        item.onmouseleave = () => item.style.background = n.is_read ? '#FFFFFF' : '#F8FAFC';
+
+        const safeTitle = (typeof escapeHTML === 'function') ? escapeHTML(n.title || 'Notification') : (n.title || 'Notification');
+        const safeBody = (typeof escapeHTML === 'function') ? escapeHTML(n.body || '') : (n.body || '');
 
         item.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="font-weight:600; font-size:13px; color: ${n.is_read ? 'var(--text)' : 'var(--accent)'};">${n.title || 'Notification'}</div>
-                ${!n.is_read ? '<div style="width:8px; height:8px; border-radius:50%; background:var(--accent-red); margin-top:4px; flex-shrink:0;"></div>' : ''}
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.35;">${safeTitle}</div>
+                ${!n.is_read ? '<div style="width:7px; height:7px; border-radius:50%; background:#2563EB; margin-top:5px; flex-shrink:0;" title="Unread"></div>' : ''}
             </div>
-            <div style="font-size:12px; color:var(--text-muted); line-height:1.4;">${n.body || ''}</div>
-            <div style="font-size:10px; color:var(--text-muted); opacity:0.7; margin-top:2px;">${formatDateTime(n.created_date)}</div>
+            <div style="font-size:12px; color:#374151; line-height:1.45; word-break:break-word;">${safeBody}</div>
+            <div style="font-size:11px; color:#6B7280; font-weight:500; margin-top:2px;">${formatDateTime(n.created_date)}</div>
         `;
 
         item.onclick = async () => {

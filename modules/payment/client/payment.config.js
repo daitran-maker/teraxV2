@@ -27,6 +27,7 @@
       { key: 'my_company', label: 'My Company', labelKey: 'col.my_company', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname' },
       { key: 'transaction_id', label: 'Transaction ID' },
       { key: 'request', label: 'Request', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description' },
+      { key: 'project', label: 'Opportunity', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_name', hidden: true },
       { key: 'payment_request', label: 'Payment Request', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description' }
     ],
     fields: [
@@ -64,6 +65,7 @@
       { key: 'counter_party', label: 'COUNTER PARTY', type: 'counter_party', full: true },
       { key: 'bank_info', label: 'BANK INFO', type: 'textarea', full: true },
       { key: 'request', label: 'REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', hidden: true },
+      { key: 'project', label: 'OPPORTUNITY', type: 'select', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_name', hidden: true },
       { key: 'contract_id', label: 'CONTRACT ID', type: 'select', optionsFrom: 'contract', optionValue: 'contract_id', optionLabel: 'contract_name_or_description', hidden: true },
       { key: 'source', label: 'SOURCE', type: 'select', options: ['Contract', 'Request'], defaultValue: 'Request', hidden: true },
       { key: 'payment_request', label: 'PAYMENT REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', hidden: true },
@@ -89,6 +91,7 @@
       { key: 'counter_party', label: 'PAY TO', full: true },
       { section: 'request information' },
       { key: 'request', label: 'REQUEST', optionsFrom: 'request', full: true },
+      { key: 'project', label: 'OPPORTUNITY', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_name', full: true },
       { key: 'payment_request', label: 'PAYMENT REQUEST', optionsFrom: 'request', full: true },
       { key: 'transaction_id', label: 'TRANSACTION ID', labelKey: 'col.transaction_id', optionsFrom: 'mtr', full: true }
     ],

@@ -86,6 +86,15 @@ async function install(externalPool = null) {
     `);
     console.log('✓ service_task_request.fy backfilled from started_date.');
 
+    // Service delivery contract FY: plain "yyyy" (strip the FY prefix, expand 2-digit years).
+    await client.query(`
+      UPDATE public.service_delivery_contract
+      SET fy = CASE WHEN regexp_replace(fy, '[^0-9]', '', 'g') ~ '^[0-9]{2}$' THEN '20' || regexp_replace(fy, '[^0-9]', '', 'g')
+                    ELSE regexp_replace(fy, '[^0-9]', '', 'g') END
+      WHERE fy ~* '^[[:space:]]*FY' OR fy ~ '^[0-9]{2}$';
+    `);
+    console.log('✓ service_delivery_contract.fy normalised to yyyy.');
+
     // 1b-2. Indexes backing the dashboard metrics (Payment ratio / Progress / Remaining time).
     //       Idempotent; an index is skipped when its table/column does not exist in this deployment.
     await client.query(`
@@ -134,6 +143,58 @@ async function install(externalPool = null) {
         END IF;
       END $$;
     `);
+
+    // 1d. Seed approval process RSDC_service_delivery (approval-only, no elements) so SDC "Submit for approval" works
+    //     on a fresh setup. Idempotent: an existing process (and its tuned approvers) is left untouched.
+    await client.query(`
+      DO $$
+      DECLARE
+        emp TEXT := 'EMP-001';
+        comp TEXT := '1';
+      BEGIN
+        IF to_regclass('public.policy_and_program') IS NOT NULL THEN
+          IF to_regclass('public.employee') IS NOT NULL THEN
+            SELECT employee_id INTO emp FROM public.employee
+             WHERE role = 'Super Admin' OR employee_id = 'EMP-001' ORDER BY employee_id ASC LIMIT 1;
+            emp := COALESCE(emp, 'EMP-001');
+          END IF;
+          IF to_regclass('public.my_company') IS NOT NULL THEN
+            SELECT my_company_id::text INTO comp FROM public.my_company ORDER BY my_company_id ASC LIMIT 1;
+            comp := COALESCE(comp, '1');
+          END IF;
+          INSERT INTO public.policy_and_program (
+            policy_id, policy_type, policy_name, description, approval_level, company_id,
+            tier1_approval, tier2_approval, policy_lead, sr_owner, elements
+          ) VALUES (
+            'RSDC_service_delivery', 'Service Delivery', 'Service Delivery Contract Approval',
+            'Yêu cầu phê duyệt Service Delivery Contract (Service Delivery Contract Approval)',
+            'Tier 1', comp, emp, NULL, emp, emp, NULL
+          )
+          ON CONFLICT (policy_id) DO NOTHING;
+        END IF;
+      END $$;
+    `);
+    console.log('✓ Approval process RSDC_service_delivery ensured.');
+
+    // 1e. Draft / Waiting for approval statuses of the SDC (the base migration only has the running statuses).
+    await client.query(`
+      DO $$
+      BEGIN
+        IF to_regclass('public.status_catalog') IS NOT NULL THEN
+          INSERT INTO public.status_catalog (status_value, table_name, column_name, status_key, display_name_en, display_name_vi, color_code)
+          SELECT v.status_value, 'service_delivery_contract', 'status', v.status_key, v.en, v.vi, v.color
+            FROM (VALUES
+              (10, 'draft', 'Draft', 'Bản nháp', '#64748B'),
+              (11, 'waiting_for_approval', 'Waiting for approval', 'Chờ phê duyệt', '#F59E0B')
+            ) AS v(status_value, status_key, en, vi, color)
+           WHERE NOT EXISTS (
+             SELECT 1 FROM public.status_catalog s
+              WHERE s.table_name = 'service_delivery_contract' AND s.column_name = 'status' AND s.status_value = v.status_value
+           );
+        END IF;
+      END $$;
+    `);
+    console.log('✓ SDC Draft / Waiting for approval statuses ensured.');
 
     // 2. Register migration meta
     await client.query(`

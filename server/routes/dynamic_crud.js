@@ -21,6 +21,7 @@ tableRegistry.register(['target_table'], targetTableHandler);
 const serviceDeliveryModule = require('../../modules/service_delivery/server');
 tableRegistry.register(['service_delivery_contract', 'service_task_request'], serviceDeliveryModule.serviceDeliveryHandler);
 serviceDeliveryModule.registerMetrics(tableRegistry);
+const relatedEmployeesService = require('../../modules/related_employees');
 const queryBuilder = require('../core/queryBuilder');
 const { eventBus, EVENTS } = require('../core/events');
 const express = require('express');
@@ -32,7 +33,7 @@ const pool = require('../db');
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
 const RequestModel = require('../models/requestModel');
-const { checkPermission, clearPermissionCache } = require('../helpers/permissionHelper');
+const { checkPermission, clearPermissionCache, canHardDelete } = require('../helpers/permissionHelper');
 const { broadcastSSE } = require('../helpers/sseHelper');
 const { triggerNotifications } = require('../helpers/notificationHelper');
 const { isAutomationActive, logAutomationRun } = require('../helpers/automationHelper');
@@ -317,7 +318,7 @@ router.get('/:tableName', async (req, res) => {
     // Safety guard: If query is for an Opportunity child slice (e.g. contract, payment) but no parent ID is provided, return empty
     const reqSlice = String(req.query.slice || '').toLowerCase();
     if (['oppotunity', 'opportunity', 'oppo'].includes(reqSlice) && !['oppotunity', 'opportunity', 'oppo'].includes(tableName)) {
-      const projVal = filters.project || filters.id__request || filters.request;
+      const projVal = filters.project || filters.id__request || filters.request || filters.oppotunity || filters.opportunity || filters.oppo || filters.id__opportunity;
       if (!projVal || String(projVal).trim() === '' || projVal === 'null' || projVal === 'undefined') {
         return res.json({
           data: [],
@@ -518,41 +519,94 @@ router.get('/:tableName', async (req, res) => {
         if (key === 'my_company' || key === 'company_id') key = 'id__my_company';
       }
 
-      // Special interceptor for opportunity filtering on expense (bidirectional link with request)
-      if ((key === 'project' || key === 'id__opportunity') && tableName === 'expense') {
-        const oppoVals = typeof value === 'string' ? value.split(',').map(s => s.trim()).filter(Boolean) : [value];
-        addFacetClause(['id__opportunity', 'project'], (idx) => {
-          const inPlaceholders = oppoVals.map((_, i) => `$${idx + i}`).join(', ');
-          return {
-            sql: `("${tableName}"."id__opportunity" IN (${inPlaceholders}) OR "${tableName}"."id__request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" IN (${inPlaceholders}) AND "id__request" IS NOT NULL))`,
-            values: oppoVals
-          };
-        });
-        continue;
-      }
-
-      if (key === 'oppotunity' && tableName === 'comment') { // oppotunity_comment_link
-        // A comment written on an Opportunity is stored on its Request (see POST); the Opportunity lists every
-        // comment of that Request, so Request and Opportunity share one thread.
+      // Special interceptor for opportunity filtering (bidirectional link with request and contracts)
+      if (['project', 'id__opportunity', 'oppotunity', 'opportunity', 'oppo'].includes(key)) {
         const oppoVal = String(value).trim();
-        addFacetClause('oppotunity', (idx) => ({
-          sql: `("comment"."request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id"::text = $${idx} AND "id__request" IS NOT NULL) OR "comment"."request" IN (SELECT "request_id" FROM "request" WHERE "id__oppotunity"::text = $${idx}))`,
-          values: [oppoVal]
-        }));
-        continue;
+        if (tableName === 'expense') {
+          addFacetClause(['id__opportunity', 'project'], (idx) => ({
+            sql: `("${tableName}"."id__opportunity" = $${idx} OR "${tableName}"."id__request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL))`,
+            values: [oppoVal]
+          }));
+          continue;
+        }
+        if (tableName === 'comment') {
+          addFacetClause(['oppotunity', 'opportunity', 'oppo'], (idx) => ({
+            sql: `("comment"."request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id"::text = $${idx} AND "id__request" IS NOT NULL) OR "comment"."request" IN (SELECT "request_id" FROM "request" WHERE "id__oppotunity"::text = $${idx}) OR "comment"."request" = $${idx})`,
+            values: [oppoVal]
+          }));
+          continue;
+        }
+        if (tableName === 'payment' || tableName === 'invoice') {
+          addFacetClause(['project', 'id__opportunity'], (idx) => ({
+            sql: `("${tableName}"."project" = $${idx} OR "${tableName}"."request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL) OR "${tableName}"."contract_id" IN (SELECT "contract_id" FROM "contract" WHERE "project" = $${idx} OR "request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL)))`,
+            values: [oppoVal]
+          }));
+          continue;
+        }
+        if (tableName === 'service_delivery_contract') {
+          addFacetClause(['project', 'id__opportunity'], (idx) => ({
+            sql: `("${tableName}"."project" = $${idx} OR "${tableName}"."id__service_request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL) OR "${tableName}"."id__contract" IN (SELECT "contract_id" FROM "contract" WHERE "project" = $${idx} OR "request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL)))`,
+            values: [oppoVal]
+          }));
+          continue;
+        }
+        if (tableName === 'contract') {
+          addFacetClause(['project', 'id__opportunity'], (idx) => ({
+            sql: `("${tableName}"."project" = $${idx} OR "${tableName}"."request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL) OR "${tableName}"."id__request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL) OR "${tableName}"."contract_id"::text IN (SELECT "id__contract"::text FROM "service_delivery_contract" WHERE "project"::text = $${idx}::text AND "id__contract" IS NOT NULL AND "deleted_at" IS NULL))`,
+            values: [oppoVal]
+          }));
+          continue;
+        }
+        if (tableName === 'service' || tableName === 'asset') {
+          addFacetClause(['project', 'id__opportunity'], (idx) => ({
+            sql: `("${tableName}"."project" = $${idx} OR "${tableName}"."request" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx} AND "id__request" IS NOT NULL))`,
+            values: [oppoVal]
+          }));
+          continue;
+        }
       }
 
-      if (key === 'project' && ['contract', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract'].includes(tableName)) {
-        const reqCol = tableName === 'service_delivery_contract' ? 'id__service_request' : 'request';
-        const projVal = String(value).trim();
-        addFacetClause('project', (idx) => ({
-          sql: `("${tableName}"."project" = $${idx} OR "${tableName}"."${reqCol}" IN (SELECT "id__request" FROM "oppotunity" WHERE "project_id" = $${idx}))`,
-          values: [projVal]
-        }));
-        continue;
+      // Special interceptor for request filtering (bidirectional link with opportunity and contracts)
+      if (['request', 'id__request', 'id__service_request'].includes(key)) {
+        const reqVal = String(value).trim();
+        if (tableName === 'expense') {
+          addFacetClause(['id__request', 'request'], (idx) => ({
+            sql: `("${tableName}"."id__request" = $${idx} OR "${tableName}"."id__opportunity" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL))`,
+            values: [reqVal]
+          }));
+          continue;
+        }
+        if (tableName === 'payment' || tableName === 'invoice') {
+          addFacetClause(['request', 'id__request'], (idx) => ({
+            sql: `("${tableName}"."request" = $${idx} OR "${tableName}"."project" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL) OR "${tableName}"."contract_id" IN (SELECT "contract_id" FROM "contract" WHERE "request" = $${idx} OR "id__request" = $${idx} OR "project" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL)))`,
+            values: [reqVal]
+          }));
+          continue;
+        }
+        if (tableName === 'service_delivery_contract') {
+          addFacetClause(['id__service_request', 'request'], (idx) => ({
+            sql: `("${tableName}"."id__service_request" = $${idx} OR "${tableName}"."project" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL) OR "${tableName}"."id__contract" IN (SELECT "contract_id" FROM "contract" WHERE "request" = $${idx} OR "id__request" = $${idx} OR "project" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL)))`,
+            values: [reqVal]
+          }));
+          continue;
+        }
+        if (tableName === 'contract') {
+          addFacetClause(['request', 'id__request'], (idx) => ({
+            sql: `("${tableName}"."request" = $${idx} OR "${tableName}"."id__request" = $${idx} OR "${tableName}"."project" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL))`,
+            values: [reqVal]
+          }));
+          continue;
+        }
+        if (tableName === 'service' || tableName === 'asset') {
+          addFacetClause(['request', 'id__request'], (idx) => ({
+            sql: `("${tableName}"."request" = $${idx} OR "${tableName}"."project" IN (SELECT "id__oppotunity" FROM "request" WHERE "request_id" = $${idx} AND "id__oppotunity" IS NOT NULL))`,
+            values: [reqVal]
+          }));
+          continue;
+        }
       }
 
-      const specialFilters = ['employee_related', 'my_company', 'contract_owner', 'fy', 'overdue', 'request_type', 'policy_name', 'payment_id', 'status', 'country', 'policy_type', 'finance_id', 'project', 'id__opportunity'];
+      const specialFilters = ['employee_related', 'my_company', 'contract_owner', 'fy', 'overdue', 'request_type', 'policy_name', 'payment_id', 'status', 'country', 'policy_type', 'finance_id', 'project', 'id__opportunity', 'oppotunity', 'opportunity', 'oppo', 'request', 'id__request', 'id__service_request'];
       if (!dbCols.includes(key) && !specialFilters.includes(key)) {
         continue;
       }
@@ -901,22 +955,38 @@ router.get('/:tableName', async (req, res) => {
           addBaseClause(() => ({ sql: '1 = 0', values: [] }));
         }
       }
-    } else if (tableName === 'request' || tablesWithRequestCol.includes(tableName)) {
-      if (!isGlobalAdmin && userForFilter.employee_id) {
-        const userEmpId = (userForFilter.employee_id || '').toLowerCase();
-        if (tableName === 'request') {
+    } else if (['oppotunity', 'opportunity', 'oppo', 'service_delivery_contract', 'service_task_request'].includes(tableName)) {
+      const isSuperAdminUser = userForFilter && userForFilter.role && userForFilter.role.toUpperCase() === 'SUPER ADMIN';
+      if (!isSuperAdminUser) {
+        const userEmpId = userForFilter && userForFilter.employee_id ? String(userForFilter.employee_id).toLowerCase().trim() : null;
+        if (!userEmpId) {
+          addBaseClause(() => ({ sql: '1 = 0', values: [] }));
+        } else {
+          const sqlTable = (tableName === 'opportunity' || tableName === 'oppo') ? 'oppotunity' : tableName;
           addBaseClause((idx) => ({
-            sql: `(
-              LOWER("request"."requester") = $${idx} OR
-              LOWER("request"."sr_creater") = $${idx} OR
-              $${idx} = ANY(SELECT LOWER(x) FROM UNNEST("request"."sr_owner") x) OR
-              LOWER("request"."policy_lead") = $${idx} OR
-              EXISTS (SELECT 1 FROM jsonb_array_elements("request".approval_flow->'steps') AS step WHERE LOWER(step->>'approver') = $${idx}) OR
-              EXISTS (SELECT 1 FROM "employee" mgr WHERE LOWER(mgr.employee_id) = $${idx} AND LOWER(mgr.employee_id) = (SELECT LOWER(emp.direct_manager) FROM "employee" emp WHERE LOWER(emp.employee_id) = ANY(SELECT LOWER(x) FROM UNNEST("request"."sr_owner") x) LIMIT 1)) OR
-              EXISTS (SELECT 1 FROM "comment" c WHERE LOWER(c.request) = LOWER("request".request_id) AND LOWER(c.tag) LIKE LOWER('%' || $${idx} || '%'))
-            )`,
+            sql: `("${sqlTable}"."related_employees" @> ARRAY[$${idx}]::text[])`,
             values: [userEmpId]
           }));
+        }
+      }
+    } else if (tableName === 'request' || tablesWithRequestCol.includes(tableName)) {
+      const isSuperAdminUser = userForFilter && userForFilter.role && userForFilter.role.toUpperCase() === 'SUPER ADMIN';
+      if ((tableName === 'request' && !isSuperAdminUser) || (!isGlobalAdmin && userForFilter.employee_id)) {
+        const userEmpId = (userForFilter.employee_id || '').toLowerCase();
+        if (tableName === 'request') {
+          if (!userEmpId) {
+            addBaseClause(() => ({ sql: '1 = 0', values: [] }));
+          } else {
+            addBaseClause((idx) => ({
+              sql: `(
+                "request"."related_employees" @> ARRAY[$${idx}]::text[] OR
+                LOWER("request"."requester") = $${idx} OR
+                LOWER("request"."sr_creater") = $${idx} OR
+                EXISTS (SELECT 1 FROM "comment" c WHERE LOWER(c.request) = LOWER("request".request_id) AND LOWER(c.tag) LIKE LOWER('%' || $${idx} || '%'))
+              )`,
+              values: [userEmpId]
+            }));
+          }
         } else if (tableName === 'mtr') {
           const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId);
           let extraOwnerConds = [];
@@ -940,8 +1010,24 @@ router.get('/:tableName', async (req, res) => {
             values: [accessibleReqIds, userEmpId]
           }));
         } else {
-          const reqParam = req.query.request || req.query.request_id || req.query.id__request || req.query.id_request;
+          let reqParam = req.query.request || req.query.request_id || req.query.id__request || req.query.id_request;
           const accessibleReqIds = await getUserAccessibleRequestIds(userEmpId, reqParam);
+          if (tableName === 'comment') {
+            const oppoParam = req.query.oppotunity || req.query.opportunity || req.query.oppo;
+            if (oppoParam) {
+              try {
+                const oppoRes = await pool.query(
+                  `SELECT COALESCE(NULLIF(o.id__request, ''), (SELECT r.request_id FROM request r WHERE r.id__oppotunity::text = o.project_id::text LIMIT 1)) AS req_id
+                   FROM oppotunity o WHERE o.project_id::text = $1 AND o.deleted_at IS NULL LIMIT 1`,
+                  [String(oppoParam)]
+                );
+                if (oppoRes.rows.length > 0 && oppoRes.rows[0].req_id) {
+                  const linkedReq = oppoRes.rows[0].req_id.toLowerCase();
+                  if (!accessibleReqIds.includes(linkedReq)) accessibleReqIds.push(linkedReq);
+                }
+              } catch (e) {}
+            }
+          }
           let reqCol = dbCols.includes('id__request') ? 'id__request' : (dbCols.includes('id_request') ? 'id_request' : 'request');
           let extraOwnerConds = [];
           if (dbCols.includes('employee')) extraOwnerConds.push(`LOWER(COALESCE("${tableName}"."employee", '')) = $2`);
@@ -957,8 +1043,24 @@ router.get('/:tableName', async (req, res) => {
               NOT EXISTS (SELECT 1 FROM "request" r WHERE LOWER(r.request_id) = LOWER("${tableName}"."${reqCol}")) OR
               LOWER("${tableName}"."${reqCol}") = ANY($${idx}::text[])
               ${hasExtra ? extraStr.replace(/\$2/g, `$${idx + 1}`) : ''}
+              ${tableName === 'contract' && hasExtra && dbCols.includes('related_employees') ? ` OR "contract"."related_employees" @> ARRAY[$${idx + 1}]::text[]` : ''}
             )`,
             values: hasExtra ? [accessibleReqIds, userEmpId] : [accessibleReqIds]
+          }));
+        }
+      }
+    }
+
+    if (tableName === 'contract' && ['service_contract', 'service_contracts'].includes(String(req.query.view || req.query.slice || '').toLowerCase())) {
+      const isSuperAdminUser = userForFilter && userForFilter.role && userForFilter.role.toUpperCase() === 'SUPER ADMIN';
+      if (!isSuperAdminUser) {
+        const userEmpId = userForFilter && userForFilter.employee_id ? String(userForFilter.employee_id).toLowerCase().trim() : null;
+        if (!userEmpId) {
+          addBaseClause(() => ({ sql: '1 = 0', values: [] }));
+        } else {
+          addBaseClause((idx) => ({
+            sql: `("contract"."related_employees" @> ARRAY[$${idx}]::text[])`,
+            values: [userEmpId]
           }));
         }
       }
@@ -1492,8 +1594,13 @@ router.get('/:tableName', async (req, res) => {
       ) as "${tableName}"`;
     }
 
+    const isLookup = reqSummary === 'false' || req.query.summary === 'false' || req.query.metrics === 'false' || req.query.lookup === 'true';
+
     // Computed columns contributed by modules (list extensions)
-    baseTableOrCTE = tableRegistry.applyListExtension(tableName, baseTableOrCTE);
+    // Only wrap with metrics for normal views; skip heavy lateral joins for dropdown select lookups (summary=false)
+    if (!isLookup) {
+      baseTableOrCTE = tableRegistry.applyListExtension(tableName, baseTableOrCTE);
+    }
 
     const countTarget = (tableName === 'finance' || tableName === 'v_finance') ? baseTableOrCTE : `"${tableName}"`;
     const countQuery = `SELECT COUNT(*) FROM ${countTarget} ${whereStr}`;
@@ -1507,7 +1614,9 @@ router.get('/:tableName', async (req, res) => {
     const totalRecords = parseInt(resultCount.rows[0].count, 10);
     let orderBy = dbCols.includes('created_date') ? 'created_date DESC NULLS LAST' : '1 DESC';
 
-    if (tableName === 'payment') {
+    if (tableName === 'oppotunity' || tableName === 'opportunity') {
+      orderBy = 'fy_recognized DESC NULLS LAST, create_date DESC NULLS LAST';
+    } else if (tableName === 'payment') {
       orderBy = 'due_date DESC NULLS LAST, payment_id DESC';
 
     } else if (tableName === 'invoice') {
@@ -1527,6 +1636,8 @@ router.get('/:tableName', async (req, res) => {
     const { sort_by, sort_dir } = req.query;
     if (sort_by) {
       const customColsMap = {
+        oppotunity: ['fy_recognized', 'project_label', 'sale_lead'],
+        opportunity: ['fy_recognized', 'project_label', 'sale_lead'],
         account: ['balance', 'balance_in_base_currency', 'latest_transaction_date'],
         asset: ['company_id', 'current_owner_name', 'value_in_base_currency'],
         service: ['company_id', 'requester', 'value', 'currency', 'value_in_base_currency'],
@@ -1567,14 +1678,27 @@ router.get('/:tableName', async (req, res) => {
     }
     const dataQuery = `SELECT * FROM ${baseTableOrCTE} ${whereStr} ORDER BY ${orderBy} LIMIT $${valIdx} OFFSET $${valIdx + 1}`;
     const resultQueryValues = [...values, limit, offset];
-    const resultData = await activePool.query(dataQuery, resultQueryValues);
+    let resultData;
+    const isMetricTable = !isLookup && ['oppotunity', 'opportunity', 'contract', 'service_delivery_contract', 'service_task_request'].includes(tableName);
+    if (isMetricTable) {
+      const client = await activePool.connect();
+      try {
+        await client.query('SET jit = off');
+        resultData = await client.query(dataQuery, resultQueryValues);
+      } finally {
+        await client.query('RESET jit').catch(() => {});
+        client.release();
+      }
+    } else {
+      resultData = await activePool.query(dataQuery, resultQueryValues);
+    }
 
     let summary = {};
     let faceted_summary = {};
     let statusCol = null;
-    const isLookupOrBulk = parseInt(limit, 10) > 100 || reqSummary === 'false';
     let facetCacheKey = null;
     let facetCacheHit = false;
+    const isLookupOrBulk = parseInt(limit, 10) > 100 || isLookup;
 
     if (parseInt(page, 10) === 1 && !isLookupOrBulk) {
       facetCacheKey = `${tableName}:${whereStr}:${JSON.stringify(values)}`;
@@ -2167,6 +2291,14 @@ router.get('/:tableName/:id', async (req, res) => {
 
     // === ROW-LEVEL SECURITY for request and child records ===
     const tablesWithRequestCol = ['mtr', 'payment', 'comment', 'service', 'contract', 'asset', 'invoice', 'target_table'];
+    // === ROW-LEVEL SECURITY for the request chain (opportunity / SDC / STR) ===
+    // Same rule as the list endpoint: Super Admin, or listed in related_employees.
+    if (['oppotunity', 'opportunity', 'oppo', 'service_delivery_contract', 'service_task_request'].includes(tableName)) {
+      if (!relatedEmployeesService.isUserRelated(record, getUserFromReq(req))) {
+        return res.status(403).json({ error: 'You do not have permission to view this content.' });
+      }
+    }
+
     if (tableName === 'account') {
       const userForCheck = getUserFromReq(req);
       const roleName = String(userForCheck.role || '').toUpperCase();
@@ -2194,19 +2326,30 @@ router.get('/:tableName/:id', async (req, res) => {
         const userEmployeeId = userForCheck.employee_id.toLowerCase();
         let targetRequest = null;
 
-        if (tableName === 'request') {
-          targetRequest = record;
-        } else if (record.request) {
-          const reqRes = await pool.query('SELECT * FROM "request" WHERE request_id = $1', [record.request]);
-          if (reqRes.rows.length > 0) {
-            targetRequest = reqRes.rows[0];
-          }
-        }
+        // If the user is the direct owner or creator of this record, allow access
+        const isDirectOwner = (
+          (record.contract_owner && String(record.contract_owner).toLowerCase() === userEmployeeId) ||
+          (record.employee && String(record.employee).toLowerCase() === userEmployeeId) ||
+          (record.created_by && String(record.created_by).toLowerCase() === userEmployeeId) ||
+          (record.updated_by && String(record.updated_by).toLowerCase() === userEmployeeId) ||
+          (Array.isArray(record.related_employees) && record.related_employees.some(x => String(x).toLowerCase().trim() === userEmployeeId))
+        );
 
-        if (targetRequest) {
-          const hasAccess = await isUserNamedOnRequest(targetRequest, userForCheck);
-          if (!hasAccess) {
-            return res.status(403).json({ error: 'You do not have permission to view this content.' });
+        if (!isDirectOwner) {
+          if (tableName === 'request') {
+            targetRequest = record;
+          } else if (record.request) {
+            const reqRes = await pool.query('SELECT * FROM "request" WHERE request_id = $1', [record.request]);
+            if (reqRes.rows.length > 0) {
+              targetRequest = reqRes.rows[0];
+            }
+          }
+
+          if (targetRequest) {
+            const hasAccess = await isUserNamedOnRequest(targetRequest, userForCheck);
+            if (!hasAccess) {
+              return res.status(403).json({ error: 'You do not have permission to view this content.' });
+            }
           }
         } else if (tablesWithRequestCol.includes(tableName) && record.request) {
           // If request does not exist in the DB (legacy record), bypass restriction to allow access
@@ -2541,11 +2684,81 @@ router.post('/:tableName', async (req, res) => {
       }
 
 
+      // Auto-inherit Request / Project / Company / Counterparty from Contract if created under a Contract
+      if (['invoice', 'payment', 'service', 'asset', 'service_delivery_contract'].includes(tableName) && (data.contract_id || data.contract || data.id__contract)) {
+        const conId = data.contract_id || data.contract || data.id__contract;
+        try {
+          const conRes = await client.query('SELECT contract_id, request, id__request, project, my_company, contractor FROM contract WHERE contract_id = $1', [conId]);
+          if (conRes.rows.length > 0) {
+            const conRow = conRes.rows[0];
+            const conReq = conRow.request || conRow.id__request;
+            if (conReq) {
+              if (!data.request) data.request = conReq;
+              if (!data.id__request) data.id__request = conReq;
+              if (tableName === 'service_delivery_contract' && !data.id__service_request) data.id__service_request = conReq;
+            }
+            if (conRow.project && !data.project && !data.id__opportunity) {
+              data.project = conRow.project;
+            } else if (!data.project && !data.id__opportunity && conReq) {
+              try {
+                const reqOppo = await client.query('SELECT id__oppotunity FROM request WHERE request_id = $1', [conReq]);
+                if (reqOppo.rows.length > 0 && reqOppo.rows[0].id__oppotunity) {
+                  data.project = reqOppo.rows[0].id__oppotunity;
+                  client.query('UPDATE contract SET project = $1 WHERE contract_id = $2 AND project IS NULL', [data.project, conId]).catch(() => {});
+                }
+              } catch (e) { }
+            }
+            if (conRow.my_company && !data.my_company) {
+              data.my_company = conRow.my_company;
+            }
+            if (conRow.contractor && !data.counter_party) {
+              data.counter_party = conRow.contractor;
+            }
+          }
+        } catch (e) {
+          console.warn('Error auto-inheriting from contract:', e);
+        }
+      }
+
+      // Auto-inherit Request / Company / My Company from Opportunity if created under an Opportunity
+      if (['contract', 'payment', 'invoice', 'service', 'asset', 'expense', 'service_delivery_contract'].includes(tableName)) {
+        const oppoId = data.project || data.id__opportunity;
+        if (oppoId) {
+          try {
+            const oppoRes = await client.query('SELECT project_id, id__request, id__company, id__my_company FROM oppotunity WHERE project_id = $1', [oppoId]);
+            if (oppoRes.rows.length > 0) {
+              const oppoRow = oppoRes.rows[0];
+              if (oppoRow.id__request && !data.request && !data.id__request) {
+                data.request = oppoRow.id__request;
+                data.id__request = oppoRow.id__request;
+                if (tableName === 'service_delivery_contract') data.id__service_request = oppoRow.id__request;
+              }
+              if (oppoRow.id__company) {
+                if (tableName === 'contract' && !data.contractor) data.contractor = oppoRow.id__company;
+                else if (['invoice', 'payment', 'service', 'asset'].includes(tableName) && !data.counter_party) data.counter_party = oppoRow.id__company;
+              }
+              if (oppoRow.id__my_company && !data.my_company) {
+                data.my_company = oppoRow.id__my_company;
+              }
+            }
+          } catch (e) {
+            console.warn('Error auto-inheriting from opportunity:', e);
+          }
+        }
+      }
+
       const requestChildren = ['payment', 'invoice', 'service', 'asset', 'contract', 'expense', 'target_table', 'service_delivery_contract'];
       if (requestChildren.includes(tableName)) {
         const userRole = req.user && req.user.role ? req.user.role : '';
         const reqId = data.request || data.id__request || data.id_request || data.id__service_request;
-        await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole, client);
+        const isContractChild = Boolean(data.contract_id || data.contract);
+        if (!isContractChild) {
+          if (reqId) {
+            await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole, client);
+          } else if (!data.project && !data.id__opportunity) {
+            await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole, client);
+          }
+        }
       }
 
       // Auto-inherit Opportunity project ID if created under a Request that has an Opportunity
@@ -2554,11 +2767,19 @@ router.post('/:tableName', async (req, res) => {
         if (reqId && (!data.project || !data.id__opportunity)) {
           try {
             const oppoCheck = await client.query('SELECT id__oppotunity FROM request WHERE request_id = $1', [reqId]);
-            if (oppoCheck.rows.length > 0 && oppoCheck.rows[0].id__oppotunity) {
+            let oppoId = oppoCheck.rows.length > 0 ? oppoCheck.rows[0].id__oppotunity : null;
+            if (!oppoId) {
+              const oppoByReq = await client.query('SELECT project_id FROM oppotunity WHERE id__request = $1 LIMIT 1', [reqId]);
+              if (oppoByReq.rows.length > 0) {
+                oppoId = oppoByReq.rows[0].project_id;
+                client.query('UPDATE request SET id__oppotunity = $1 WHERE request_id = $2 AND id__oppotunity IS NULL', [oppoId, reqId]).catch(() => {});
+              }
+            }
+            if (oppoId) {
               if (tableName === 'expense') {
-                if (!data.id__opportunity) data.id__opportunity = oppoCheck.rows[0].id__oppotunity;
+                if (!data.id__opportunity) data.id__opportunity = oppoId;
               } else {
-                if (!data.project) data.project = oppoCheck.rows[0].id__oppotunity;
+                if (!data.project) data.project = oppoId;
               }
             }
           } catch (e) { }
@@ -2607,13 +2828,14 @@ router.post('/:tableName', async (req, res) => {
     const colUpdatedDate = findCol('updated_date');
     const colLog = findCol('logs') || findCol('log');
 
-    if (tableName === 'comment' && data.oppotunity !== undefined) { // oppotunity_comment_link
+    if (tableName === 'comment' && (data.oppotunity !== undefined || data.opportunity !== undefined || data.oppo !== undefined)) { // oppotunity_comment_link
       // Comment written on an Opportunity => counted as a comment of the Opportunity's Request.
+      const oppoId = data.oppotunity !== undefined ? data.oppotunity : (data.opportunity !== undefined ? data.opportunity : data.oppo);
       if (!data.request) {
         const oppoReq = await client.query(
           `SELECT COALESCE(NULLIF(o.id__request, ''), (SELECT r.request_id FROM request r WHERE r.id__oppotunity::text = o.project_id::text LIMIT 1)) AS request_id
            FROM oppotunity o WHERE o.project_id::text = $1::text AND o.deleted_at IS NULL LIMIT 1`,
-          [String(data.oppotunity)]
+          [String(oppoId)]
         );
         if (!oppoReq.rows.length || !oppoReq.rows[0].request_id) {
           return res.status(400).json({ error: 'Opportunity chưa liên kết Request nên chưa thể bình luận.' });
@@ -2621,6 +2843,8 @@ router.post('/:tableName', async (req, res) => {
         data.request = oppoReq.rows[0].request_id;
       }
       delete data.oppotunity;
+      delete data.opportunity;
+      delete data.oppo;
     }
 
     if (tableName === 'comment' || tableName === 'ticket_comment') {
@@ -2666,6 +2890,15 @@ router.post('/:tableName', async (req, res) => {
         data[k] = JSON.stringify(data[k]);
       }
     });
+
+    // Auto-compute related_employees if table is registered in extension
+    if (relatedEmployeesService.hasTable(tableName) && dbCols.includes('related_employees')) {
+      try {
+        data.related_employees = await relatedEmployeesService.computeRelatedEmployees(tableName, data, client);
+      } catch (relErr) {
+        console.warn(`[related_employees] Compute on insert error for ${tableName}:`, relErr.message);
+      }
+    }
 
     const keys = Object.keys(data).filter(k => dbCols.includes(k));
     const values = keys.map(k => data[k]);
@@ -2727,6 +2960,18 @@ router.post('/:tableName', async (req, res) => {
           console.error('[dynamic_crud] Failed to link oppotunity to request:', e);
         }
       }
+    }
+
+    // Keep the whole request chain (opportunity / contract / SDC / STR) visible to the same people
+    if (['oppotunity', 'opportunity', 'oppo', 'contract', 'service_contract', 'service_delivery_contract', 'service_task_request'].includes(tableName)) {
+      await relatedEmployeesService.syncChainForRecord(tableName, responseData, client);
+    }
+
+    // Auto-sync request related_employees when comment is added with tag
+    if (tableName === 'comment' && responseData.request) {
+      relatedEmployeesService.syncRequestRelatedEmployees(responseData.request, client).catch(err => {
+        console.warn('[related_employees] Sync request on comment insert failed:', err.message);
+      });
     }
 
     if (tableName === 'request') {
@@ -2917,10 +3162,21 @@ router.put('/:tableName/:id', async (req, res) => {
   if (requestChildren.includes(tableName) && oldRecord) {
     const userRole = req.user && req.user.role ? req.user.role : '';
     const reqId = data.request || data.id__request || data.id_request || oldRecord.request || oldRecord.id__request || oldRecord.id_request;
-    try {
-      await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole);
-    } catch (authErr) {
-      return res.status(403).json({ error: authErr.message });
+    const isContractChild = Boolean(data.contract_id || data.contract || oldRecord.contract_id || oldRecord.contract);
+    if (!isContractChild) {
+      if (reqId) {
+        try {
+          await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole);
+        } catch (authErr) {
+          return res.status(403).json({ error: authErr.message });
+        }
+      } else if (!data.project && !oldRecord.project && !data.id__opportunity && !oldRecord.id__opportunity) {
+        try {
+          await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole);
+        } catch (authErr) {
+          return res.status(403).json({ error: authErr.message });
+        }
+      }
     }
   }
 
@@ -3184,6 +3440,16 @@ router.put('/:tableName/:id', async (req, res) => {
     }
   });
 
+  // Auto-compute related_employees if table is registered in extension
+  if (relatedEmployeesService.hasTable(tableName) && dbCols.includes('related_employees')) {
+    try {
+      const mergedRecord = { ...(oldRecord || {}), ...data };
+      data.related_employees = await relatedEmployeesService.computeRelatedEmployees(tableName, mergedRecord, getPoolForTable(tableName));
+    } catch (relErr) {
+      console.warn(`[related_employees] Compute on update error for ${tableName}:`, relErr.message);
+    }
+  }
+
   const keys = Object.keys(data).filter(k => dbCols.includes(k));
   const values = keys.map(k => data[k]);
 
@@ -3237,6 +3503,24 @@ router.put('/:tableName/:id', async (req, res) => {
 
     if (tableName === 'cms_tenant_info' && data.base_currency) {
       await pool.query('UPDATE public.my_company SET base_currency = $1', [data.base_currency]);
+    }
+
+    // Keep the whole request chain visible to the same people after a change
+    if (['oppotunity', 'opportunity', 'oppo', 'contract', 'service_contract', 'service_delivery_contract', 'service_task_request'].includes(tableName)) {
+      await relatedEmployeesService.syncChainForRecord(tableName, result.rows[0], getPoolForTable(tableName));
+    } else if (tableName === 'request' && result.rows[0].request_id) {
+      // SR owner / approver / requester changes must reach the opportunity chain of this request
+      relatedEmployeesService.syncRequestRelatedEmployees(result.rows[0].request_id, getPoolForTable('request')).catch(err => {
+        console.warn('[related_employees] Sync request chain on update failed:', err.message);
+      });
+    }
+
+    // Auto-sync request related_employees when comment is updated
+    if (tableName === 'comment' && (result.rows[0].request || (oldRecord && oldRecord.request))) {
+      const targetReqId = result.rows[0].request || oldRecord.request;
+      relatedEmployeesService.syncRequestRelatedEmployees(targetReqId, getPoolForTable('request')).catch(err => {
+        console.warn('[related_employees] Sync request on comment update failed:', err.message);
+      });
     }
 
     // Automation: Data Change Trigger for Request (Payment / Invoice)
@@ -3450,8 +3734,8 @@ router.delete('/:tableName/:id', async (req, res) => {
   const isSuperAdmin = userRole.toUpperCase() === 'SUPER ADMIN';
 
   if (req.query.hard === 'true') {
-    if (!isSuperAdmin) {
-      return res.status(403).json({ error: 'Access denied: Only Super Admin can perform permanent deletions.' });
+    if (!(await canHardDelete(req.user, tableName))) {
+      return res.status(403).json({ error: 'Access denied: you are not allowed to perform permanent deletions (action rule hard_delete_' + tableName + ').' });
     }
     const client = await getPoolForTable(tableName).connect();
     try {
@@ -3677,7 +3961,13 @@ router.delete('/:tableName/:id', async (req, res) => {
     const requestChildren = ['payment', 'invoice', 'service', 'asset', 'target_table', 'expense'];
     if (requestChildren.includes(tableName)) {
       let reqCol = dbCols.includes('id__request') ? 'id__request' : (dbCols.includes('id_request') ? 'id_request' : 'request');
-      let selectQuery = `SELECT ${reqCol} AS request FROM "${tableName}" WHERE (${pk}::text = $1`;
+      let extraCols = [];
+      if (dbCols.includes('contract_id')) extraCols.push('contract_id');
+      if (dbCols.includes('contract')) extraCols.push('contract');
+      if (dbCols.includes('project')) extraCols.push('project');
+      if (dbCols.includes('id__opportunity')) extraCols.push('id__opportunity');
+      const extraSelect = extraCols.length > 0 ? `, ${extraCols.map(c => `"${c}"`).join(', ')}` : '';
+      let selectQuery = `SELECT ${reqCol} AS request${extraSelect} FROM "${tableName}" WHERE (${pk}::text = $1`;
       if (hasIdCol && pk !== 'id') {
         selectQuery += ` OR id::text = $1`;
       }
@@ -3687,11 +3977,23 @@ router.delete('/:tableName/:id', async (req, res) => {
       }
       const existingRes = await pool.query(selectQuery, [id]);
       if (existingRes.rows.length > 0) {
-        const reqId = existingRes.rows[0].request;
-        try {
-          await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole);
-        } catch (authErr) {
-          return res.status(403).json({ error: authErr.message });
+        const row = existingRes.rows[0];
+        const reqId = row.request;
+        const isContractChild = Boolean(row.contract_id || row.contract);
+        if (!isContractChild) {
+          if (reqId) {
+            try {
+              await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole);
+            } catch (authErr) {
+              return res.status(403).json({ error: authErr.message });
+            }
+          } else if (!row.project && !row.id__opportunity) {
+            try {
+              await validateRequestChildPermissions(tableName, reqId, userEmployeeId, userRole);
+            } catch (authErr) {
+              return res.status(403).json({ error: authErr.message });
+            }
+          }
         }
       }
     }
@@ -3775,6 +4077,11 @@ router.delete('/:tableName/:id', async (req, res) => {
     // Update target_table configuration log if this record is deleted under an active request
     if (result.rows.length > 0) {
       await targetTableService.onRecordDeleted(tableName, id, userEmployeeId);
+      if (tableName === 'comment' && result.rows[0].request) {
+        relatedEmployeesService.syncRequestRelatedEmployees(result.rows[0].request, getPoolForTable('request')).catch(err => {
+          console.warn('[related_employees] Sync request on comment delete failed:', err.message);
+        });
+      }
     }
 
     if (['action_rules', 'exception_rules', 'column_permissions'].includes(tableName)) {
@@ -3816,10 +4123,8 @@ router.post('/:tableName/bulk-delete', async (req, res) => {
 
   // Support hard delete in bulk delete
   if (req.query.hard === 'true') {
-    const userRole = req.user && req.user.role ? req.user.role : '';
-    const isSuperAdmin = userRole.toUpperCase() === 'SUPER ADMIN';
-    if (!isSuperAdmin) {
-      return res.status(403).json({ error: 'Access denied: Only Super Admin can perform permanent deletions.' });
+    if (!(await canHardDelete(req.user, tableName))) {
+      return res.status(403).json({ error: 'Access denied: you are not allowed to perform permanent deletions (action rule hard_delete_' + tableName + ').' });
     }
     const client = await getPoolForTable(tableName).connect();
     const userEmployeeId = user && user.employee_id ? user.employee_id : (req.user && req.user.employee_id ? req.user.employee_id : 'system');

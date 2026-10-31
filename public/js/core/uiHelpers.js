@@ -228,6 +228,22 @@ function getStickyTableColumnStyle(moduleKey, columnKey, isHeader, mod = null) {
   return '';
 }
 
+window.isHardDeleteAllowed = window.isHardDeleteAllowed || function (viewName) {
+  const isSuper = !!(window.authUser && window.authUser.role && String(window.authUser.role).toUpperCase() === 'SUPER ADMIN');
+  const rules = window.userActionPermissions && window.userActionPermissions['hard_delete'];
+  if (!rules) return isSuper;
+  const viewKey = String(viewName || '').toLowerCase();
+  const candidates = [viewKey];
+  if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(viewKey)) candidates.push('request');
+  if (viewKey === 'employee_active') candidates.push('employee');
+  if (viewKey === 'service_contract' || viewKey === 'service_contracts') candidates.push('contract');
+  if (viewKey === 'opportunity' || viewKey === 'oppo') candidates.push('oppotunity');
+  for (const k of candidates) {
+    if (rules[k] !== undefined) return rules[k];
+  }
+  return isSuper;
+};
+
 // --- Authentication Check ---
 if (window.location.hash.includes('token=')) {
   const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -466,6 +482,7 @@ let currentView = 'table'; // 'table' | 'detail'
 let currentRecord = null;
 let currentData = [];
 let selectCache = {};
+window.selectCache = selectCache;
 let selectedIds = new Set();
 let currentSearch = '';
 let inFlightSelectRequests = {};

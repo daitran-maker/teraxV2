@@ -5,35 +5,47 @@ const service = require('./identity.service');
 const repo = require('./identity.repository');
 const pool = require('../../../server/db');
 const { checkPermission, clearPermissionCache } = require('../../../server/helpers/permissionHelper');
+const v = require('./identity.validation');
 
 // ==================== AUTH CONTROLLER ====================
+
+/** Respond with a safe error: AuthError messages are shown, everything else is generic. */
+function sendAuthError(res, err, fallbackStatus = 500) {
+  if (err && err.expose) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+  console.error('[Auth] Unexpected error:', err);
+  return res.status(fallbackStatus).json({ error: 'Lỗi hệ thống. Vui lòng thử lại sau.' });
+}
 
 // POST /api/auth/login
 authRouter.post('/login', async (req, res) => {
   try {
-    const { credential, login_id, username, password } = req.body;
+    const body = v.parseOrReject(v.loginSchema, req.body, res);
+    if (!body) return;
 
-    if (credential) {
-      const result = await service.loginWithGoogle(credential);
+    if (body.credential) {
+      const result = await service.loginWithGoogle(body.credential);
       return res.json(result);
     }
 
-    const identifier = login_id || username;
-    const result = await service.loginWithPassword(identifier, password);
+    const identifier = (body.login_id || body.username || body.email || '').trim();
+    const result = await service.loginWithPassword(identifier, body.password);
     res.json(result);
   } catch (err) {
-    res.status(401).json({ error: err.message });
+    sendAuthError(res, err, 401);
   }
 });
 
 // POST /api/auth/google-login
 authRouter.post('/google-login', async (req, res) => {
   try {
-    const { credential } = req.body;
-    const result = await service.loginWithGoogle(credential);
+    const body = v.parseOrReject(v.googleLoginSchema, req.body, res);
+    if (!body) return;
+    const result = await service.loginWithGoogle(body.credential);
     res.json(result);
   } catch (err) {
-    res.status(401).json({ error: err.message });
+    sendAuthError(res, err, 401);
   }
 });
 
@@ -45,7 +57,7 @@ function getTokenFromReq(req) {
 
 function requireCurrentToken(req, res) {
   const token = getTokenFromReq(req);
-  if (!token) {
+  if (!token || typeof token !== 'string') {
     res.status(401).json({ error: 'Auth token missing' });
     return null;
   }
@@ -62,7 +74,7 @@ authRouter.get('/me', async (req, res) => {
   try {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.query.token;
-    if (!token) return res.status(401).json({ error: 'Auth token missing' });
+    if (!token || typeof token !== 'string') return res.status(401).json({ error: 'Auth token missing' });
 
     const decoded = service.verifyToken(token);
     if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
@@ -84,13 +96,17 @@ authRouter.get('/me', async (req, res) => {
       avatar: user.avatar
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendAuthError(res, err);
   }
 });
 
-// GET /api/auth/switch-users
+// GET /api/auth/switch-users  (Super Admin, or a session started by a Super Admin)
 authRouter.get('/switch-users', async (req, res) => {
-  if (!requireCurrentToken(req, res)) return;
+  const decoded = requireCurrentToken(req, res);
+  if (!decoded) return;
+  if (!service.canSwitchUsers(decoded)) {
+    return res.status(403).json({ error: 'Chỉ Super Admin mới được chuyển đổi người dùng.' });
+  }
 
   try {
     const users = await service.getSwitchUsers();
@@ -101,22 +117,24 @@ authRouter.get('/switch-users', async (req, res) => {
   }
 });
 
-// POST /api/auth/switch-user
+// POST /api/auth/switch-user  (Super Admin, or a session started by a Super Admin)
 authRouter.post('/switch-user', async (req, res) => {
-  if (!requireCurrentToken(req, res)) return;
-
-  const { employee_id } = req.body || {};
-  if (!employee_id) {
-    return res.status(400).json({ error: 'Missing employee_id.' });
+  const decoded = requireCurrentToken(req, res);
+  if (!decoded) return;
+  if (!service.canSwitchUsers(decoded)) {
+    return res.status(403).json({ error: 'Chỉ Super Admin mới được chuyển đổi người dùng.' });
   }
 
+  const body = v.parseOrReject(v.switchUserSchema, req.body, res, 'Missing employee_id.');
+  if (!body) return;
+
   try {
-    const result = await service.switchUser(employee_id);
+    const result = await service.switchUser(body.employee_id, decoded);
     res.json(result);
   } catch (err) {
+    if (err && err.expose) return res.status(err.status || 500).json({ error: err.message });
     console.error('Switch user error:', err);
-    const status = err.message.includes('not found') ? 404 : (err.message.includes('disabled') ? 403 : 500);
-    res.status(status).json({ error: err.message || 'Could not switch user.' });
+    res.status(500).json({ error: 'Could not switch user.' });
   }
 });
 
@@ -126,8 +144,10 @@ authRouter.post('/change-password', async (req, res) => {
     const user = req.user || requireCurrentToken(req, res);
     if (!user) return;
 
-    const oldPassword = req.body.oldPassword || req.body.old_password;
-    const newPassword = req.body.newPassword || req.body.new_password;
+    const body = v.parseOrReject(v.changePasswordSchema, req.body, res);
+    if (!body) return;
+    const oldPassword = body.oldPassword || body.old_password;
+    const newPassword = body.newPassword || body.new_password;
 
     if (!oldPassword || !newPassword) {
       return res.status(400).json({ error: 'Vui lòng cung cấp mật khẩu cũ và mật khẩu mới.' });
@@ -136,60 +156,65 @@ authRouter.post('/change-password', async (req, res) => {
     await service.changePassword(user.employee_id, oldPassword, newPassword);
     res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err && err.expose) return res.status(err.status === 401 ? 400 : (err.status || 400)).json({ error: err.message });
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Lỗi hệ thống. Vui lòng thử lại sau.' });
   }
 });
 
-// GET /api/auth/magic-login
+// GET /api/auth/magic-login  (dedicated short-lived token with purpose = "magic")
 authRouter.get('/magic-login', async (req, res) => {
-  const { token } = req.query;
-  if (!token) {
-    return res.status(400).json({ error: 'Magic link token missing' });
-  }
+  const q = v.parseOrReject(v.magicQuerySchema, req.query, res, 'Magic link token missing');
+  if (!q) return;
 
   try {
-    const decoded = service.verifyToken(token);
-    if (!decoded || !decoded.email) {
+    const decoded = service.verifyMagicToken(q.token);
+    if (!decoded) {
       return res.status(401).json({ error: 'Invalid or expired magic link' });
     }
 
     const user = await repo.findEmployeeForAuth(decoded.email);
-    if (!user) {
-      return res.status(404).json({ error: 'User for magic link not found' });
+    if (!user || user.status === 'Inactive' || user.app_user_enabled === false) {
+      return res.status(401).json({ error: 'Invalid or expired magic link' });
     }
 
     const authToken = service.createAuthToken(user);
     res.json({
       message: 'Magic Link login successful',
       token: authToken,
-      user
+      user: {
+        employee_id: user.employee_id,
+        username: user.username,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        employee_level: user.employee_level,
+        position: user.position,
+        department_id: user.department_id,
+        company_id: user.company_id
+      }
     });
   } catch (err) {
     res.status(401).json({ error: 'Invalid or expired magic link' });
   }
 });
 
-// GET /api/auth/google/sso-callback
+// GET /api/auth/google/sso-callback  (token is HMAC-signed by the CMS, bound to this host, single-use)
 authRouter.get('/google/sso-callback', async (req, res) => {
-  const { sso_token } = req.query;
-  if (!sso_token) {
+  const q = v.ssoQuerySchema.safeParse(req.query || {});
+  if (!q.success) {
     return res.status(400).send('<h3>SSO Token missing</h3>');
   }
 
   try {
-    const ssoData = JSON.parse(Buffer.from(sso_token, 'base64').toString('utf-8'));
-    const targetEmail = ssoData.email;
-
-    if (!targetEmail) {
-      return res.status(400).send('<h3>Invalid SSO Payload</h3>');
-    }
+    const targetEmail = service.verifySsoToken(q.data.sso_token, q.data.sso_sig, req.hostname);
 
     const user = await repo.findEmployeeForAuth(targetEmail);
-    if (!user || (user.status && user.status !== 17 && user.status !== '17' && user.status !== 'Active')) {
+    if (!user || (user.status && user.status !== 17 && user.status !== '17' && user.status !== 'Active') || user.app_user_enabled === false) {
       return res.status(401).send(`
         <div style="font-family: sans-serif; text-align: center; padding: 50px;">
           <h2 style="color: #EF4444;">Tài Khoản Chưa Được Cấp Quyền</h2>
-          <p>Email <strong>${targetEmail}</strong> chưa được tạo trong hệ thống của công ty này.</p>
+          <p>Email <strong>${v.escapeHtml(targetEmail)}</strong> chưa được tạo trong hệ thống của công ty này.</p>
           <a href="/login.html" style="color: #2563EB;">Quay lại trang đăng nhập</a>
         </div>
       `);
@@ -209,8 +234,11 @@ authRouter.get('/google/sso-callback', async (req, res) => {
     }));
     res.redirect(`/#token=${encodeURIComponent(authToken)}&user=${userPayload}`);
   } catch (err) {
+    if (err && err.expose) {
+      return res.status(err.status || 401).send(`<h3>Lỗi xác thực SSO: ${v.escapeHtml(err.message)}</h3>`);
+    }
     console.error('SSO Callback error:', err);
-    res.status(500).send(`<h3>Lỗi xác thực SSO: ${err.message}</h3>`);
+    res.status(500).send('<h3>Lỗi xác thực SSO.</h3>');
   }
 });
 
@@ -394,7 +422,7 @@ permissionsRouter.get('/my-action-permissions', async (req, res) => {
       }
 
       // Detect CRUD action_id format: add_viewname, edit_viewname, delete_viewname
-      const crudMatch = rawActionId.match(/^(add|edit|delete)_(.+)$/i);
+      const crudMatch = rawActionId.match(/^(add|edit|delete|hard_delete)_(.+)$/i);
       if (crudMatch) {
         const verb = crudMatch[1].toLowerCase();      // 'add', 'edit', 'delete'
         const viewSuffix = crudMatch[2].toLowerCase(); // e.g. 'employee', 'payment', 'request'

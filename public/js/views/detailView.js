@@ -260,10 +260,11 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
         });
       }
 
-      // Auto-load inline Finance and Feedback summary for request modules
+      // Auto-load inline Finance and Feedback summary for request and opportunity modules
+      const isRequestOrOppoModule = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'oppotunity', 'opportunity', 'oppo'].includes(moduleKey);
       const isRequestModule = ['request', 'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(moduleKey);
       const inlineSummary = content.querySelector('#inline-finance-summary');
-      if (isRequestModule && inlineSummary) {
+      if (isRequestOrOppoModule && inlineSummary) {
         loadFinanceSummary(moduleKey, pkVal, inlineSummary);
       }
       const inlineFeedback = content.querySelector('#inline-feedback-summary');
@@ -341,16 +342,10 @@ async function openDetailInternal(moduleKey, pkVal, force = false, silent = fals
       }
       essentialLookupPromises.push(prefetchLookups(moduleKey, [freshRecord]).catch(() => []));
 
-      // If initial render didn't have cached data (cold load e.g. F5), await lookups first so labels show correctly!
-      if (!record) {
-        await Promise.all(essentialLookupPromises);
+      // Await essential lookups so all entity labels (employee, company, process, etc.) render properly
+      await Promise.all(essentialLookupPromises);
+      if (content && content.isConnected) {
         renderDetailDOM(freshRecord);
-      } else {
-        Promise.all(essentialLookupPromises).then(() => {
-          if (content && content.isConnected && currentRecord === freshRecord) {
-            renderDetailDOM(freshRecord);
-          }
-        }).catch(() => {});
       }
     }).catch(err => {
       if (!silent && !record) {
@@ -1808,9 +1803,12 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
       .map(s => s.trim().replace(/^\[|\]$/g, ''))
       .filter(Boolean);
     extraData.sr_owner = newOwnerArr;
-  } else if (actionId === 'ACT-REQUEST-02') {
+  } else if (actionId === 'ACT-REQUEST-02' || actionId === 'ACT-OPPO-02') {
     let fieldConfig = fields.find(f => f.key === 'elements');
-    const availableElements = ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Target table', 'Assign task', 'Opportunity', 'Finance'];
+    const isOppoAction = actionId === 'ACT-OPPO-02' || ['oppotunity', 'opportunity', 'oppo'].includes(moduleKey);
+    const availableElements = isOppoAction
+      ? ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Service Delivery Contract', 'Finance']
+      : ['Contract', 'Payment', 'Invoice', 'Expense', 'Service', 'Asset', 'Target table', 'Assign task', 'Opportunity', 'Finance'];
     if (!fieldConfig) {
       fieldConfig = {
         key: 'elements',
@@ -1834,6 +1832,15 @@ window.executeAction = async function (actionId, moduleKey, pkVal) {
       const parentPol = selectCache['policy'] ? selectCache['policy'].find(p => String(p.policy_id) === String(currentRecord.request_type)) : null;
       if (parentPol && parentPol.elements) {
         rawElements = parentPol.elements;
+      }
+    }
+    if (!rawElements && isOppoAction && currentRecord && currentRecord.id__request) {
+      if (!selectCache['request']) {
+        await getSelectOptions('request').catch(() => { });
+      }
+      const parentReq = (selectCache['request'] || []).find(r => String(r.request_id) === String(currentRecord.id__request));
+      if (parentReq && parentReq.elements) {
+        rawElements = parentReq.elements;
       }
     }
     let defaultValue = '';
@@ -2679,6 +2686,12 @@ function buildDetailViewHTML(moduleKey, record) {
             elementsVal = policy.elements;
           }
         }
+        if (!elementsVal && record.id__request) {
+          const req = (selectCache['request'] || []).find(r => String(r.request_id) === String(record.id__request));
+          if (req && req.elements) {
+            elementsVal = req.elements;
+          }
+        }
 
         let activeElements = [];
         if (elementsVal) {
@@ -2709,7 +2722,7 @@ function buildDetailViewHTML(moduleKey, record) {
               return activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || !!record.id__oppotunity;
             }
             if (childKey === 'service_delivery_contract') {
-              return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY');
+              return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || !!record.id__oppotunity || activeElements.includes('CONTRACT') || activeElements.includes('SERVICE');
             }
             if (childKey === 'request_rating') return true;
             return false;
@@ -2723,7 +2736,7 @@ function buildDetailViewHTML(moduleKey, record) {
             if (childKey === 'asset') return activeElements.includes('ASSET');
             if (childKey === 'expense') return activeElements.includes('EXPENSE');
             if (childKey === 'service_delivery_contract') {
-              return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY');
+              return activeElements.includes('SERVICE DELIVERY CONTRACT') || activeElements.includes('SERVICE_DELIVERY_CONTRACT') || activeElements.includes('SERVICE DELIVERY') || activeElements.includes('SERVICE_DELIVERY') || activeElements.includes('OPPORTUNITY') || activeElements.includes('OPPOTUNITY') || activeElements.includes('CONTRACT') || activeElements.includes('SERVICE');
             }
             return true;
           }
@@ -2851,8 +2864,7 @@ function buildDetailViewHTML(moduleKey, record) {
                       <span class="material-symbols-rounded" style="font-size: 16px; color: #DC2626;">delete</span> Delete
                     </button>
                   `;
-          const isSuperAdmin = authUser && authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN';
-          if (isSuperAdmin) {
+          if (typeof window.isHardDeleteAllowed === 'function' && window.isHardDeleteAllowed(activeViewName)) {
             deleteBtn += `
                     <button class="btn btn-custom-action btn-custom-action-danger" onclick="confirmHardDelete('${moduleKey}', '${pkVal}', '${String(displayName).replace(/'/g, "\\'")}' )" style="background: #FFF5F5; border: 1px solid #FECACA; color: #EF4444; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                       <span class="material-symbols-rounded" style="font-size: 16px; color: #EF4444;">delete_forever</span> Hard Delete
@@ -2922,7 +2934,9 @@ function buildDetailViewHTML(moduleKey, record) {
       if ((fieldCfg && fieldCfg.hidden) || (colCfg && colCfg.hidden && !isExplicitDetailField) || !isColumnAllowed(moduleKey, row.key)) return '';
       if (moduleKey === 'target_table' && row.key === 'record_ids' && String(record.type || '').trim().toLowerCase() === 'add') return '';
 
-      let val = record[row.key];
+      let val = (resolvedRecord && resolvedRecord[row.key] !== undefined && resolvedRecord[row.key] !== null)
+        ? resolvedRecord[row.key]
+        : record[row.key];
       if (row.key === 'elements' && moduleKey === 'request') {
         const isEmpty = !val || (Array.isArray(val) && val.length === 0);
         if (isEmpty) {
@@ -2980,8 +2994,10 @@ function buildDetailViewHTML(moduleKey, record) {
       } else {
         val = parseBufferVal(val);
         const virtualVal = typeof resolveVirtualColumn === 'function' ? resolveVirtualColumn(moduleKey, row.key, record) : undefined;
-        if (virtualVal !== undefined) {
+        if (virtualVal !== undefined && virtualVal !== val && virtualVal !== record[row.key]) {
           val = virtualVal;
+        } else if ((row.optionsFrom === 'employee' || fieldCfg?.optionsFrom === 'employee') && typeof resolveEmployeeLabel === 'function') {
+          val = resolveEmployeeLabel(val) || val;
         } else {
           val = resolveLookupValue(moduleKey, row.key, val);
         }
@@ -3071,7 +3087,7 @@ function buildDetailViewHTML(moduleKey, record) {
         } else {
           valHTML = `<span style="color: #94A3B8; font-style: italic;">—</span>`;
         }
-      } else if ((fieldCfg && fieldCfg.type === 'file') || row.key === 'file' || row.key === 'logo' || row.key === 'avatar') {
+      } else if (row.type === 'file' || row.key === 'attached_file' || row.key === 'attachment' || (fieldCfg && fieldCfg.type === 'file') || row.key === 'file' || row.key === 'logo' || row.key === 'avatar' || row.key === 'picture') {
         let fileList = [];
         if (val) {
           if (typeof val === 'object') {
@@ -3110,14 +3126,20 @@ function buildDetailViewHTML(moduleKey, record) {
         if (fileList.length === 0) {
           valHTML = `<span style="color: #94A3B8; font-style: italic;">—</span>`;
         } else {
-          valHTML = `<div style="display:flex; flex-direction:column; gap:6px;">` + fileList.map(fileUrl => {
+          valHTML = `<div style="display:flex; flex-direction:column; gap:8px;">` + fileList.map(fileUrl => {
             if (!fileUrl || typeof fileUrl !== 'string') return '';
-            const lowerVal = String(fileUrl).toLowerCase();
-            if (lowerVal.match(/[.](jpeg|jpg|gif|png|webp|svg)/) || lowerVal.includes('data:image') || lowerVal.startsWith('/uploads/') || lowerVal.startsWith('uploads/') || lowerVal.startsWith('http://') || lowerVal.startsWith('https://')) {
-              return `<a href="${escapeHTML(fileUrl)}" target="_blank" style="display:inline-block;"><img src="${escapeHTML(fileUrl)}" style="max-width:180px; max-height:180px; border-radius:8px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px;" /></a>`;
+            const rawUrl = String(fileUrl).trim();
+            const lowerVal = rawUrl.toLowerCase();
+            const isImg = lowerVal.match(/[.](jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i) || lowerVal.startsWith('data:image/');
+            const targetUrl = (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('/') || rawUrl.startsWith('data:'))
+              ? rawUrl
+              : '/' + rawUrl;
+
+            if (isImg) {
+              return `<a href="${escapeHTML(targetUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;"><img src="${escapeHTML(targetUrl)}" style="max-width:180px; max-height:180px; border-radius:8px; border:1px solid #E2E8F0; object-fit:contain; background:#F8FAFC; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.05);" /></a>`;
             } else {
-              const cleanFileName = formatFileNameDisplay(fileUrl);
-              return `<a href="${escapeHTML(fileUrl)}" target="_blank" download="${escapeHTML(cleanFileName)}" style="display:inline-flex; align-items:center; gap:6px; color:#2563EB; font-weight:600; text-decoration:none;"><span class="material-symbols-rounded" style="font-size:16px;">attach_file</span> ${escapeHTML(cleanFileName)}</a>`;
+              const cleanFileName = formatFileNameDisplay(rawUrl);
+              return `<a href="${escapeHTML(targetUrl)}" target="_blank" rel="noopener noreferrer" download="${escapeHTML(cleanFileName)}" style="display:inline-flex; align-items:center; gap:8px; color:#2563EB; font-size:13px; font-weight:600; text-decoration:none; padding:7px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; transition:all 0.15s; width:fit-content; max-width:100%; box-sizing:border-box;" onmouseover="this.style.background='#EFF6FF'; this.style.borderColor='#BFDBFE';" onmouseout="this.style.background='#F8FAFC'; this.style.borderColor='#E2E8F0';"><span class="material-symbols-rounded" style="font-size:18px; color:#3B82F6; flex-shrink:0;">attach_file</span> <span style="max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(cleanFileName)}</span></a>`;
             }
           }).filter(Boolean).join('') + `</div>`;
         }
@@ -3184,7 +3206,7 @@ function buildDetailViewHTML(moduleKey, record) {
         }
 
         let linkIcon = '';
-        const targetOptionsFrom = (fieldCfg && fieldCfg.optionsFrom) || (colCfg && colCfg.optionsFrom) || (mod.fields && mod.fields.find(f => f.key === row.key)?.optionsFrom);
+        const targetOptionsFrom = row.optionsFrom || (fieldCfg && fieldCfg.optionsFrom) || (colCfg && colCfg.optionsFrom) || (mod.fields && mod.fields.find(f => f.key === row.key)?.optionsFrom);
         const nonNavigableLookups = ['cms_country', 'cms_province', 'cms_city', 'cms_currency', 'account_currency', 'country', 'currency', 'province', 'city', 'location', 'my_location', 'employee', 'employee_active', 'helpdesk_policy'];
         const rowKeyLower = String(row.key || '').toLowerCase();
         const isExcludedKey = ['country', 'currency', 'id__currency', 'currency_code', 'country_code', 'province', 'city', 'location', 'my_location'].includes(rowKeyLower) || rowKeyLower.includes('country') || (rowKeyLower.includes('currency') && !rowKeyLower.includes('base_currency_val'));
@@ -3648,7 +3670,7 @@ function buildDetailViewHTML(moduleKey, record) {
           ? ((childKey === 'assigned_task' || childKey === 'request_rating') ? 'request_id' 
             : ((childKey === 'expense' || childKey === 'oppotunity' || childKey === 'opportunity' || childKey === 'oppo') ? 'id__request' 
             : (childKey === 'service_delivery_contract' ? 'id__service_request' : 'request'))) 
-          : (moduleKey === 'contract' ? 'contract_id' : moduleKey);
+          : (['contract', 'service_contract', 'service_contracts'].includes(moduleKey) ? (childKey === 'service_delivery_contract' ? 'id__contract' : 'contract_id') : moduleKey);
         if (moduleKey === 'assigned_task') foreignKey = 'task_id';
         if (childKey === 'ticket_comment') foreignKey = 'ticket';
         if ((moduleKey === 'employee' || moduleKey === 'employee_active') && childKey === 'request') foreignKey = 'requester';
@@ -3694,11 +3716,23 @@ function buildDetailViewHTML(moduleKey, record) {
         if (moduleKey === 'my_company' || moduleKey === 'company') {
           initialObj._lock_company = true;
         }
-        if (moduleKey === 'contract') {
+        if (['contract', 'service_contract', 'service_contracts'].includes(moduleKey)) {
           initialObj.source = 'Contract';
           initialObj.contract_id = pkVal;
+          initialObj.id__contract = pkVal;
+          initialObj._parent_module = moduleKey;
+          initialObj._parent_foreign_key = (childKey === 'service_delivery_contract') ? 'id__contract' : 'contract_id';
+          if (childKey === 'service_delivery_contract') {
+            foreignKey = 'id__contract';
+          }
           if (record) {
-            if (record.request) initialObj.request = record.request;
+            const reqVal = record.request || record.id__request;
+            if (reqVal) {
+              initialObj.request = reqVal;
+              initialObj.id__request = reqVal;
+              initialObj.id__service_request = reqVal;
+            }
+            if (record.project) initialObj.project = record.project;
             if (record.my_company) initialObj.my_company = record.my_company;
             if (record.currency) initialObj.currency = record.currency;
             if (record.contractor) initialObj.counter_party = record.contractor;
@@ -3719,7 +3753,9 @@ function buildDetailViewHTML(moduleKey, record) {
           }
         }
         if (['oppotunity', 'opportunity', 'oppo'].includes(moduleKey)) {
-          if (['contract', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract'].includes(childKey)) {
+          if (['contract',
+          'service_contract',
+          'service_contracts', 'payment', 'invoice', 'service', 'asset', 'service_delivery_contract'].includes(childKey)) {
             foreignKey = 'project';
           } else if (childKey === 'expense') {
             foreignKey = 'id__opportunity';
@@ -3727,14 +3763,26 @@ function buildDetailViewHTML(moduleKey, record) {
           initialObj.project = pkVal;
           initialObj.id__opportunity = pkVal;
           initialObj._parent_foreign_key = foreignKey;
+          initialObj._parent_module = 'oppotunity';
           if (record) {
             if (record.id__request) {
               initialObj.request = record.id__request;
               initialObj.id__request = record.id__request;
               initialObj.id__service_request = record.id__request;
             }
-            if (record.id__company) initialObj.id__company = record.id__company;
-            if (record.id__my_company) initialObj.my_company = record.id__my_company;
+            if (record.id__company) {
+              initialObj.id__company = record.id__company;
+              if (childKey === 'contract') {
+                initialObj.contractor = record.id__company || record.company_id || record.counter_party || '';
+              }
+              if (['invoice', 'payment', 'service', 'asset'].includes(childKey)) {
+                initialObj.counter_party = record.id__company;
+              }
+            }
+            if (record.id__my_company) {
+              initialObj.my_company = record.id__my_company;
+              initialObj.id__my_company = record.id__my_company;
+            }
             if (record.currency) initialObj.currency = record.currency;
             if (childKey === 'service_delivery_contract') {
               let oppFy = record.fy;
@@ -3771,8 +3819,11 @@ function buildDetailViewHTML(moduleKey, record) {
             initialObj.id__request = pkVal;
             initialObj._parent_foreign_key = 'id__request';
             initialObj.project_name = record ? (record.description || `Opportunity for Request ${pkVal}`) : '';
-            if (record && record.company_id) initialObj.id__company = record.company_id;
-            if (record && record.my_company) initialObj.id__my_company = record.my_company;
+            if (record && (record.my_company || record.company_id)) {
+              initialObj.id__my_company = record.my_company || record.company_id;
+            }
+            delete initialObj.id__company;
+            initialObj.status = 6;
           } else if (childKey === 'service_delivery_contract') {
             foreignKey = 'id__service_request';
             initialObj.id__service_request = pkVal;

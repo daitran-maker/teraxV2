@@ -30,10 +30,12 @@
       { key: 'vat_value_in_base_currency', label: 'VAT Value in Base Currency', labelKey: 'col.vat_value_in_base_currency', type: 'number' },
       { key: 'total_value_in_base_currency', label: 'Total Value in Base Currency', labelKey: 'col.total_value_in_base_currency', type: 'number' },
       { key: 'request', label: 'Request', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description', hidden: true },
+      { key: 'project', label: 'Opportunity', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_name', hidden: true },
       { key: 'attached_file', label: 'Attached File', hidden: true }
     ],
     fields: [
       { key: 'request', label: 'Request ID', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'description' },
+      { key: 'project', label: 'Opportunity', type: 'select', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_name', hidden: true },
       { key: 'contract_id', label: 'CONTRACT ID', type: 'select', optionsFrom: 'contract', optionValue: 'contract_id', optionLabel: 'contract_name_or_description' },
       { key: 'source', label: 'SOURCE', type: 'select', options: ['Contract', 'Request'], defaultValue: 'Request', hidden: true },
       { key: 'invoice_no', label: 'Invoice No.', type: 'text' },
@@ -78,6 +80,7 @@
       { key: 'total_value_in_base_currency', label: 'TOTAL VALUE IN BASE CURRENCY', labelKey: 'col.total_value_in_base_currency' },
       { section: 'request information' },
       { key: 'request', label: 'REQUEST', optionsFrom: 'request', optionValue: 'request_id', full: true },
+      { key: 'project', label: 'OPPORTUNITY', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_name', full: true },
       { key: 'invoice_request', label: 'INVOICE REQUEST', optionsFrom: 'request', optionValue: 'request_id', full: true },
       { key: 'request_date', label: 'REQUEST DATE', full: true },
       { key: 'attached_file', label: 'ATTACHED FILE', type: 'file', full: true }

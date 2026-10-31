@@ -66,6 +66,11 @@ function triggerCatchUpRefresh() {
   if (currentView === 'table') {
     refreshTableData(currentModule, true).catch(() => { });
   } else if (currentView === 'detail' && currentRecord) {
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable)) {
+      console.log('[Sync] User is currently typing/editing. Skipping catch-up detail reload to protect inputs.');
+      return;
+    }
     const actualModule = (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(currentModule)) ? 'request' : currentModule;
     const mod = MODULES[actualModule];
     const pkField = mod ? mod.pk : null;

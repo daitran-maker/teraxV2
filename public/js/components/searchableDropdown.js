@@ -432,6 +432,37 @@ window.initializeSearchableDropdowns = function (container = document) {
 
       let highlightedIndex = -1;
 
+      let cachedOptionsData = null;
+      const getOptionsData = () => {
+        if (cachedOptionsData) return cachedOptionsData;
+        const opts = select.options;
+        const len = opts.length;
+        const res = [];
+        for (let i = 0; i < len; i++) {
+          const opt = opts[i];
+          const val = opt.value || '';
+          if (!val) continue;
+          let text = opt.textContent || '';
+          if (val.includes('@') && !text.toLowerCase().includes(val.toLowerCase())) {
+            text = `${text} (${val})`;
+          }
+          const ds = opt.dataset;
+          let extra = '';
+          if (ds) {
+            extra = [ds.type, ds.name, ds.desc, ds.amount, ds.account].filter(Boolean).join(' ').toLowerCase();
+          }
+          res.push({
+            value: val,
+            label: text,
+            labelLower: text.toLowerCase(),
+            valLower: val.toLowerCase(),
+            extraLower: extra
+          });
+        }
+        cachedOptionsData = res;
+        return res;
+      };
+
       // Sync text input with the currently selected <option> label
       const syncSearchInput = () => {
         const selectedOpt = select.options[select.selectedIndex];
@@ -446,8 +477,81 @@ window.initializeSearchableDropdowns = function (container = document) {
         }
       };
 
-      // Render ALL matching suggestions (no limit)
+      // Remote (lazy) search for large lookup tables: max 10 rows per request, no full list in the browser
+      let lazySeq = 0;
+      const lazyQueryCache = new Map();
+      const renderLazySuggestions = async (query) => {
+        const source = select.dataset.lazySource;
+        const valueKey = select.dataset.lazyValue;
+        const labelKey = select.dataset.lazyLabel;
+        const q = (query || '').trim();
+        const seq = ++lazySeq;
+        let rows = lazyQueryCache.get(q);
+        if (!rows) {
+          list.innerHTML = `<div class="searchable-dropdown-no-results">${typeof t === 'function' ? t('form.searching', 'Searching...') : 'Searching...'}</div>`;
+          try {
+            rows = await window.searchLookupOptions(source, q, 10);
+            lazyQueryCache.set(q, rows);
+          } catch (e) {
+            rows = null;
+          }
+          if (seq !== lazySeq) return; // a newer search superseded this one
+        }
+        list.innerHTML = '';
+        highlightedIndex = -1;
+        if (!rows) {
+          list.innerHTML = `<div class="searchable-dropdown-no-results" style="color:red;">${typeof t === 'function' ? t('form.load_error', 'Failed to load data') : 'Failed to load data'}</div>`;
+          return;
+        }
+        const fragment = document.createDocumentFragment();
+        const currentVal = String(select.value || '');
+        let count = 0;
+        rows.forEach(row => {
+          const ov = row[valueKey];
+          if (ov === undefined || ov === null || String(ov) === '') return;
+          const label = window.formatLookupRowLabel(source, row, labelKey, valueKey);
+          const item = document.createElement('div');
+          item.className = 'searchable-dropdown-item';
+          item.textContent = label;
+          item.dataset.value = String(ov);
+          if (String(ov) === currentVal) item.classList.add('selected');
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Keep the chosen record available to label/auto-fill code, then add it as an option
+            window.rememberLookupRecord(source, valueKey, row);
+            let opt = Array.from(select.options).find(o => o.value === String(ov));
+            if (!opt) {
+              opt = new Option(label, String(ov));
+              select.add(opt);
+            }
+            list.style.display = 'none';
+            select.value = String(ov);
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            syncSearchInput();
+          });
+          fragment.appendChild(item);
+          count++;
+        });
+        if (count === 0) {
+          list.innerHTML = `<div class="searchable-dropdown-no-results">${typeof t === 'function' ? t('form.no_results', 'No results found') : 'No results found'}</div>`;
+          return;
+        }
+        list.appendChild(fragment);
+        if (rows.length >= 10) {
+          const hint = document.createElement('div');
+          hint.className = 'searchable-dropdown-no-results';
+          hint.style.cssText = 'padding:6px 12px;font-size:11px;color:#9ca3af;';
+          hint.textContent = typeof t === 'function' ? t('form.refine_search', 'Showing top 10 — type more to narrow down') : 'Showing top 10 — type more to narrow down';
+          list.appendChild(hint);
+        }
+      };
+
+      // Render suggestions efficiently
       const renderSuggestions = (query = '') => {
+        if (select.dataset.lazySource && window.searchLookupOptions) {
+          renderLazySuggestions(query);
+          return;
+        }
         list.innerHTML = '';
         highlightedIndex = -1;
 
@@ -456,43 +560,32 @@ window.initializeSearchableDropdowns = function (container = document) {
           return;
         }
 
-        const q = query.toLowerCase();
-        const filtered = Array.from(select.options).filter(opt => {
-          if (opt.value === '') return false;
-          const labelMatch = opt.textContent.toLowerCase().includes(q);
-          const valueMatch = opt.value.toLowerCase().includes(q);
-          const typeMatch = (opt.dataset.type || '').toLowerCase().includes(q);
-          const nameMatch = (opt.dataset.name || '').toLowerCase().includes(q);
-          const descMatch = (opt.dataset.desc || '').toLowerCase().includes(q);
-          const amountMatch = (opt.dataset.amount || '').toLowerCase().includes(q);
-          const accountMatch = (opt.dataset.account || '').toLowerCase().includes(q);
-          return labelMatch || valueMatch || typeMatch || nameMatch || descMatch || amountMatch || accountMatch;
-        });
+        const q = (query || '').toLowerCase().trim();
+        const optionsList = getOptionsData();
+        const filtered = q
+          ? optionsList.filter(item => item.labelLower.includes(q) || item.valLower.includes(q) || (item.extraLower && item.extraLower.includes(q)))
+          : optionsList;
 
         if (filtered.length === 0) {
-          list.innerHTML = `<div class="searchable-dropdown-no-results">${t('form.no_results', 'No results found')}</div>`;
+          list.innerHTML = `<div class="searchable-dropdown-no-results">${typeof t === 'function' ? t('form.no_results', 'No results found') : 'No results found'}</div>`;
           return;
         }
 
-        const MAX_SUGGESTIONS = 150;
+        const MAX_SUGGESTIONS = 100;
         const displayList = filtered.slice(0, MAX_SUGGESTIONS);
         const fragment = document.createDocumentFragment();
+        const currentVal = String(select.value || '');
 
-        displayList.forEach((opt) => {
+        displayList.forEach((itemData) => {
           const item = document.createElement('div');
           item.className = 'searchable-dropdown-item';
-
-          let displayLabel = opt.textContent;
-          if (opt.value.includes('@') && !opt.textContent.toLowerCase().includes(opt.value.toLowerCase())) {
-            displayLabel = `${opt.textContent} (${opt.value})`;
-          }
-          item.textContent = displayLabel;
-          item.dataset.value = opt.value;
-          if (opt.selected) item.classList.add('selected');
+          item.textContent = itemData.label;
+          item.dataset.value = itemData.value;
+          if (String(itemData.value) === currentVal) item.classList.add('selected');
 
           item.addEventListener('click', (e) => {
             e.stopPropagation();
-            select.value = opt.value;
+            select.value = itemData.value;
             select.dispatchEvent(new Event('change', { bubbles: true }));
             syncSearchInput();
             list.style.display = 'none'; // Close list on item selection
@@ -529,7 +622,8 @@ window.initializeSearchableDropdowns = function (container = document) {
         showAllOptions();
       });
 
-      // Filter while typing; show all when cleared
+      // Filter while typing with debounce
+      let inputDebounceTimer = null;
       input.addEventListener('input', () => {
         if (isSelectDisabled() || input.disabled || input.readOnly) return;
         const val = input.value.trim();
@@ -540,7 +634,10 @@ window.initializeSearchableDropdowns = function (container = document) {
           }
         }
         list.style.display = 'block';
-        renderSuggestions(val);
+        clearTimeout(inputDebounceTimer);
+        inputDebounceTimer = setTimeout(() => {
+          renderSuggestions(val);
+        }, select.dataset.lazySource ? 300 : 50);
       });
 
       input.addEventListener('blur', () => {
@@ -630,7 +727,17 @@ window.initializeSearchableDropdowns = function (container = document) {
       });
 
       // Watch for options being added/removed or disabled changes
-      const observer = new MutationObserver(() => {
+      const observer = new MutationObserver((mutations) => {
+        let optionsChanged = false;
+        for (const m of mutations) {
+          if (m.type === 'childList') {
+            optionsChanged = true;
+            break;
+          }
+        }
+        if (optionsChanged) {
+          cachedOptionsData = null;
+        }
         const disabled = isSelectDisabled();
         input.disabled = disabled;
         input.style.cursor = disabled ? 'not-allowed' : 'pointer';
@@ -647,9 +754,8 @@ window.initializeSearchableDropdowns = function (container = document) {
       // Hide the raw <select> using the original (pre-intercept) setter
       originalSetProperty('display', 'none', 'important');
 
-      // Populate input with current selection (if any) and pre-render suggestions
+      // Populate input with current selection (if any). Do not eagerly render suggestions while hidden!
       syncSearchInput();
-      renderSuggestions();
     };
 
     morphToSearchable();

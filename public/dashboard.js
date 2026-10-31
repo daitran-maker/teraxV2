@@ -85,10 +85,10 @@ async function loadHomeDashboard() {
                         </div>
                     </div>
                     <!-- Dash Noti Pagination -->
-                    <div id="dash-noti-pagination" style="padding:10px 15px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--bg-default); font-size:12px; gap:8px; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
-                      <button id="dashNotifPrevBtn" class="btn btn-sm" style="font-size:11px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; padding:4px 8px; border-radius:4px; transition: all 0.2s;" onclick="dashChangeNotificationPage(-1)">Prev</button>
-                      <span id="dashNotifPageInfo" style="color:var(--text-muted); font-weight:500;">Page 1 of 1</span>
-                      <button id="dashNotifNextBtn" class="btn btn-sm" style="font-size:11px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; padding:4px 8px; border-radius:4px; transition: all 0.2s;" onclick="dashChangeNotificationPage(1)">Next</button>
+                    <div id="dash-noti-pagination" style="padding:10px 15px; border-top:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; background:#F9FAFB; font-size:12px; gap:8px; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
+                      <button id="dashNotifPrevBtn" class="btn btn-sm" style="font-size:11px; background:#FFFFFF; border:1px solid #D1D5DB; color:#374151; cursor:pointer; padding:4px 10px; border-radius:4px; transition: all 0.15s ease;" onclick="dashChangeNotificationPage(-1)">Prev</button>
+                      <span id="dashNotifPageInfo" style="color:#374151; font-weight:500;">Page 1 of 1</span>
+                      <button id="dashNotifNextBtn" class="btn btn-sm" style="font-size:11px; background:#FFFFFF; border:1px solid #D1D5DB; color:#374151; cursor:pointer; padding:4px 10px; border-radius:4px; transition: all 0.15s ease;" onclick="dashChangeNotificationPage(1)">Next</button>
                     </div>
                 </div>
 
@@ -369,13 +369,13 @@ function createDashPageButton(pageNum, isActive) {
         align-items: center;
         justify-content: center;
         font-size: 11px;
-        border: 1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
+        border: 1px solid ${isActive ? '#9CA3AF' : '#D1D5DB'};
         border-radius: 4px;
-        background: ${isActive ? 'rgba(249, 115, 22, 0.1)' : 'transparent'};
-        color: ${isActive ? 'var(--accent)' : 'var(--text)'};
+        background: ${isActive ? '#E5E7EB' : '#FFFFFF'};
+        color: ${isActive ? '#111827' : '#374151'};
         font-weight: ${isActive ? '700' : '500'};
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.15s ease;
     `;
     btn.onclick = () => {
         if (pageNum !== dashNotiPage) {

@@ -336,6 +336,24 @@
   // Opportunity aliases
   window.__MODULE_EXTENSIONS__ = window.__MODULE_EXTENSIONS__ || [];
   window.__MODULE_EXTENSIONS__.push(function(MODULES) {
+    const OPPO_STATUS_OPTIONS = [
+      { value: 1, label: 'Cancel' },
+      { value: 2, label: 'Closed' },
+      { value: 3, label: 'Commit' },
+      { value: 4, label: 'Internal' },
+      { value: 5, label: 'Lost' },
+      { value: 6, label: 'Open' },
+      { value: 7, label: 'Pending' },
+      { value: 8, label: 'Won' },
+      { value: 9, label: 'Upside' },
+      { value: 10, label: 'At risk' }
+    ];
+
+    const OPPO_TYPE_OPTIONS = [
+      { value: 1, label: 'Netnew' },
+      { value: 2, label: 'Renewal' }
+    ];
+
     MODULES.oppotunity = {
       label: 'Opportunities',
       labelKey: 'nav.oppotunity',
@@ -353,9 +371,10 @@
         { key: 'fy_target_closed_date', label: 'Fy Target Closed Date', hidden: true },
         { key: 'quarter_by_closed_date', label: 'Quarter By Closed Date', hidden: true },
         { key: 'id__my_company', label: 'My Company', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname' },
-        { key: 'id__company', label: 'END USER', optionsFrom: 'company', optionValue: 'company_id', optionLabel: 'company_fullname' },
-        { key: 'status', label: 'STATUS', badge: true },
-        { key: 'estimated_revenue', label: 'Estimated Revenue' },
+        { key: 'id__company', label: 'END USER / COMPANY', optionsFrom: 'company', optionValue: 'company_id', optionLabel: 'company_fullname' },
+        { key: 'status', label: 'STATUS', badge: true, options: OPPO_STATUS_OPTIONS },
+        { key: 'type', label: 'OPPO TYPE', badge: true, options: OPPO_TYPE_OPTIONS },
+        { key: 'estimated_revenue', label: 'Estimated Revenue', type: 'number' },
         { key: 'currency', label: 'Currency' },
         { key: 'stage', label: 'Stage' },
         { key: 'sources', label: 'Sources' },
@@ -367,12 +386,13 @@
       fields: [
         { key: 'project_name', label: 'PROJECT NAME', type: 'text', required: true, full: true },
         { key: 'id__my_company', label: 'MY COMPANY', type: 'select', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname' },
-        { key: 'id__company', label: 'CUSTOMER / END USER', type: 'select', optionsFrom: 'company', optionValue: 'company_id', optionLabel: 'company_fullname', required: true },
+        { key: 'id__company', label: 'END USER / COMPANY', type: 'select', optionsFrom: 'company', optionValue: 'company_id', optionLabel: 'company_fullname', required: true },
         { key: 'id__request', label: 'REQUEST', type: 'select', optionsFrom: 'request', optionValue: 'request_id', optionLabel: 'request_title' },
+        { key: 'type', label: 'OPPO TYPE', type: 'select', options: OPPO_TYPE_OPTIONS, defaultValue: 1 },
+        { key: 'status', label: 'STATUS', type: 'select', options: OPPO_STATUS_OPTIONS, defaultValue: 6, createReadonly: true },
         { key: 'estimated_revenue', label: 'ESTIMATED REVENUE', type: 'text' },
         { key: 'currency', label: 'CURRENCY', type: 'select', optionsFrom: 'cms_currency', optionValue: 'code', optionLabel: 'label', required: true },
         { key: 'exchange_rate', label: 'EXCHANGE RATE', type: 'text' },
-        { key: 'status', label: 'STATUS', type: 'segmented', options: [{ value: 52, label: 'Open' }, { value: 53, label: 'Closed Won' }, { value: 54, label: 'Closed Lost' }], defaultValue: 52 },
         { key: 'stage', label: 'STAGE', type: 'text' },
         { key: 'sources', label: 'SOURCES', type: 'text' },
         { key: 'close_date', label: 'CLOSE DATE', type: 'date' },
@@ -384,14 +404,17 @@
         { section: 'opportunity information' },
         { key: 'project_name', label: 'PROJECT NAME', full: true },
         { key: 'project_id', label: 'PROJECT ID', full: true },
+        { key: 'id__request', label: 'REQUEST', optionsFrom: 'request', optionValue: 'request_id', full: true },
+        { key: 'type', label: 'OPPO TYPE', badge: true, options: OPPO_TYPE_OPTIONS },
+        { key: 'status', label: 'STATUS', badge: true, options: OPPO_STATUS_OPTIONS },
         { key: 'id__my_company', label: 'MY COMPANY', optionsFrom: 'my_company', optionValue: 'my_company_id', optionLabel: 'company_shortname', full: true },
-        { key: 'id__company', label: 'CUSTOMER / END USER', optionsFrom: 'company', optionValue: 'company_id', optionLabel: 'company_fullname', full: true },
+        { key: 'id__company', label: 'END USER / COMPANY', optionsFrom: 'company', optionValue: 'company_id', optionLabel: 'company_fullname', full: true },
         { key: 'stage', label: 'STAGE' },
         { key: 'sources', label: 'SOURCES' },
         { key: 'create_date', label: 'CREATE DATE' },
         { key: 'close_date', label: 'CLOSE DATE' },
         { section: 'financial information' },
-        { key: 'estimated_revenue', label: 'ESTIMATED REVENUE' },
+        { key: 'estimated_revenue', label: 'ESTIMATED REVENUE', type: 'number' },
         { key: 'currency', label: 'CURRENCY' },
         { key: 'exchange_rate', label: 'EXCHANGE RATE' },
         { section: 'opportunity person' },

@@ -13,7 +13,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const cors = require('cors');
 const path = require('path');
-const rateLimit = require('express-rate-limit');
+const security = require('./middleware/security');
 const pool = require('./db');
 
 // Trigger server reload to apply view_name updates in DB action rules
@@ -24,13 +24,17 @@ const identityModule = require('../modules/identity/server');
 const organizationModule = require('../modules/organization/server');
 
 const app = express();
-app.set('trust proxy', true);
+// TRUST_PROXY: number of reverse-proxy hops (e.g. 1). Defaults to legacy behaviour when unset.
+const _trustProxy = process.env.TRUST_PROXY;
+app.set('trust proxy', _trustProxy === undefined ? true : (/^\d+$/.test(_trustProxy) ? parseInt(_trustProxy, 10) : _trustProxy === 'true'));
+app.disable('x-powered-by');
+app.use(security.securityHeaders);
 
 // Transparent proxy for Helpdesk standalone app (wildcard DNS support)
 const http = require('http');
 app.use((req, res, next) => {
   const host = req.headers.host || '';
-  if (host.startsWith('helpdesk.') && process.env.IS_HELPDESK !== 'true') {
+  if (/^helpdesk\.[a-z0-9.-]+(:\d+)?$/i.test(host) && process.env.IS_HELPDESK !== 'true') {
     const targetHost = process.env.HELPDESK_PROXY_TARGET || 'crc-helpdesk-service';
     const targetPort = process.env.HELPDESK_PROXY_PORT || 5223;
 
@@ -58,24 +62,28 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 5221;
 
-// Rate limiters
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { trustProxy: false },
-  message: { error: 'Quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau 15 phút.' }
-});
-
+// Rate limiters (see server/middleware/security.js)
+const { authLimiter, uploadLimiter, publicSyncLimiter } = security;
 
 // Middleware
 if (compression) {
   app.use(compression());
 }
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cors(security.buildCorsOptions()));
+
+// Global rate limit for every API endpoint
+app.use('/api', security.globalLimiter);
+
+// Public / unauthenticated routes get small body limits and must send JSON.
+// (body-parser skips parsing once req.body is set, so these take precedence.)
+app.use('/api/auth', security.requireJsonBody, express.json({ limit: '100kb' }), express.urlencoded({ extended: false, limit: '100kb', parameterLimit: 50 }));
+app.use(['/api/cms', '/api/support'], publicSyncLimiter, express.json({ limit: process.env.PUBLIC_BODY_LIMIT || '5mb' }));
+
+// Authenticated routes: default body limit (override with BODY_LIMIT, e.g. '50mb')
+const BODY_LIMIT = process.env.BODY_LIMIT || '25mb';
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT, parameterLimit: 5000 }));
+app.use(security.sanitizeBody);
 try {
   app.use('/api', require('./helpers/hashidMiddleware'));
 } catch (e) {
@@ -90,6 +98,17 @@ if (!JWT_SECRET) {
 }
 
 // Serve static frontend files with smart caching headers
+// Uploaded files: never let the browser sniff or execute active content from user uploads
+const ACTIVE_CONTENT_EXT = /\.(html?|xhtml|svg|svgz|xml|xsl|xslt|js|mjs|php\d?|phtml|jsp|aspx?|swf|hta)$/i;
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (ACTIVE_CONTENT_EXT.test(req.path)) {
+    res.setHeader('Content-Disposition', 'attachment');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public'), {
   setHeaders: (res, filepath) => {
     if (filepath.endsWith('.html')) {
@@ -97,7 +116,7 @@ app.use(express.static(path.join(__dirname, '../public'), {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-    } else if (filepath.endsWith('setupWizard.js') || filepath.endsWith('tableView.js') || filepath.endsWith('detailView.js') || filepath.endsWith('i18n.js')) {
+    } else if (filepath.endsWith('setupWizard.js') || filepath.endsWith('tableView.js') || filepath.endsWith('detailView.js') || filepath.endsWith('i18n.js') || filepath.endsWith('.config.js')) {
       // Frequently updated core views/i18n, bypass cache to ensure instant client updates
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
@@ -113,16 +132,34 @@ app.use(express.static(path.join(__dirname, '../public'), {
 }));
 
 // Serve modular domain frontend files
+// Never expose server-side module source code over static hosting
+app.use('/modules', (req, res, next) => {
+  if (/(^|\/)server(\/|$)/i.test(req.path) || /package\.json$/i.test(req.path)) {
+    return res.status(404).end();
+  }
+  next();
+});
 app.use('/modules', express.static(path.join(__dirname, '../modules'), {
   setHeaders: (res, filepath) => {
-    if (filepath.endsWith('.js') || filepath.endsWith('.css')) {
+    if (filepath.endsWith('.config.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (filepath.endsWith('.js') || filepath.endsWith('.css')) {
       res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
     }
   }
 }));
 
-// Public API Routes — apply rate limiters to prevent brute-force
-app.use('/api/auth/login', authLimiter);
+// Public API Routes — max 5 failed attempts / 15 min on every credential-handling route
+app.use([
+  '/api/auth/login',
+  '/api/auth/google-login',
+  '/api/auth/change-password',
+  '/api/auth/magic-login',
+  '/api/auth/google/sso-callback',
+  '/api/auth/switch-user'
+], authLimiter);
 
 app.use('/api/auth', identityModule.authRouter);
 
@@ -144,34 +181,118 @@ async function checkStorageQuota(incomingBytes = 0) {
 }
 
 const DISALLOWED_FILE_EXTENSIONS = new Set([
-  'exe', 'bat', 'cmd', 'sh', 'vbs', 'msi', 'dll', 'com', 'ps1', 'scr', 'bin', 'pif', 'application', 'gadget', 'hta', 'cpl', 'msc', 'jar'
+  // executables / scripts
+  'exe', 'bat', 'cmd', 'sh', 'vbs', 'vbe', 'msi', 'dll', 'com', 'ps1', 'scr', 'bin', 'pif', 'application', 'gadget', 'hta', 'cpl', 'msc', 'jar',
+  'js', 'mjs', 'wsf', 'lnk', 'reg', 'php', 'php3', 'php4', 'php5', 'phtml', 'jsp', 'asp', 'aspx', 'cgi', 'pl', 'py', 'swf',
+  // active content that would run in the app origin (stored XSS)
+  'html', 'htm', 'xhtml', 'svg', 'svgz', 'xml', 'xsl', 'xslt'
 ]);
+
+const MAX_UPLOAD_BYTES = parseInt(process.env.UPLOAD_MAX_BYTES || String(200 * 1024 * 1024), 10); // 200 MB / file
+const MAX_CHUNK_BYTES = parseInt(process.env.UPLOAD_MAX_CHUNK_BYTES || String(5 * 1024 * 1024), 10); // 5 MB / chunk
+const MAX_CHUNKS = 1000;
+const UPLOAD_ID_REGEX = /^[A-Za-z0-9_-]{1,64}$/;
 
 function isFileExtensionDisallowed(filename) {
   if (!filename) return false;
-  const ext = path.extname(filename).replace('.', '').toLowerCase();
+  const ext = path.extname(String(filename)).replace('.', '').toLowerCase();
   return DISALLOWED_FILE_EXTENSIONS.has(ext);
+}
+
+function safeExt(rawName) {
+  const ext = path.extname(String(rawName || '')).replace('.', '').toLowerCase();
+  return /^[a-z0-9]{1,10}$/.test(ext) ? ext : 'bin';
 }
 
 function sanitizeUploadFileName(rawName) {
   if (!rawName) return 'file';
-  let decoded = rawName;
-  try { decoded = decodeURIComponent(rawName); } catch (e) {}
+  let decoded = String(rawName).slice(0, 500);
+  try { decoded = decodeURIComponent(decoded); } catch (e) {}
   const base = path.basename(decoded, path.extname(decoded)).trim();
   // Strip commas, quotes, brackets, semicolons, and illegal filesystem characters
-  const sanitized = base.replace(/[,;[\]'"\\/:*?<>|\x00-\x1f]/g, '_').trim();
+  const sanitized = base.replace(/[,;[\]'"\\/:*?<>|\x00-\x1f]/g, '_').replace(/\.{2,}/g, '_').trim().slice(0, 120);
   return sanitized || 'file';
 }
+
+function getUploadsDir() {
+  const UPLOADS_DIR = path.join(__dirname, '../public/uploads');
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  return UPLOADS_DIR;
+}
+
+function sendUploadError(res, err, tag) {
+  const msg = String((err && err.message) || '');
+  if (msg.includes('giới hạn dung lượng')) {
+    return res.status(413).json({ error: msg });
+  }
+  console.error(`[${tag}] Error:`, err);
+  return res.status(500).json({ error: 'Upload failed.' });
+}
+
+/**
+ * Stream request body to disk while enforcing a hard byte limit.
+ * Aborts and removes the partial file (when `removeOnAbort`) if the limit is exceeded.
+ */
+function streamToFile(req, res, filePath, { flags = 'w', maxBytes, existingBytes = 0, removeOnAbort = true, onDone, tag }) {
+  const declared = parseInt(req.headers['content-length'] || '0', 10);
+  if (declared && declared + existingBytes > maxBytes) {
+    req.resume();
+    return res.status(413).json({ error: 'File quá lớn.' });
+  }
+
+  const writeStream = fs.createWriteStream(filePath, { flags });
+  let received = 0;
+  let aborted = false;
+
+  req.on('data', (chunk) => {
+    received += chunk.length;
+    if (!aborted && received + existingBytes > maxBytes) {
+      aborted = true;
+      req.unpipe(writeStream);
+      writeStream.destroy();
+      req.resume(); // drain
+      if (removeOnAbort) fs.unlink(filePath, () => {});
+      if (!res.headersSent) res.status(413).json({ error: 'File quá lớn.' });
+    }
+  });
+  req.on('aborted', () => {
+    if (!aborted) {
+      aborted = true;
+      writeStream.destroy();
+      if (removeOnAbort) fs.unlink(filePath, () => {});
+    }
+  });
+
+  req.pipe(writeStream);
+
+  writeStream.on('finish', () => {
+    if (aborted || res.headersSent) return;
+    onDone(received);
+  });
+  writeStream.on('error', (err) => {
+    if (res.headersSent) return;
+    console.error(`[${tag}] Error writing file:`, err);
+    res.status(500).json({ error: 'Upload failed.' });
+  });
+}
+
+// All upload endpoints require a valid login + are rate limited
+app.use(['/api/upload-file', '/api/upload-binary', '/api/upload-chunk'], uploadLimiter, identityModule.authenticate);
 
 // Pre-upload endpoint for large attachments to avoid Base64 payload limits
 app.post('/api/upload-file', async (req, res) => {
   try {
     const { name, base64 } = req.body || {};
-    if (!base64 || !name) {
+    if (typeof base64 !== 'string' || typeof name !== 'string' || !base64 || !name) {
       return res.status(400).json({ error: 'Missing file data or name' });
     }
+    if (name.length > 500) {
+      return res.status(400).json({ error: 'File name too long' });
+    }
     if (isFileExtensionDisallowed(name)) {
-      return res.status(400).json({ error: `File type not allowed (${path.extname(name)}). Executable and script files are prohibited for security.` });
+      return res.status(400).json({ error: `File type not allowed (${path.extname(name)}). Executable, script and web-page files are prohibited for security.` });
     }
     const matches = base64.match(/^data:([^;]+);base64,(.+)$/);
     let buffer, ext;
@@ -190,10 +311,16 @@ app.post('/api/upload-file', async (req, res) => {
         'image/png': 'png',
         'image/jpeg': 'jpg'
       };
-      ext = mimeToExt[mime] || path.extname(name).replace('.', '') || 'bin';
+      ext = mimeToExt[mime] || safeExt(name);
     } else {
       buffer = Buffer.from(base64, 'base64');
-      ext = path.extname(name).replace('.', '') || 'bin';
+      ext = safeExt(name);
+    }
+    if (DISALLOWED_FILE_EXTENSIONS.has(ext)) {
+      return res.status(400).json({ error: `File type not allowed (.${ext}).` });
+    }
+    if (buffer.length > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ error: 'File quá lớn.' });
     }
 
     // Enforce storage quota check
@@ -201,101 +328,100 @@ app.post('/api/upload-file', async (req, res) => {
 
     const cleanName = sanitizeUploadFileName(name);
     const filename = `upload_${Date.now()}_${cleanName}.${ext}`;
-    const UPLOADS_DIR = path.join(__dirname, '../public/uploads');
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    }
-    fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+    fs.writeFileSync(path.join(getUploadsDir(), filename), buffer);
     const fileUrl = `/uploads/${filename}`;
-    console.log(`[UploadFile] Pre-uploaded file '${name}' -> ${fileUrl} (${buffer.length} bytes)`);
+    console.log(`[UploadFile] Pre-uploaded file '${cleanName}' -> ${fileUrl} (${buffer.length} bytes)`);
     res.json({ success: true, url: fileUrl });
   } catch (err) {
-    console.error('[UploadFile] Error:', err);
-    res.status(500).json({ error: err.message });
+    sendUploadError(res, err, 'UploadFile');
   }
 });
 
 // Stream raw file binary upload: POST /api/upload-binary?name=test.pdf
 app.post('/api/upload-binary', async (req, res) => {
   try {
-    const rawName = req.query.name || 'file.bin';
+    const rawName = String(req.query.name || 'file.bin').slice(0, 500);
     if (isFileExtensionDisallowed(rawName)) {
-      return res.status(400).json({ error: `File type not allowed (${path.extname(rawName)}). Executable and script files are prohibited for security.` });
+      return res.status(400).json({ error: `File type not allowed (${path.extname(rawName)}). Executable, script and web-page files are prohibited for security.` });
     }
     // Check storage limit before streaming
-    await checkStorageQuota(0);
+    await checkStorageQuota(parseInt(req.headers['content-length'] || '0', 10) || 0);
 
     const cleanName = sanitizeUploadFileName(rawName);
-    const ext = path.extname(rawName).replace('.', '') || 'bin';
+    const ext = safeExt(rawName);
     const filename = `upload_${Date.now()}_${cleanName}.${ext}`;
-    const UPLOADS_DIR = path.join(__dirname, '../public/uploads');
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    }
-    const filePath = path.join(UPLOADS_DIR, filename);
-    const writeStream = fs.createWriteStream(filePath);
+    const filePath = path.join(getUploadsDir(), filename);
 
-    req.pipe(writeStream);
-
-    writeStream.on('finish', () => {
-      const fileUrl = `/uploads/${filename}`;
-      console.log(`[UploadBinary] Streamed binary file '${rawName}' -> ${fileUrl}`);
-      res.json({ success: true, url: fileUrl });
-    });
-
-    writeStream.on('error', (err) => {
-      console.error('[UploadBinary] Error writing file:', err);
-      res.status(500).json({ error: err.message });
+    streamToFile(req, res, filePath, {
+      maxBytes: MAX_UPLOAD_BYTES,
+      tag: 'UploadBinary',
+      onDone: () => {
+        const fileUrl = `/uploads/${filename}`;
+        console.log(`[UploadBinary] Streamed binary file '${cleanName}' -> ${fileUrl}`);
+        res.json({ success: true, url: fileUrl });
+      }
     });
   } catch (err) {
-    console.error('[UploadBinary] Error:', err);
-    res.status(500).json({ error: err.message });
+    sendUploadError(res, err, 'UploadBinary');
   }
 });
 
 // Chunked file upload endpoint to bypass 1MB proxy body limits
 app.post('/api/upload-chunk', async (req, res) => {
   try {
-    const rawName = req.query.name || 'file.bin';
+    const rawName = String(req.query.name || 'file.bin').slice(0, 500);
     if (isFileExtensionDisallowed(rawName)) {
-      return res.status(400).json({ error: `File type not allowed (${path.extname(rawName)}). Executable and script files are prohibited for security.` });
+      return res.status(400).json({ error: `File type not allowed (${path.extname(rawName)}). Executable, script and web-page files are prohibited for security.` });
     }
-    // Check storage limit before writing chunk
-    await checkStorageQuota(0);
 
-    const uploadId = req.query.uploadId || Date.now();
+    const uploadId = String(req.query.uploadId || Date.now());
+    if (!UPLOAD_ID_REGEX.test(uploadId)) {
+      return res.status(400).json({ error: 'Invalid uploadId' });
+    }
     const chunkIndex = parseInt(req.query.chunkIndex || '0', 10);
     const totalChunks = parseInt(req.query.totalChunks || '1', 10);
+    if (!Number.isInteger(chunkIndex) || !Number.isInteger(totalChunks) ||
+        totalChunks < 1 || totalChunks > MAX_CHUNKS || chunkIndex < 0 || chunkIndex >= totalChunks) {
+      return res.status(400).json({ error: 'Invalid chunk parameters' });
+    }
+
+    // Check storage limit before writing chunk
+    await checkStorageQuota(parseInt(req.headers['content-length'] || '0', 10) || 0);
 
     const cleanName = sanitizeUploadFileName(rawName);
-    const ext = path.extname(rawName).replace('.', '') || 'bin';
+    const ext = safeExt(rawName);
     const filename = `upload_${uploadId}_${cleanName}.${ext}`;
-    const UPLOADS_DIR = path.join(__dirname, '../public/uploads');
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    const filePath = path.join(getUploadsDir(), filename);
+
+    // First chunk always starts a fresh file; later chunks append
+    let existingBytes = 0;
+    if (chunkIndex > 0) {
+      try { existingBytes = fs.statSync(filePath).size; } catch (e) { existingBytes = 0; }
     }
-    const filePath = path.join(UPLOADS_DIR, filename);
 
-    const writeStream = fs.createWriteStream(filePath, { flags: 'a' });
-    req.pipe(writeStream);
+    if (existingBytes + (parseInt(req.headers['content-length'] || '0', 10) || 0) > MAX_UPLOAD_BYTES) {
+      req.resume();
+      return res.status(413).json({ error: 'File quá lớn.' });
+    }
 
-    writeStream.on('finish', () => {
-      if (chunkIndex === totalChunks - 1) {
-        const fileUrl = `/uploads/${filename}`;
-        console.log(`[UploadChunk] Completed chunked upload '${rawName}' -> ${fileUrl} (${totalChunks} chunks)`);
-        res.json({ success: true, url: fileUrl });
-      } else {
-        res.json({ success: true, chunkIndex });
+    streamToFile(req, res, filePath, {
+      flags: chunkIndex === 0 ? 'w' : 'a',
+      maxBytes: MAX_CHUNK_BYTES,
+      existingBytes: 0,
+      removeOnAbort: chunkIndex === 0,
+      tag: 'UploadChunk',
+      onDone: () => {
+        if (chunkIndex === totalChunks - 1) {
+          const fileUrl = `/uploads/${filename}`;
+          console.log(`[UploadChunk] Completed chunked upload '${cleanName}' -> ${fileUrl} (${totalChunks} chunks)`);
+          res.json({ success: true, url: fileUrl });
+        } else {
+          res.json({ success: true, chunkIndex });
+        }
       }
     });
-
-    writeStream.on('error', (err) => {
-      console.error('[UploadChunk] Error writing chunk:', err);
-      res.status(500).json({ error: err.message });
-    });
   } catch (err) {
-    console.error('[UploadChunk] Error:', err);
-    res.status(500).json({ error: err.message });
+    sendUploadError(res, err, 'UploadChunk');
   }
 });
 
@@ -440,7 +566,7 @@ app.get('/api/system-status', async (req, res) => {
   }
 });
 
-app.post('/api/system-status/cleanup-logs', async (req, res) => {
+app.post('/api/system-status/cleanup-logs', security.requireRoles('Super Admin'), async (req, res) => {
   try {
     await pool.query('TRUNCATE TABLE audit_logs CASCADE');
     console.log('[SystemStatus] Successfully truncated audit_logs table.');
@@ -497,6 +623,9 @@ pool.query(`
   VALUES ('sdc_submit', 'service_delivery_contract', '[request.sr_owner],[request.policy_lead],[request.requester],[request.sr_creater],[coordinator__employee],[created_by]', 'Gửi Service Delivery Contract để phê duyệt (RSDC_service_delivery).', 'Submit for approval', true)
   ON CONFLICT (action_id) DO NOTHING
 `).catch(err => console.error('Failed to seed action rule for sdc_submit:', err.message));
+
+// Payload too large / malformed JSON / unexpected errors
+app.use(security.errorHandler);
 
 app.listen(PORT, () => {
   console.log(`✅ CRC App Server running on http://localhost:${PORT}`);

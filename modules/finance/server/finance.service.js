@@ -19,17 +19,56 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
   const client = dbClient || pool;
   if (!requestId) return null;
 
-  // 1. Request Info
+  // 1. Request or Opportunity Info
+  let reqRow = null;
+  let linkedReqId = null;
+  let linkedOppoId = null;
+
   const reqRes = await client.query(
     `SELECT r.request_id, r.request_type, r.sr_submitted_date, r.sr_created_date, r.deleted_at,
+            r.id__oppotunity,
             p.policy_name, p.elements as policy_elements, r.elements as request_elements
      FROM request r
      LEFT JOIN policy_and_program p ON r.request_type = p.policy_id::text OR r.request_type = p.policy_name
      WHERE r.request_id = $1`,
     [requestId]
   );
-  if (reqRes.rows.length === 0) return null;
-  const reqRow = reqRes.rows[0];
+  if (reqRes.rows.length > 0) {
+    reqRow = reqRes.rows[0];
+    linkedReqId = reqRow.request_id;
+    linkedOppoId = reqRow.id__oppotunity ? String(reqRow.id__oppotunity) : null;
+  } else {
+    // Check if it's an opportunity!
+    const oppoRes = await client.query(
+      `SELECT project_id, id__request, project_name, elements, create_date
+       FROM oppotunity
+       WHERE project_id::text = $1`,
+      [requestId]
+    );
+    if (oppoRes.rows.length > 0) {
+      const oppoRow = oppoRes.rows[0];
+      linkedOppoId = String(oppoRow.project_id);
+      linkedReqId = oppoRow.id__request ? String(oppoRow.id__request) : null;
+      reqRow = {
+        request_id: oppoRow.project_id,
+        policy_name: oppoRow.project_name || 'Opportunity',
+        request_type: 'Opportunity',
+        sr_submitted_date: oppoRow.create_date,
+        sr_created_date: oppoRow.create_date,
+        request_elements: oppoRow.elements
+      };
+    }
+  }
+  if (!reqRow) return null;
+
+  if (linkedReqId && !linkedOppoId) {
+    const oppoCheck = await client.query(`SELECT project_id FROM oppotunity WHERE id__request = $1 LIMIT 1`, [linkedReqId]);
+    if (oppoCheck.rows.length > 0) linkedOppoId = String(oppoCheck.rows[0].project_id);
+  }
+  if (linkedOppoId && !linkedReqId) {
+    const reqCheck = await client.query(`SELECT request_id FROM request WHERE id__oppotunity::text = $1 LIMIT 1`, [linkedOppoId]);
+    if (reqCheck.rows.length > 0) linkedReqId = String(reqCheck.rows[0].request_id);
+  }
 
   // 2. Contracts
   const conRes = await client.query(
@@ -40,8 +79,11 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
             COALESCE(exchance_rate, 1.0) as rate, currency,
             value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency
      FROM contract
-     WHERE (request = $1 OR id__request = $1) AND deleted_at IS NULL`,
-    [requestId]
+     WHERE (
+       ($1::text IS NOT NULL AND (request = $1 OR id__request = $1))
+       OR ($2::text IS NOT NULL AND project = $2)
+     ) AND deleted_at IS NULL`,
+    [linkedReqId, linkedOppoId]
   );
 
   const sellingConIds = [];
@@ -138,8 +180,12 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
               COALESCE(value, 0) as val, COALESCE(exchange_rate, 1.0) as rate, currency,
               value_in_base_currency
        FROM payment
-       WHERE (request = $1 OR contract_id = ANY($2)) AND deleted_at IS NULL`,
-      [requestId, allConIds]
+       WHERE (
+         ($1::text IS NOT NULL AND request = $1)
+         OR ($2::text IS NOT NULL AND project = $2)
+         OR contract_id = ANY($3)
+       ) AND deleted_at IS NULL`,
+      [linkedReqId, linkedOppoId, allConIds]
     );
   } else {
     payRes = await client.query(
@@ -147,8 +193,11 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
               COALESCE(value, 0) as val, COALESCE(exchange_rate, 1.0) as rate, currency,
               value_in_base_currency
        FROM payment
-       WHERE request = $1 AND deleted_at IS NULL`,
-      [requestId]
+       WHERE (
+         ($1::text IS NOT NULL AND request = $1)
+         OR ($2::text IS NOT NULL AND project = $2)
+       ) AND deleted_at IS NULL`,
+      [linkedReqId, linkedOppoId]
     );
   }
 
@@ -248,8 +297,12 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
               COALESCE(exchange_rate, 1) as rate, currency,
               value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency
        FROM invoice
-       WHERE (request = $1 OR contract_id = ANY($2)) AND deleted_at IS NULL`,
-      [requestId, allConIds]
+       WHERE (
+         ($1::text IS NOT NULL AND request = $1)
+         OR ($2::text IS NOT NULL AND project = $2)
+         OR contract_id = ANY($3)
+       ) AND deleted_at IS NULL`,
+      [linkedReqId, linkedOppoId, allConIds]
     );
   } else {
     invRes = await client.query(
@@ -260,8 +313,11 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
               COALESCE(exchange_rate, 1) as rate, currency,
               value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency
        FROM invoice
-       WHERE request = $1 AND deleted_at IS NULL`,
-      [requestId]
+       WHERE (
+         ($1::text IS NOT NULL AND request = $1)
+         OR ($2::text IS NOT NULL AND project = $2)
+       ) AND deleted_at IS NULL`,
+      [linkedReqId, linkedOppoId]
     );
   }
 
@@ -329,8 +385,11 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
             COALESCE(exchange_rate, 1.0) as rate, id__currency as currency,
             value_before_vat_in_base_currency, vat_value_in_base_currency, total_value_in_base_currency
      FROM expense
-     WHERE id__request = $1 AND deleted_at IS NULL`,
-    [requestId]
+     WHERE (
+       ($1::text IS NOT NULL AND id__request = $1)
+       OR ($2::text IS NOT NULL AND id__opportunity = $2)
+     ) AND deleted_at IS NULL`,
+    [linkedReqId, linkedOppoId]
   );
 
   let expenseBase = 0;
@@ -394,8 +453,11 @@ async function calculateRequestFinanceSummary(requestId, dbClient) {
   const assetRes = await client.query(
     `SELECT office_asset_id, purchase_cost, exchange_rate, currency, value_in_base_currency
      FROM asset
-     WHERE request = $1 AND deleted_at IS NULL`,
-    [requestId]
+     WHERE (
+       ($1::text IS NOT NULL AND request = $1)
+       OR ($2::text IS NOT NULL AND project = $2)
+     ) AND deleted_at IS NULL`,
+    [linkedReqId, linkedOppoId]
   );
 
   let assetCount = 0;

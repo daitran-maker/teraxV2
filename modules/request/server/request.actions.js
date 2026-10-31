@@ -44,10 +44,35 @@ async function updateElements({ client, record, record_id, user, action_id, data
       action: 'updated elements',
       changes: { elements: { old: record.elements, new: elementArr } }
     };
-    await client.query(
-      `UPDATE request SET elements = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE request_id = $1`,
-      [record_id, elementArr, JSON.stringify([logEntry])]
-    );
+
+    if (action_id === 'ACT-OPPO-02' || record.project_id) {
+      await client.query(
+        `UPDATE oppotunity SET elements = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE project_id = $1`,
+        [record_id, elementArr, JSON.stringify([logEntry])]
+      );
+      if (record.id__request) {
+        await client.query(
+          `UPDATE request SET elements = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE request_id = $1`,
+          [record.id__request, elementArr, JSON.stringify([logEntry])]
+        );
+      }
+    } else {
+      await client.query(
+        `UPDATE request SET elements = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE request_id = $1`,
+        [record_id, elementArr, JSON.stringify([logEntry])]
+      );
+      if (record.id__oppotunity) {
+        await client.query(
+          `UPDATE oppotunity SET elements = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE project_id = $1`,
+          [record.id__oppotunity, elementArr, JSON.stringify([logEntry])]
+        );
+      } else {
+        await client.query(
+          `UPDATE oppotunity SET elements = $2, log = COALESCE(log, '[]'::jsonb) || $3::jsonb WHERE id__request = $1`,
+          [record_id, elementArr, JSON.stringify([logEntry])]
+        );
+      }
+    }
 }
 
 async function rateRequest({ client, record, record_id, user, action_id, data }) {

@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../../server/db');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
+const { requireRoles } = require('../../../server/middleware/security');
 const path = require('path');
 const fs = require('fs');
+
+// Backup / restore / revert are privileged operations.
+const superAdminOnly = requireRoles('Super Admin');
+const revertAllowed = requireRoles('Super Admin', 'Admin');
+router.use((req, res, next) => (req.path === '/revert' ? revertAllowed(req, res, next) : superAdminOnly(req, res, next)));
 
 const ALLOWED_TABLES = [
   'account',               'action_rules',
@@ -196,9 +202,9 @@ router.post('/snapshot', async (req, res) => {
   const filename = `snapshot_${Date.now()}.dump`;
   const filepath = path.join(BACKUP_DIR, filename);
 
-  const dumpCmd = `pg_dump -h "${dbConfig.host}" -p "${dbConfig.port}" -U "${dbConfig.user}" -d "${dbConfig.database}" -Fc -f "${filepath}"`;
+  const dumpArgs = ['-h', String(dbConfig.host), '-p', String(dbConfig.port), '-U', String(dbConfig.user), '-d', String(dbConfig.database), '-Fc', '-f', filepath];
 
-  exec(dumpCmd, { env: { ...process.env, PGPASSWORD: dbConfig.password } }, (err, stdout, stderr) => {
+  execFile('pg_dump', dumpArgs, { env: { ...process.env, PGPASSWORD: dbConfig.password } }, (err, stdout, stderr) => {
     if (err) {
       console.error('[pg_dump Error]', stderr);
       return res.status(500).json({ error: `pg_dump failed: ${stderr || err.message}` });
@@ -261,9 +267,9 @@ router.post('/snapshot/:filename/restore', async (req, res) => {
     return res.status(500).json({ error: 'Database configuration not available.' });
   }
 
-  const restoreCmd = `pg_restore -h "${dbConfig.host}" -p "${dbConfig.port}" -U "${dbConfig.user}" -d "${dbConfig.database}" --clean --no-owner "${filepath}"`;
+  const restoreArgs = ['-h', String(dbConfig.host), '-p', String(dbConfig.port), '-U', String(dbConfig.user), '-d', String(dbConfig.database), '--clean', '--no-owner', filepath];
 
-  exec(restoreCmd, { env: { ...process.env, PGPASSWORD: dbConfig.password } }, (err, stdout, stderr) => {
+  execFile('pg_restore', restoreArgs, { env: { ...process.env, PGPASSWORD: dbConfig.password } }, (err, stdout, stderr) => {
     if (err) {
       console.error('[pg_restore Error]', stderr);
       return res.status(500).json({ error: `pg_restore failed: ${stderr || err.message}` });

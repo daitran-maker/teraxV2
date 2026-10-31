@@ -102,7 +102,7 @@
       groupBy: ['fy', 'status', 'coordinator__employee'],
       columns: [
         { key: 'id', label: 'SD ID', labelKey: 'col.service_delivery_id', hidden: true },
-        { key: 'sd_old_id', label: 'Legacy ID', labelKey: 'col.sd_old_id', hidden: true },
+        { key: 'sd_old_id', label: 'OLD SD', labelKey: 'col.sd_old_id', hidden: true },
         { key: 'project', label: 'Opportunity', labelKey: 'col.opportunity', optionsFrom: 'oppotunity', optionValue: 'project_id', optionLabel: 'project_label' },
         { key: 'service_scope', label: 'Service Scope', labelKey: 'col.service_scope', full: true },
         { key: 'coordinator__employee', label: 'Coordinator', labelKey: 'col.coordinator__employee', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
@@ -121,8 +121,8 @@
         { key: 'coordinator__employee', label: 'COORDINATOR', labelKey: 'col.coordinator__employee', type: 'select', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name', required: true },
         { key: 'status', label: 'STATUS', labelKey: 'col.status', type: 'select', options: SD_STATUS_OPTIONS, defaultValue: 10, createHidden: true, disabled: true },
         { key: 'service', label: 'SERVICE', labelKey: 'col.service', type: 'select', options: SD_SERVICE_OPTIONS },
-        { key: 'sd_old_id', label: 'LEGACY ID', labelKey: 'col.sd_old_id', type: 'text' },
-        { key: 'fy', label: 'FISCAL YEAR (FY)', labelKey: 'col.fy', type: 'text', placeholder: 'e.g. FY26' },
+        { key: 'sd_old_id', label: 'OLD SD', labelKey: 'col.sd_old_id', type: 'text' },
+        { key: 'fy', label: 'FISCAL YEAR', labelKey: 'col.fy', type: 'text', placeholder: 'yyyy (e.g. 2026)' },
         { section: 'period & sla' },
         { key: 'start_date', label: 'START DATE', labelKey: 'col.start_date', type: 'date', required: true },
         { key: 'end_date', label: 'END DATE', labelKey: 'col.end_date', type: 'date', required: true },
@@ -141,7 +141,7 @@
         { key: 'coordinator__employee', label: 'COORDINATOR', labelKey: 'col.coordinator__employee', optionsFrom: 'employee', optionValue: 'employee_id', optionLabel: 'full_name' },
         { key: 'status', label: 'STATUS', labelKey: 'col.status', badge: true, options: SD_STATUS_OPTIONS },
         { key: 'service', label: 'SERVICE', labelKey: 'col.service', options: SD_SERVICE_OPTIONS },
-        { key: 'sd_old_id', label: 'LEGACY ID', labelKey: 'col.sd_old_id' },
+        { key: 'sd_old_id', label: 'OLD SD', labelKey: 'col.sd_old_id' },
         { key: 'fy', label: 'FISCAL YEAR', labelKey: 'col.fy' },
         { section: 'period & sla' },
         { key: 'start_date', label: 'START DATE', labelKey: 'col.start_date' },
@@ -226,7 +226,7 @@
         { key: 'end_date', label: 'END DATE', labelKey: 'col.end_date', type: 'datetime' },
         { key: 'service', label: 'SERVICE', labelKey: 'col.service', type: 'select', options: STR_SERVICE_OPTIONS },
         { key: 'status', label: 'STATUS', labelKey: 'col.status', type: 'select', options: STR_STATUS_OPTIONS, defaultValue: 1 },
-        { key: 'fy', label: 'FISCAL YEAR (FY)', labelKey: 'col.fy', type: 'text', placeholder: 'Auto from start date', createReadonly: true, editReadonly: true },
+        { key: 'fy', label: 'FISCAL YEAR', labelKey: 'col.fy', type: 'text', placeholder: 'Auto from start date', createReadonly: true, editReadonly: true },
         { section: 'reports' },
         { key: 'report_status', label: 'REPORT STATUS', labelKey: 'col.report_status', type: 'segmented', options: ['Not Required', 'Pending', 'Approved', 'Rejected'], defaultValue: 'Not Required' },
         { key: 'report_content', label: 'REPORT CONTENT', labelKey: 'col.report_content', type: 'textarea', full: true },
@@ -412,7 +412,7 @@
       fields: (MODULES.contract && MODULES.contract.fields) || SC_FIELDS,
       detailFields: (MODULES.contract && MODULES.contract.detailFields) || SC_DETAIL_FIELDS,
       displayName: (r) => (MODULES.contract && MODULES.contract.displayName) ? MODULES.contract.displayName(r) : (r.contract_id || 'Service Contract'),
-      children: []
+      children: ['invoice', 'payment', 'service_delivery_contract', 'logs']
     };
 
     // 6. COLUMN ARRANGEMENT per view (unlisted columns stay in the config but hidden).
@@ -478,7 +478,10 @@
         fy_target_closed_date: { label: 'FY TARGET CLOSED DATE', labelKey: 'col.sd_fy_target_closed' }
       });
       m.statusCards = false; // no badge cards on Opportunity
+      m.defaultSort = { column: 'fy_recognized', dir: 'DESC' };
     });
+
+    MODULES.service_contracts = MODULES.service_contract;
 
     // --- Service contract (view of contract) ---
     arrangeColumns(MODULES.service_contract, [

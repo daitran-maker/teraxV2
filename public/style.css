@@ -872,14 +872,15 @@ body .data-table tbody tr.hidden-by-group {
 }
 
 .btn-outline {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
+  background: #FFFFFF;
+  color: #374151;
+  border: 1px solid #D1D5DB;
 }
 
 .btn-outline:hover {
-  background: var(--accent);
-  color: white;
+  background: #F3F4F6;
+  border-color: #9CA3AF;
+  color: #111827;
 }
 
 .btn-sm {
@@ -2535,12 +2536,9 @@ body .data-table tbody tr.hidden-by-group {
   box-shadow: var(--shadow-md) !important;
 }
 
-/* Action button style overrides (white background, black text, orange border) */
+/* Action button style overrides (grey lines for light gentle app tone, borderless for solid orange actions) */
 .btn,
-.btn-primary,
 .btn-secondary,
-.btn-success,
-.btn-danger,
 .btn-outline,
 .btn-login,
 button.btn,
@@ -2550,17 +2548,14 @@ button.btn,
 .comment-box button,
 .modal-actions button {
   background: #ffffff !important;
-  color: #000000 !important;
-  border: 1px solid rgba(234, 88, 12, 0.35) !important;
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.08) !important;
-  transition: all 0.2s ease-in-out !important;
+  color: #111827 !important;
+  border: 1px solid #D1D5DB !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease-in-out !important;
 }
 
 .btn:hover,
-.btn-primary:hover,
 .btn-secondary:hover,
-.btn-success:hover,
-.btn-danger:hover,
 .btn-outline:hover,
 .btn-login:hover,
 button.btn:hover,
@@ -2569,11 +2564,29 @@ button.btn:hover,
 .form-actions button:hover,
 .comment-box button:hover,
 .modal-actions button:hover {
-  background: #ea580c !important;
+  background: #F3F4F6 !important;
+  color: #111827 !important;
+  border-color: #9CA3AF !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Primary actions filled with solid orange: no outer border frame */
+.btn-primary,
+button.btn-primary {
+  background: #F97316 !important;
   color: #ffffff !important;
-  border-color: #ea580c !important;
-  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.25) !important;
-  transform: translateY(-1px) !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.btn-primary:hover,
+button.btn-primary:hover {
+  background: #EA580C !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Neutral overrides for all status badges to remove harsh colors */
@@ -4133,9 +4146,9 @@ body {
 }
 .dashboard-filter-toggle:hover,
 .dashboard-filter-toggle[aria-expanded="false"] {
-  border-color: var(--terax-orange) !important;
-  color: var(--terax-orange) !important;
-  background: #FFF7ED !important;
+  border-color: #D1D5DB !important;
+  color: #374151 !important;
+  background: #F9FAFB !important;
 }
 .dv-filter-sidebar.is-hidden { display: none !important; }
 
@@ -4381,7 +4394,7 @@ body:has(#view-my_request-detail) .topbar-title { color: var(--terax-text) !impo
 }
 #form-modal.request-form-modal .btn-primary {
   min-width: 98px; height: 40px; border-radius: 6px !important;
-  background: var(--terax-orange) !important; border-color: var(--border) !important;
+  background: var(--terax-orange) !important; border: none !important;
   color: #fff !important;
 }
 #form-modal.request-form-modal .form-notes-container { display: none; }
@@ -5260,12 +5273,13 @@ tr.soft-deleted-row .child-count-badge {
   scrollbar-width: none;  /* Firefox */
 }
 
-/* Final button cascade lock from the newer UI. */
+/* Final button cascade lock from the newer UI (borderless for solid orange actions). */
 .btn-primary,
 button.btn-primary,
 .table-actions-wrapper > .btn-custom-action {
   background: #FF6A00 !important;
-  border: 1px solid #FF6A00 !important;
+  border: none !important;
+  outline: none !important;
   color: #FFFFFF !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
@@ -5275,7 +5289,7 @@ button.btn-primary,
 button.btn-primary:hover:not(:disabled),
 .table-actions-wrapper > .btn-custom-action:hover:not(:disabled) {
   background: #EA580C !important;
-  border-color: #EA580C !important;
+  border: none !important;
   color: #FFFFFF !important;
 }
 
@@ -5893,7 +5907,8 @@ button.btn-custom-action,
 .btn-save,
 .btn-submit {
   background: #F97316 !important;
-  border: 1px solid #F97316 !important;
+  border: none !important;
+  outline: none !important;
   color: #FFFFFF !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
@@ -5904,7 +5919,7 @@ button.btn-custom-action,
   justify-content: center !important;
   gap: 6px !important;
   cursor: pointer !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.15s ease !important;
   box-sizing: border-box !important;
 }
 
@@ -5916,10 +5931,10 @@ button.btn-custom-action:hover:not(:disabled),
 .btn-save:hover:not(:disabled),
 .btn-submit:hover:not(:disabled) {
   background: #EA580C !important;
-  border-color: #EA580C !important;
+  border: none !important;
   color: #FFFFFF !important;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(255, 106, 0, 0.2) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12) !important;
 }
 
 /* Secondary / Outline Action Buttons */
@@ -6194,7 +6209,7 @@ button.btn-custom-action:hover:not(:disabled),
   box-shadow: none !important;
 }
 
-/* Primary Action CTA (+ Add): EXACT 36px Height, Orange Fill + Gray Border */
+/* Primary Action CTA (+ Add): EXACT 36px Height, Solid Orange Fill (Borderless) */
 .btn-primary,
 button.btn-primary,
 .btn-custom-action,
@@ -6203,7 +6218,8 @@ button.btn-custom-action,
 .btn-save,
 .btn-submit {
   background: #F97316 !important;
-  border: 1px solid #D1D5DB !important;
+  border: none !important;
+  outline: none !important;
   color: #FFFFFF !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
@@ -6228,7 +6244,7 @@ button.btn-primary:hover:not(:disabled),
 button.btn-custom-action:hover:not(:disabled),
 #form-modal-save:hover:not(:disabled) {
   background: #EA580C !important;
-  border-color: #9CA3AF !important;
+  border: none !important;
   color: #FFFFFF !important;
   box-shadow: none !important;
 }
@@ -6384,7 +6400,8 @@ button.btn-custom-action:hover:not(:disabled),
   min-height: 36px !important;
   max-height: 36px !important;
   background: #FF6A00 !important;
-  border: 1px solid #D1D5DB !important;
+  border: none !important;
+  outline: none !important;
   color: #FFFFFF !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
@@ -6406,7 +6423,7 @@ button.btn-custom-action:hover:not(:disabled),
 .dv-search-header .btn-custom-action:hover:not(:disabled),
 .dv-search-header button.btn-custom-action:hover:not(:disabled) {
   background: #EA580C !important;
-  border-color: #9CA3AF !important;
+  border: none !important;
   color: #FFFFFF !important;
 }
 
@@ -7250,6 +7267,222 @@ button.btn-custom-action:hover:not(:disabled),
     z-index: 11 !important;
     background: #F8FAFC !important;
   }
+}
+
+/* =========================================================================
+   DESIGN HARMONIZATION (Tone unification):
+   1. Action wrappers & outline/secondary actions: gentle grey lines (#D1D5DB / #E5E7EB).
+      Solid orange filled actions: borderless (no outer frame).
+   2. Bell notification dropdown: 100% black/dark-grey text, zero background blending.
+   ========================================================================= */
+
+/* Rule 1A: All regular/outline/secondary action buttons use gentle grey lines */
+.btn:not(.btn-primary):not(#form-modal-save):not(.btn-save):not(.btn-submit):not([style*="background: #F97316"]):not([style*="background:#F97316"]):not([style*="background: #EA580C"]):not([style*="background:#EA580C"]):not([style*="background: #ea580c"]):not([style*="background:#ea580c"]):not([style*="background: #FF6A00"]):not([style*="background:#FF6A00"]):not([style*="background: #ff6a00"]):not([style*="background:#ff6a00"]),
+.btn-outline,
+.btn-secondary,
+.table-filter-sidebar-toggle,
+.dashboard-filter-toggle,
+.table-filter-toggle,
+.dv-search-header .btn-outline,
+.table-actions-wrapper .btn:not(.btn-primary):not(.btn-custom-action),
+.detail-actions .btn:not(.btn-primary):not(.btn-custom-action) {
+  border: 1px solid #D1D5DB !important;
+  box-shadow: none !important;
+}
+
+.btn-outline:hover,
+.btn-secondary:hover,
+.table-filter-sidebar-toggle:hover,
+.dashboard-filter-toggle:hover,
+.table-filter-toggle:hover {
+  background: #F3F4F6 !important;
+  border-color: #9CA3AF !important;
+  color: #111827 !important;
+  box-shadow: none !important;
+}
+
+/* Rule 1B: Solid orange action buttons are completely borderless */
+.btn-primary,
+button.btn-primary,
+#form-modal-save,
+.btn-save,
+.btn-submit,
+.btn-custom-action,
+button.btn-custom-action,
+.table-actions-wrapper > .btn-custom-action,
+.dv-search-header .btn-primary,
+.dv-search-header button.btn-primary,
+.dv-search-header .btn-custom-action,
+.dv-search-header button.btn-custom-action,
+button[style*="background: #F97316"],
+button[style*="background:#F97316"],
+button[style*="background: #EA580C"],
+button[style*="background:#EA580C"],
+button[style*="background: #ea580c"],
+button[style*="background:#ea580c"],
+button[style*="background: #FF6A00"],
+button[style*="background:#FF6A00"],
+button[style*="background: #ff6a00"],
+button[style*="background:#ff6a00"] {
+  border: none !important;
+  outline: none !important;
+}
+
+.btn-primary:hover,
+button.btn-primary:hover,
+#form-modal-save:hover,
+.btn-save:hover,
+.btn-submit:hover,
+.btn-custom-action:hover,
+button.btn-custom-action:hover {
+  border: none !important;
+  outline: none !important;
+}
+
+/* Pagination buttons: Active page uses subtle grey frame, not orange */
+.pagination-page-btn.is-active,
+.pagination-page-btn.active,
+.pagination-controls .pagination-page-btn.is-active,
+.pagination-controls .pagination-page-btn.active {
+  border: 1px solid #9CA3AF !important;
+  box-shadow: none !important;
+}
+
+/* =========================================================================
+   Rule 2: Bell Notification Dropdown - 100% Black / Dark Grey Text Contrast
+   ========================================================================= */
+#notificationDropdown,
+.notification-dropdown {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E7EB !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
+/* Header */
+#notificationDropdown > div:first-child {
+  background: #F9FAFB !important;
+  border-bottom: 1px solid #E5E7EB !important;
+  padding: 14px 16px !important;
+}
+
+#notificationDropdown h4 {
+  color: #111827 !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+}
+
+#notificationDropdown .notif-mark-all-btn,
+#notificationDropdown button[onclick*="markAllNotificationsRead"] {
+  color: #374151 !important;
+  background: transparent !important;
+  border: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  padding: 4px 8px !important;
+}
+
+#notificationDropdown .notif-mark-all-btn:hover,
+#notificationDropdown button[onclick*="markAllNotificationsRead"]:hover {
+  color: #111827 !important;
+  background: #E5E7EB !important;
+  border-radius: 4px !important;
+}
+
+/* Notification List & Items */
+#notificationList {
+  background: #FFFFFF !important;
+}
+
+#notificationList > div {
+  border-bottom: 1px solid #E5E7EB !important;
+  color: #111827 !important;
+}
+
+#notificationList > div:last-child {
+  border-bottom: none !important;
+}
+
+/* Notification Title: 100% black */
+#notificationList div[style*="font-weight:600"],
+#notificationList .noti-title,
+#notificationList h5 {
+  color: #111827 !important;
+  font-weight: 600 !important;
+}
+
+/* Notification Body / Message: Dark grey/slate */
+#notificationList div[style*="font-size:12px"],
+#notificationList .noti-body,
+#notificationList p,
+#notificationList span {
+  color: #374151 !important;
+}
+
+/* Notification Time / Date */
+#notificationList div[style*="font-size:10px"],
+#notificationList div[style*="font-size:11px"],
+#notificationList .noti-time {
+  color: #6B7280 !important;
+  opacity: 1 !important;
+  font-weight: 500 !important;
+}
+
+/* Empty State */
+#notificationList [data-i18n="dash.noti.empty"],
+#notificationList div:empty,
+#notificationList div[style*="text-align:center"] {
+  color: #4B5563 !important;
+  font-weight: 500 !important;
+}
+
+/* Dropdown Pagination Footer */
+#notificationPagination {
+  background: #F9FAFB !important;
+  border-top: 1px solid #E5E7EB !important;
+  padding: 10px 16px !important;
+}
+
+#notificationPagination #notifPageInfo,
+#notificationPagination span {
+  color: #374151 !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+}
+
+#notifPrevBtn,
+#notifNextBtn,
+#notificationPagination .btn {
+  background: #FFFFFF !important;
+  border: 1px solid #D1D5DB !important;
+  color: #374151 !important;
+  box-shadow: none !important;
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+}
+
+#notifPrevBtn:hover:not(:disabled),
+#notifNextBtn:hover:not(:disabled),
+#notificationPagination .btn:hover:not(:disabled) {
+  background: #F3F4F6 !important;
+  border-color: #9CA3AF !important;
+  color: #111827 !important;
+}
+
+.notif-page-btn {
+  background: #FFFFFF !important;
+  border: 1px solid #D1D5DB !important;
+  color: #374151 !important;
+  box-shadow: none !important;
+}
+
+.notif-page-btn:hover {
+  background: #F3F4F6 !important;
+  border-color: #9CA3AF !important;
+  color: #111827 !important;
 }
 
 

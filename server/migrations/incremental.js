@@ -88,6 +88,46 @@ async function runIncrementalMigrations() {
   } catch (e) {
     console.error('Failed to run migrateAutoCompleteApprovedPaymentRequests migration:', e);
   }
+  try {
+    await ensureHardDeleteRulesSeed();
+  } catch (e) {
+    console.error('Failed to run ensureHardDeleteRulesSeed migration:', e);
+  }
+}
+
+/**
+ * Hard Delete is a permanent, cascading delete. It is controlled by action rules `hard_delete_<table>`
+ * (same naming as add_/edit_/delete_). Runs on every start so a fresh deploy always has the full set.
+ *  - one rule per existing `delete_<x>` rule (same view_name), default role Super Admin;
+ *  - plus the tables whose Delete is not driven by a `delete_<x>` rule (opportunity, service delivery, ...).
+ * ON CONFLICT DO NOTHING: rules already tuned by an admin are never overwritten.
+ */
+async function ensureHardDeleteRulesSeed() {
+  const client = await pool.connect();
+  try {
+    if ((await client.query("SELECT to_regclass('public.action_rules') AS t")).rows[0].t === null) return;
+    await client.query(`
+      INSERT INTO action_rules (action_id, view_name, roles, display_name, description, display)
+      VALUES
+        ('hard_delete_oppotunity', 'oppotunity,opportunity,oppo', '[Super Admin]', 'Hard Delete Opportunity', 'Xóa vĩnh viễn Opportunity', true),
+        ('hard_delete_service_delivery_contract', 'service_delivery_contract', '[Super Admin]', 'Hard Delete Service Delivery Contract', 'Xóa vĩnh viễn Service Delivery Contract', true),
+        ('hard_delete_service_task_request', 'service_task_request', '[Super Admin]', 'Hard Delete Service Task Request', 'Xóa vĩnh viễn Service Task Request', true),
+        ('hard_delete_contract', 'request,contract,service_contract', '[Super Admin]', 'Hard Delete Contract', 'Xóa vĩnh viễn Contract / Service Contract', true),
+        ('hard_delete_request', 'request,my_request,my_approval,my_process_owner,my_task,my_team', '[Super Admin]', 'Hard Delete Request', 'Xóa vĩnh viễn Request', true)
+      ON CONFLICT (action_id) DO NOTHING;
+
+      INSERT INTO action_rules (action_id, view_name, roles, display_name, description, display)
+      SELECT 'hard_' || action_id, view_name, '[Super Admin]',
+             'Hard Delete ' || regexp_replace(action_id, '^delete_', ''),
+             'Xóa vĩnh viễn (hard delete, kèm dữ liệu liên quan) - ' || regexp_replace(action_id, '^delete_', ''),
+             true
+        FROM action_rules
+       WHERE action_id LIKE 'delete\\_%'
+      ON CONFLICT (action_id) DO NOTHING;
+    `);
+  } finally {
+    client.release();
+  }
 }
 
 async function migrateAutoCompleteApprovedPaymentRequests() {

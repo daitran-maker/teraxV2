@@ -185,12 +185,41 @@ function wrapWithMetrics(tableName, baseTableOrCTE) {
     : `(SELECT o.project_id, o.id__request AS rid, o.id__company::text AS company_id FROM "oppotunity" o
         WHERE k.pid IS NOT NULL AND o.project_id = k.pid AND o.deleted_at IS NULL LIMIT 1)`;
 
+  // ---- payment ratio scope: paid payments vs CONTRACT VALUE of the related contract(s) -----
+  //  contract view      : the contract itself
+  //  SDC / STR          : the contract linked to the SDC (id__contract); when none, the contracts of its opportunity
+  //  opportunity        : every contract of the opportunity + contracts referenced by its SDCs
+  const rcScope = isContractView
+    ? `cc.contract_id::text = "contract".contract_id::text`
+    : `((k.contract_id IS NOT NULL AND cc.contract_id::text = k.contract_id)
+        OR (k.contract_id IS NULL AND op.project_id IS NOT NULL AND (
+              cc.project = op.project_id
+              OR (op.rid IS NOT NULL AND (cc.request = op.rid OR cc.id__request = op.rid))
+              OR cc.contract_id::text IN (SELECT dd.id__contract::text FROM "service_delivery_contract" dd
+                                          WHERE dd.project = op.project_id AND dd.id__contract IS NOT NULL AND dd.deleted_at IS NULL))))`;
+  const rcJoin = `
+    LEFT JOIN LATERAL (
+      SELECT
+        SUM(CASE WHEN x.ctype = ${CONTRACT_TYPE_SELLING} THEN x.tv ELSE 0 END) AS sell_total,
+        SUM(CASE WHEN x.ctype = ${CONTRACT_TYPE_SELLING} THEN LEAST(x.paid, x.tv) ELSE 0 END) AS sell_paid,
+        SUM(CASE WHEN x.ctype = ${CONTRACT_TYPE_BUYING} THEN x.tv ELSE 0 END) AS buy_total,
+        SUM(CASE WHEN x.ctype = ${CONTRACT_TYPE_BUYING} THEN LEAST(x.paid, x.tv) ELSE 0 END) AS buy_paid
+      FROM (
+        SELECT cc.type AS ctype,
+          COALESCE(cc.total_value_in_base_currency, 0) AS tv,
+          COALESCE((SELECT SUM(${amount}) FROM "payment" p
+                    WHERE p.deleted_at IS NULL AND p.contract_id = cc.contract_id AND ${isPaid}), 0) AS paid
+        FROM "contract" cc
+        WHERE cc.deleted_at IS NULL AND COALESCE(cc.total_value_in_base_currency, 0) > 0 AND ${rcScope}
+      ) x
+    ) rc ON true`;
+
   return `(
     SELECT "${tableName}".*,
-      COALESCE(pm.sell_total, 0) AS oppo_pay_sell_total,
-      COALESCE(pm.sell_paid, 0) AS oppo_pay_sell_paid,
-      COALESCE(pm.buy_total, 0) AS oppo_pay_buy_total,
-      COALESCE(pm.buy_paid, 0) AS oppo_pay_buy_paid,
+      COALESCE(rc.sell_total, 0) AS oppo_pay_sell_total,
+      COALESCE(rc.sell_paid, 0) AS oppo_pay_sell_paid,
+      COALESCE(rc.buy_total, 0) AS oppo_pay_buy_total,
+      COALESCE(rc.buy_paid, 0) AS oppo_pay_buy_paid,
       ROUND(tk.pc, 2) AS oppo_prog_completed,
       ROUND(tk.pp, 2) AS oppo_prog_processing,
       ROUND(tk.pn, 2) AS oppo_prog_not_started,
@@ -198,8 +227,8 @@ function wrapWithMetrics(tableName, baseTableOrCTE) {
       COALESCE(tk.tasks, 0) AS oppo_prog_task_count,
       to_char(${startExpr}, 'YYYY-MM-DD') AS oppo_start_date,
       to_char(${endExpr}, 'YYYY-MM-DD') AS oppo_end_date,
-      ROUND(100.0 * (COALESCE(pm.sell_paid, 0) + COALESCE(pm.buy_paid, 0))
-            / NULLIF(COALESCE(pm.sell_total, 0) + COALESCE(pm.buy_total, 0), 0), 2) AS oppo_payment_ratio,
+      ROUND(100.0 * (COALESCE(rc.sell_paid, 0) + COALESCE(rc.buy_paid, 0))
+            / NULLIF(COALESCE(rc.sell_total, 0) + COALESCE(rc.buy_total, 0), 0), 2) AS oppo_payment_ratio,
       ROUND(tk.pc, 2) AS oppo_progress,
       (${endExpr} - CURRENT_DATE + 1) AS oppo_remaining_time,
       eu.company_id AS oppo_end_user,
@@ -212,7 +241,7 @@ function wrapWithMetrics(tableName, baseTableOrCTE) {
       SELECT co.company_id::text AS company_id, co.country::text AS country FROM "company" co
       WHERE co.company_id::text = COALESCE(CASE WHEN ct.type = ${CONTRACT_TYPE_SELLING} THEN NULLIF(ct.contractor, '') END, op.company_id)
         AND co.deleted_at IS NULL LIMIT 1
-    ) eu ON true${strJoin}${finJoin}
+    ) eu ON true${strJoin}${finJoin}${rcJoin}
     LEFT JOIN LATERAL (
       SELECT
         SUM(CASE WHEN ${sellCond} THEN ${amount} ELSE 0 END) AS sell_total,

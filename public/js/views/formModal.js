@@ -125,6 +125,7 @@ async function openAddModal(moduleKey, initialData = null) {
     }
 
     if (!initialData) initialData = {};
+    window.__currentInitialData = { ...initialData };
 
     // Instant modal opening with spinner to eliminate perceived lag
     const titleText = moduleKey === 'support' ? 'New Support Ticket' : `${t('form.add_title', 'Add')} ${getModuleMeta(moduleKey).title}`;
@@ -135,7 +136,7 @@ async function openAddModal(moduleKey, initialData = null) {
       modalBodyEl.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 0; gap:12px; color:var(--text-secondary);">
           <span class="material-symbols-rounded" style="font-size:32px; animation:spin 1s linear infinite; color:var(--primary);">progress_activity</span>
-          <span style="font-size:13px; font-weight:500;">${typeof t === 'function' ? t('common.loading', 'Loading...') : 'Loading...'}</span>
+          <span style="font-size:13px; font-weight:500;">${typeof t === 'function' ? t('form.loading_form', 'Loading...') : 'Loading...'}</span>
         </div>
       `;
       openModal('form-modal');
@@ -143,9 +144,20 @@ async function openAddModal(moduleKey, initialData = null) {
 
     // Parallel pre-warm/fetch of all required lookup select options to avoid sequential blocking
     if (mod && Array.isArray(mod.fields)) {
-      const lookupKeys = [...new Set(mod.fields.filter(f => f && f.optionsFrom && !f.hidden && !f.createHidden).map(f => f.optionsFrom))];
+      const lookupFields = mod.fields.filter(f => f && f.optionsFrom && !f.hidden && !f.createHidden);
+      const lookupKeys = [...new Set(lookupFields.map(f => f.optionsFrom))];
       if (lookupKeys.length > 0) {
-        await Promise.all(lookupKeys.map(k => getSelectOptions(k).catch(() => [])));
+        await Promise.all(lookupKeys.map(k => {
+          const fieldsOfKey = lookupFields.filter(f => f.optionsFrom === k);
+          // Large lookup tables: don't download the full list, only resolve prefilled values by id
+          if (typeof window.isLazyLookupField === 'function' && !window.isLookupCacheFull(k) &&
+              fieldsOfKey.every(f => window.isLazyLookupField(f, moduleKey))) {
+            return Promise.all(fieldsOfKey
+              .filter(f => initialData[f.key] !== undefined && initialData[f.key] !== null && String(initialData[f.key]) !== '')
+              .map(f => window.fetchLookupRecord(k, f.optionValue, initialData[f.key]))).catch(() => []);
+          }
+          return getSelectOptions(k).catch(() => []);
+        }));
       }
     }
 
@@ -351,6 +363,7 @@ async function openAddModal(moduleKey, initialData = null) {
       if (matchedSd) {
         let taskFy = matchedSd.fy;
         if (!taskFy && matchedSd.project && typeof window.extractFiscalYearFromOpportunity === 'function') {
+          if (typeof window.fetchLookupRecord === 'function') await window.fetchLookupRecord('oppotunity', 'project_id', matchedSd.project);
           const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
           const matchedOpp = oppCache.find(o => String(o.project_id) === String(matchedSd.project));
           if (matchedOpp) taskFy = window.extractFiscalYearFromOpportunity(matchedOpp);
@@ -369,11 +382,11 @@ async function openAddModal(moduleKey, initialData = null) {
   document.getElementById('form-modal-body').innerHTML = body;
   initializeSearchableDropdowns(document.getElementById('form-modal-body'));
 
-  // Bind dynamic auto-calculation of FY when Opportunity is selected in Service Delivery Contract
+  // Bind dynamic auto-calculation of FY and contract filtering when Opportunity is selected in Service Delivery Contract
   if (moduleKey === 'service_delivery_contract') {
     const projSelect = document.getElementById('f-project');
     if (projSelect) {
-      projSelect.addEventListener('change', () => {
+      projSelect.addEventListener('change', async () => {
         const pVal = projSelect.value;
         const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
         const matchedOpp = oppCache.find(o => String(o.project_id) === String(pVal));
@@ -385,6 +398,28 @@ async function openAddModal(moduleKey, initialData = null) {
             fyInp.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }
+        const contractSelect = document.getElementById('f-id__contract');
+        if (contractSelect) {
+          try {
+            const contracts = await getSelectOptions('contract');
+            const oppReq = matchedOpp ? matchedOpp.id__request : null;
+            const filteredContracts = contracts.filter(c => {
+              if (pVal && String(c.project) === String(pVal)) return true;
+              if (oppReq && String(c.request) === String(oppReq)) return true;
+              return false;
+            });
+            const prevVal = contractSelect.value;
+            let optHtml = '<option value="">— Select —</option>';
+            filteredContracts.forEach(c => {
+              const ov = c.contract_id;
+              const ol = c.contract_label || [c.type, c.contractspood_no, c.contract_name_or_description || c.contract_id].filter(Boolean).join(' | ') || ov;
+              optHtml += `<option value="${escapeHTML(ov)}" ${String(prevVal) === String(ov) ? 'selected' : ''}>${escapeHTML(ol)}</option>`;
+            });
+            contractSelect.innerHTML = optHtml;
+          } catch (e) {
+            console.warn('Error filtering contracts on opportunity change:', e);
+          }
+        }
       });
     }
   }
@@ -393,13 +428,14 @@ async function openAddModal(moduleKey, initialData = null) {
   if (moduleKey === 'service_task_request') {
     const sdSelect = document.getElementById('f-service_delivery');
     if (sdSelect) {
-      sdSelect.addEventListener('change', () => {
+      sdSelect.addEventListener('change', async () => {
         const sdVal = sdSelect.value;
         const sdCache = (window.selectCache && window.selectCache['service_delivery_contract']) || [];
         const matchedSd = sdCache.find(s => String(s.id) === String(sdVal));
         if (matchedSd) {
           let calcFy = matchedSd.fy;
           if (!calcFy && matchedSd.project && typeof window.extractFiscalYearFromOpportunity === 'function') {
+            if (typeof window.fetchLookupRecord === 'function') await window.fetchLookupRecord('oppotunity', 'project_id', matchedSd.project);
             const oppCache = (window.selectCache && (window.selectCache['oppotunity'] || window.selectCache['opportunity'])) || [];
             const matchedOpp = oppCache.find(o => String(o.project_id) === String(matchedSd.project));
             if (matchedOpp) calcFy = window.extractFiscalYearFromOpportunity(matchedOpp);
@@ -663,31 +699,65 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
   let html = '';
   let val = '';
 
-  // Custom constraint for payment/invoice reference field when source is Contract
-  if (field.key === 'request' && (moduleKey === 'payment' || moduleKey === 'invoice') && record && record.source === 'Contract') {
-    field.key = 'contract_id';
-    field.label = 'Contract';
-    field.labelKey = 'col.contract';
-    field.optionsFrom = 'contract';
+  // If child record under contract, hide request field but preserve its value as hidden input
+  if ((moduleKey === 'payment' || moduleKey === 'invoice') && record && record.source === 'Contract') {
+    if (field.key === 'contract_id') {
+      field.label = 'Contract';
+      field.labelKey = 'col.contract';
+      field.optionsFrom = 'contract';
+    }
+    if (field.key === 'request') {
+      field.hidden = true;
+    }
   }
 
   // If this form modal was opened from a parent record (child element creation), hide the parent reference field
   if (record) {
     const parentKey = record._parent_foreign_key;
     const parentMod = record._parent_module;
-    if (parentKey && field.key === parentKey && !(record._lock_service_delivery && field.key === 'service_delivery')) {
+    if (parentKey && field.key === parentKey) {
       field.hidden = true;
     }
-    if (parentMod && (field.key === parentMod || field.key === `${parentMod}_id` || field.key === `id__${parentMod}`) && !(record._lock_service_delivery && field.key === 'service_delivery')) {
+    if (parentMod && (field.key === parentMod || field.key === `${parentMod}_id` || field.key === `id__${parentMod}`)) {
       field.hidden = true;
     }
-    if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_team'].includes(parentMod)) {
-      if (['request', 'id__request', 'id_request', 'request_id'].includes(field.key)) {
+    if (['request', 'my_request', 'my_approval', 'my_process_owner', 'my_team', 'my_task'].includes(parentMod)) {
+      if (['request', 'id__request', 'id_request', 'request_id', 'id__service_request', 'payment_request', 'invoice_request'].includes(field.key)) {
+        field.hidden = true;
+      }
+      if (['project', 'id__opportunity', 'oppotunity', 'opportunity'].includes(field.key) && record.project) {
+        field.hidden = true;
+      }
+    }
+    if (['oppotunity', 'opportunity', 'oppo'].includes(parentMod)) {
+      // Hide all Opportunity link fields (they are auto-bound to this parent opportunity)
+      if (['project', 'id__opportunity', 'oppotunity', 'opportunity', 'oppo', 'project_id', 'opportunity_id'].includes(field.key)) {
+        field.hidden = true;
+      }
+      // Hide all Request link fields (they are auto-inherited from this opportunity or not applicable)
+      if (['request', 'id__request', 'id_request', 'request_id', 'id__service_request', 'payment_request', 'invoice_request'].includes(field.key)) {
+        field.hidden = true;
+      }
+    }
+    if (parentMod === 'service_delivery_contract') {
+      if (['service_delivery', 'service_delivery_contract', 'id__service_delivery_contract', 'sd_contract'].includes(field.key)) {
+        field.hidden = true;
+      }
+      if (['project', 'id__opportunity'].includes(field.key) && record.project) {
+        field.hidden = true;
+      }
+      if (['request', 'id__request', 'id__service_request'].includes(field.key)) {
         field.hidden = true;
       }
     }
     if (parentMod === 'contract') {
-      if (['contract_id', 'contract', 'contractspood'].includes(field.key)) {
+      if (['contract_id', 'contract', 'contractspood', 'id__contract'].includes(field.key)) {
+        field.hidden = true;
+      }
+      if (['request', 'id__request', 'id_request', 'request_id'].includes(field.key)) {
+        field.hidden = true;
+      }
+      if (['project', 'id__opportunity', 'oppotunity', 'opportunity'].includes(field.key) && record.project) {
         field.hidden = true;
       }
     }
@@ -1107,14 +1177,17 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
   } else if (field.type === 'select' && field.optionsFrom) {
     let sourceKey = field.optionsFrom;
     let opts;
+    let lazyLookupAttrs = '';
     if (sourceKey === 'request') {
       // Fetch only the current user's requests for dropdowns in child forms
       const MY_REQ_CACHE_KEY = 'my_request_dropdown';
       if (selectCache[MY_REQ_CACHE_KEY] && selectCache[MY_REQ_CACHE_KEY].isFullList) {
         opts = selectCache[MY_REQ_CACHE_KEY];
+      } else if (selectCache['request'] && selectCache['request'].length > 0) {
+        opts = selectCache['request'];
       } else {
         try {
-          const res = await apiGet('/my-views/my-request?limit=1000000');
+          const res = await apiGet('/my-views/my-request?limit=1000');
           const data = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
           data.isFullList = true;
           selectCache[MY_REQ_CACHE_KEY] = data;
@@ -1146,6 +1219,16 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         } catch (e) { opts = []; }
       } else {
         opts = [];
+      }
+    } else if (typeof window.isLazyLookupField === 'function' && window.isLazyLookupField(field, moduleKey) && !window.isLookupCacheFull(sourceKey)) {
+      // Large lookup table: only the current value is loaded; the dropdown searches server-side (10 rows max)
+      const seedRow = val ? await window.fetchLookupRecord(sourceKey, field.optionValue, val) : null;
+      if (!val || seedRow) {
+        opts = seedRow ? [seedRow] : [];
+        lazyLookupAttrs = ` data-lazy-source="${escapeHTML(sourceKey)}" data-lazy-value="${escapeHTML(field.optionValue)}" data-lazy-label="${escapeHTML(field.optionLabel || '')}"`;
+      } else {
+        // Current value could not be resolved by id: fall back to the full list to stay safe
+        opts = await getSelectOptions(sourceKey);
       }
     } else {
       opts = await getSelectOptions(sourceKey);
@@ -1236,6 +1319,19 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         }
       }
 
+      if (moduleKey === 'service_delivery_contract' && (field.key === 'id__contract' || sourceKey === 'contract')) {
+        const curProj = record ? (record.project || record.id__opportunity) : null;
+        const curReq = record ? (record.id__service_request || record.request || record.id__request) : null;
+        if (curProj || curReq) {
+          displayOpts = displayOpts.filter(o => {
+            if (curProj && String(o.project) === String(curProj)) return true;
+            if (curReq && String(o.request) === String(curReq)) return true;
+            if (val && String(o[field.optionValue]) === String(val)) return true;
+            return false;
+          });
+        }
+      }
+
       if ((field.key === 'request_type' || field.key === 'policy_id' || field.key === 'ticket_type') && (sourceKey === 'policy' || sourceKey === 'helpdesk_policy')) {
         const checkAutoCreated = (typeof window.isAutoCreatedPolicy === 'function')
           ? window.isAutoCreatedPolicy
@@ -1304,7 +1400,7 @@ async function renderFieldHTML(moduleKey, fieldOrig, record) {
         currentValOptionHTML = `<option value="${val}" selected>${resolvedDisplay}</option>`;
       }
 
-      html += `<select class="form-select" id="f-${field.key}" name="${field.key}" ${onChangeStr} ${disabledAttr}>
+      html += `<select class="form-select" id="f-${field.key}" name="${field.key}" ${onChangeStr} ${disabledAttr}${lazyLookupAttrs}>
       <option value="">— Select —</option>
       ${staticOptionsHTML}
       ${currentValOptionHTML}
@@ -2589,11 +2685,14 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
 
   // Prevent user from clicking save while upload is running!
   const saveBtn = document.getElementById('form-modal-save');
-  const originalSaveText = saveBtn ? saveBtn.textContent : '';
+  const originalSaveText = saveBtn ? (saveBtn.dataset.originalText || saveBtn.textContent) : '';
   if (saveBtn) {
+    if (!saveBtn.dataset.originalText) {
+      saveBtn.dataset.originalText = originalSaveText;
+    }
     saveBtn.disabled = true;
     saveBtn.dataset.uploading = 'true';
-    saveBtn.textContent = typeof t === 'function' ? t('form.uploading_file', 'Đang tải file...') : 'Đang tải file...';
+    saveBtn.textContent = typeof t === 'function' ? t('form.uploading_file', 'Uploading file...') : 'Uploading file...';
   }
 
   const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
@@ -2631,6 +2730,10 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
       if (saveBtn) {
         saveBtn.disabled = false;
         saveBtn.dataset.uploading = 'false';
+        const isRequestForm = !!document.getElementById('form-modal-draft');
+        const fallbackText = isRequestForm ? (typeof t === 'function' ? t('form.submit', 'Submit') : 'Submit') : (typeof t === 'function' ? t('form.save', 'Save') : 'Save');
+        saveBtn.textContent = saveBtn.dataset.originalText || originalSaveText || fallbackText;
+        delete saveBtn.dataset.originalText;
         const activeModKey = document.getElementById('form-modal')?.dataset?.moduleKey || (typeof currentModule !== 'undefined' ? currentModule : null);
         if (typeof validateFormAndNotify === 'function' && activeModKey) validateFormAndNotify(activeModKey, false);
       }
@@ -2642,7 +2745,10 @@ window.handleMultipleFileChange = function (inputProxy, fieldKey, idx) {
       if (saveBtn) {
         saveBtn.disabled = false;
         saveBtn.dataset.uploading = 'false';
-        saveBtn.textContent = originalSaveText || 'Save';
+        const isRequestForm = !!document.getElementById('form-modal-draft');
+        const fallbackText = isRequestForm ? (typeof t === 'function' ? t('form.submit', 'Submit') : 'Submit') : (typeof t === 'function' ? t('form.save', 'Save') : 'Save');
+        saveBtn.textContent = saveBtn.dataset.originalText || originalSaveText || fallbackText;
+        delete saveBtn.dataset.originalText;
       }
     });
 };
@@ -3122,7 +3228,20 @@ async function submitAdd(moduleKey, extraData = {}) {
   }
 
   const mod = MODULES[moduleKey];
-  const data = { ...collectFormData(moduleKey), ...extraData };
+  const initialContext = window.__currentInitialData ? { ...window.__currentInitialData } : {};
+  delete initialContext._parent_module;
+  delete initialContext._parent_foreign_key;
+  delete initialContext._lock_company;
+  delete initialContext._foreignKey;
+  delete initialContext._lock_service_delivery;
+
+  const collected = collectFormData(moduleKey);
+  for (const [k, v] of Object.entries(initialContext)) {
+    if (v !== undefined && v !== null && (collected[k] === undefined || collected[k] === null || collected[k] === '')) {
+      collected[k] = v;
+    }
+  }
+  const data = { ...initialContext, ...collected, ...extraData };
   const activeHashModule = getActiveHashModule();
   const isRequestChildAdd = (REQUEST_CHILD_RELOAD_MODULES.includes(moduleKey) || ['payment', 'expense', 'invoice', 'service', 'asset', 'contract', 'assigned_task', 'target_table', 'comment', 'service_delivery_contract', 'service_task_request'].includes(moduleKey)) && currentView === 'detail' && currentModule && currentRecord;
   const parentModuleKeyForAdd = isRequestChildAdd ? currentModule : null;
@@ -3300,6 +3419,7 @@ async function submitAdd(moduleKey, extraData = {}) {
     }
     showToast(`${getModuleMeta(moduleKey).title} ${t('toast.record_added', 'record added successfully!')}`, 'success');
     delete selectCache[moduleKey]; // Clear only current module cache
+    if (typeof rewarmSelectCache === 'function') rewarmSelectCache(moduleKey); // refill in background so next Add form opens instantly
     markReportPanesDirty([moduleKey]);
     if (isRequestChildAdd && parentPkValForAdd) {
       clearChildTableCache(moduleKey, parentViewKeyForAdd || parentModuleKeyForAdd, parentPkValForAdd);
@@ -3460,6 +3580,7 @@ async function submitEdit(moduleKey, pkVal, extraData = {}) {
     closeModal('form-modal');
     showToast(t('toast.record_updated', 'Record updated successfully!'), 'success');
     delete selectCache[moduleKey]; // Clear only current module cache
+    if (typeof rewarmSelectCache === 'function') rewarmSelectCache(moduleKey);
 
     // Clear DOM cache pane for this module to force reload on next navigation
     const cachedPane = document.getElementById('pane-' + moduleKey);

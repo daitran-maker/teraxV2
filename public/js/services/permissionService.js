@@ -24,7 +24,7 @@ window.isActionAllowed = function (viewName, actionId) {
     if (actId === 'add' || actId === 'edit') return true;
     if (actId === 'delete') return false;
   }
-  if (['oppotunity', 'oppo', 'opportunity', 'service_delivery_contract', 'service_task_request'].includes(viewKey)) {
+  if (['oppotunity', 'oppo', 'opportunity', 'service_delivery_contract', 'service_task_request', 'service_contract', 'service_contracts'].includes(viewKey)) {
     if (actId === 'add' || actId === 'edit' || actId === 'delete') return true;
   }
 
@@ -64,6 +64,24 @@ window.isActionAllowed = function (viewName, actionId) {
   }
 
   return false;
+};
+
+// Hard Delete is controlled by action rules `hard_delete_<table>` (permissions map key: 'hard_delete').
+// A rule for the view wins (it may also disable hard delete); with no rule at all only Super Admin may.
+window.isHardDeleteAllowed = function (viewName) {
+  const isSuper = !!(authUser && authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN');
+  const rules = window.userActionPermissions && window.userActionPermissions['hard_delete'];
+  if (!rules) return isSuper;
+  const viewKey = String(viewName || '').toLowerCase();
+  const candidates = [viewKey];
+  if (['my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team'].includes(viewKey)) candidates.push('request');
+  if (viewKey === 'employee_active') candidates.push('employee');
+  if (viewKey === 'service_contract' || viewKey === 'service_contracts') candidates.push('contract');
+  if (viewKey === 'opportunity' || viewKey === 'oppo') candidates.push('oppotunity');
+  for (const k of candidates) {
+    if (rules[k] !== undefined) return rules[k];
+  }
+  return isSuper;
 };
 
 window.isActionAllowedWithContext = function (childKey, actionId, parentKey) {
@@ -468,6 +486,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       console.error('Error fetching setup status:', err);
       window.setupCompleted = true; // default on error
+    }
+    if (typeof getSelectOptions === 'function') {
+      getSelectOptions('employee').catch(() => {});
+    }
+    // Warm the remaining dropdown sources when the browser is idle so Add forms open instantly
+    if (typeof warmLookups === 'function' && typeof runWhenIdle === 'function') {
+      setTimeout(() => runWhenIdle(() => warmLookups().catch(() => {})), 1500);
     }
   }
 

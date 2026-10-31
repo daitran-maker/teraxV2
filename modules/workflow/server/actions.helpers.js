@@ -156,7 +156,8 @@ const ALLOWED_TABLES = [
   'ticket_type', 'ticket_comment',
   'v_finance', 'finance',
   'v_department', 'v_department_select', 'target_table',
-  'assigned_task', 'task_subtask', 'request_rating', 'expense'
+  'assigned_task', 'task_subtask', 'request_rating', 'expense',
+  'service_delivery_contract', 'service_task_request'
 ];
 
 function isValidTable(tableName) {
@@ -218,6 +219,14 @@ const ACTION_LOGIC = {
       const sr = getRecordStatusId(r, 'request', 'sr_status');
       const pr = getRecordStatusId(r, 'request', 'process_status');
       return sr !== 1 && (pr === 8 || pr === 9); // Not Draft (1), and is Processing (8) or Completed (9)
+    }
+  },
+  'ACT-OPPO-02': {
+    label: 'Elements',
+    color: 'var(--accent)',
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="19" height="19" fill="none" style="vertical-align: middle;"><path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><text x="10" y="14" font-size="8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="bold" fill="currentColor" style="stroke:none;">E</text></svg>`,
+    when: (r) => {
+      return !r.deleted_at;
     }
   },
   'ACT-REQUEST-03': {

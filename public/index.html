@@ -310,18 +310,18 @@
               <span id="notificationBadge" style="display:none; position:absolute; top:2px; right:4px; background:var(--accent-red); color:white; font-size:9px; font-weight:bold; border-radius:10px; padding:2px 4px; line-height:1;">0</span>
             </button>
           
-          <div id="notificationDropdown" class="notification-dropdown" style="display:none; position:absolute; right:0; top:45px; width:350px; background:rgba(255, 255, 255, 0.98); backdrop-filter: blur(20px); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); z-index:100; max-height:400px; flex-direction:column; overflow:hidden;">
-            <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--bg-default);">
-              <h4 style="margin:0; font-size:15px; font-weight:600; color:var(--text);" data-i18n="dash.noti.title">Notifications</h4>
-              <button class="btn btn-sm" style="font-size:12px; background:transparent; border:none; color:var(--accent); cursor:pointer;" onclick="markAllNotificationsRead()" data-i18n="dash.noti.mark_all_read">Mark all as read</button>
+          <div id="notificationDropdown" class="notification-dropdown" style="display:none; position:absolute; right:0; top:45px; width:360px; background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); z-index:100; max-height:420px; flex-direction:column; overflow:hidden;">
+            <div style="padding:14px 16px; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; background:#F9FAFB;">
+              <h4 style="margin:0; font-size:14px; font-weight:700; color:#111827;" data-i18n="dash.noti.title">Notifications</h4>
+              <button class="btn btn-sm notif-mark-all-btn" style="font-size:12px; font-weight:500; background:transparent; border:none; color:#374151; cursor:pointer; padding:2px 6px;" onclick="markAllNotificationsRead()" data-i18n="dash.noti.mark_all_read">Mark all as read</button>
             </div>
-            <div id="notificationList" style="overflow-y:auto; flex:1; padding:0; margin:0; list-style:none;">
-               <div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;" data-i18n="dash.noti.empty">No notifications</div>
+            <div id="notificationList" style="overflow-y:auto; flex:1; padding:0; margin:0; list-style:none; background:#FFFFFF;">
+               <div style="padding:24px 20px; text-align:center; color:#4B5563; font-size:13px; font-weight:500;" data-i18n="dash.noti.empty">No notifications</div>
             </div>
-            <div id="notificationPagination" style="padding:10px 15px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--bg-default); font-size:12px; gap:8px; flex-shrink:0;">
-              <button id="notifPrevBtn" class="btn btn-sm" style="font-size:11px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; padding:4px 8px; border-radius:4px; transition: all 0.2s;" onclick="changeNotificationPage(-1)" data-i18n="table.prev">Prev</button>
-              <span id="notifPageInfo" style="color:var(--text-muted); font-weight:500;">Page 1 of 1</span>
-              <button id="notifNextBtn" class="btn btn-sm" style="font-size:11px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; padding:4px 8px; border-radius:4px; transition: all 0.2s;" onclick="changeNotificationPage(1)" data-i18n="table.next">Next</button>
+            <div id="notificationPagination" style="padding:10px 16px; border-top:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; background:#F9FAFB; font-size:12px; gap:8px; flex-shrink:0;">
+              <button id="notifPrevBtn" class="btn btn-sm notif-nav-btn" style="font-size:11px; font-weight:500; background:#FFFFFF; border:1px solid #D1D5DB; color:#374151; cursor:pointer; padding:4px 10px; border-radius:4px; transition: all 0.15s ease;" onclick="changeNotificationPage(-1)" data-i18n="table.prev">Prev</button>
+              <span id="notifPageInfo" style="color:#374151; font-weight:500; font-size:12px;">Page 1 of 1</span>
+              <button id="notifNextBtn" class="btn btn-sm notif-nav-btn" style="font-size:11px; font-weight:500; background:#FFFFFF; border:1px solid #D1D5DB; color:#374151; cursor:pointer; padding:4px 10px; border-radius:4px; transition: all 0.15s ease;" onclick="changeNotificationPage(1)" data-i18n="table.next">Next</button>
             </div>
           </div>
         </div>
@@ -573,42 +573,42 @@
   <script src="js/config/enums.js?v=1050"></script>
   <script src="modules/organization/client/organization.config.js?v=1126"></script>
   <script src="modules/request/client/request.config.js?v=1050"></script>
-  <script src="modules/payment/client/payment.config.js?v=1197"></script>
-  <script src="modules/invoice/client/invoice.config.js?v=1115"></script>
+  <script src="modules/payment/client/payment.config.js?v=1212"></script>
+  <script src="modules/invoice/client/invoice.config.js?v=1212"></script>
   <script src="modules/expense/client/expense.config.js?v=1050"></script>
   <script src="modules/finance/client/finance.config.js?v=1050"></script>
-  <script src="modules/contract/client/contract.config.js?v=1050"></script>
+  <script src="modules/contract/client/contract.config.js?v=1207"></script>
   <script src="modules/asset/client/asset.config.js?v=1050"></script>
   <script src="modules/service/client/service.config.js?v=1115"></script>
   <script src="modules/target_table/client/target_table.config.js?v=1128"></script>
   <script src="modules/support/client/support.config.js?v=1050"></script>
-  <script src="modules/system/client/system.config.js?v=1202"></script>
-  <script src="modules/service_delivery/client/service_delivery.config.js?v=1200"></script>
+  <script src="modules/system/client/system.config.js?v=1209"></script>
+  <script src="modules/service_delivery/client/service_delivery.config.js?v=1207"></script>
   <script src="config.js?v=1050"></script>
-  <script src="js/core/uiHelpers.js?v=1191"></script>
+  <script src="js/core/uiHelpers.js?v=1216"></script>
+  <script src="js/services/permissionService.js?v=1216"></script>
+  <script src="js/services/recordPolicyService.js?v=1216"></script>
+  <script src="js/services/syncService.js?v=1216"></script>
   <script src="app.js?v=1050"></script>
   <script src="js/services/exportService.js?v=1050"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" defer></script>
   <script src="js/views/kanbanView.js?v=1050"></script>
   <script src="js/views/setupWizard.js?v=1166" charset="UTF-8"></script>
   <script src="js/components/userSwitcher.js?v=1141"></script>
-  <script src="js/components/searchableDropdown.js?v=1130"></script>
-  <script src="js/services/bulkActionService.js?v=1150"></script>
+  <script src="js/components/searchableDropdown.js?v=1131"></script>
+  <script src="js/services/bulkActionService.js?v=1216"></script>
   <script src="js/views/myViewsDashboard.js?v=1190"></script>
   <script src="js/components/inlineComments.js?v=1150"></script>
   <script src="js/services/deleteService.js?v=1150"></script>
   <script src="js/views/financeSummary.js?v=1150"></script>
-  <script src="js/views/childTableView.js?v=1202"></script>
-  <script src="js/services/lookupService.js?v=1150"></script>
+  <script src="js/views/childTableView.js?v=1203"></script>
+  <script src="js/services/lookupService.js?v=1216"></script>
   <script src="js/core/tabRouter.js?v=1202"></script>
   <script src="js/views/automationView.js?v=1150"></script>
-  <script src="js/views/tableView.js?v=1190"></script>
-  <script src="js/views/detailView.js?v=1202"></script>
-  <script src="js/views/formModal.js?v=1190"></script>
+  <script src="js/views/tableView.js?v=1216"></script>
+  <script src="js/views/detailView.js?v=1216"></script>
+  <script src="js/views/formModal.js?v=1214"></script>
   <script src="js/views/fieldHandlers.js?v=1150"></script>
-  <script src="js/services/syncService.js?v=1151"></script>
-  <script src="js/services/recordPolicyService.js?v=1190"></script>
-  <script src="js/services/permissionService.js?v=1150"></script>
   <script src="notifications.js?v=1150"></script>
   <script src="dashboard.js?v=1150"></script>
 

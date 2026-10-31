@@ -32,6 +32,14 @@ async function initDb() {
       console.warn('[Extension] Service delivery install error:', extErr.message);
     }
 
+    // ── Related Employees Extension Installer ──
+    try {
+      const installRelatedEmployees = require('../../modules/related_employees/install');
+      await installRelatedEmployees(pool);
+    } catch (extErr) {
+      console.warn('[Extension] Related employees install error:', extErr.message);
+    }
+
     // ── Status Catalog for Opportunity & Service Delivery ──
     try {
       const fs = require('fs');

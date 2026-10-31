@@ -252,7 +252,7 @@ router.get('/my-action-permissions', async (req, res) => {
       }
 
       // Detect CRUD action_id format: add_viewname, edit_viewname, delete_viewname
-      const crudMatch = rawActionId.match(/^(add|edit|delete)_(.+)$/i);
+      const crudMatch = rawActionId.match(/^(add|edit|delete|hard_delete)_(.+)$/i);
       if (crudMatch) {
         const verb = crudMatch[1].toLowerCase();      // 'add', 'edit', 'delete'
         const viewSuffix = crudMatch[2].toLowerCase(); // e.g. 'employee', 'payment'

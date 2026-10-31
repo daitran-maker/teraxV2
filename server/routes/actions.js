@@ -83,7 +83,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
       if (rule.display === false || String(rule.display).toLowerCase() === 'false') return false;
       // Exclude CRUD permission rules (add_*, edit_*, delete_*) — these control
       // the toolbar Add/Edit/Delete buttons, NOT custom workflow action buttons.
-      if (/^(add|edit|delete)(_.*)?$/i.test(rule.action_id || '')) return false;
+      if (/^(add|edit|delete|hard_delete)(_.*)?$/i.test(rule.action_id || '')) return false;
       if (tableName === 'ticket' && !allowedTicketActions.includes(rule.action_id)) return false;
       if (!rule.view_name) return true;
       const views = rule.view_name.split(',').map(v => v.trim().replace(/^\[|\]$/g, '').toLowerCase());
@@ -101,7 +101,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
           const parts = roleStr.split('.');
           if (parts.length === 2) {
             const refCol = parts[0].toLowerCase(); // e.g., 'request'
-            const foreignKeyVal = record[refCol] || record[refCol + '_id'];
+            const foreignKeyVal = record[refCol] || record[refCol + '_id'] || record['id__' + refCol];
             if (foreignKeyVal && typeof foreignKeyVal === 'string' && !parentRecords[refCol]) {
               // Predict PK as table_id (e.g., request -> request_id)
               const pk = `${refCol}_id`;
@@ -676,10 +676,11 @@ router.post('/execute', async (req, res) => {
               const parts = roleStr.split('.');
               if (parts.length === 2) {
                 const refCol = parts[0].toLowerCase(); // e.g., 'request'
-                if (record[refCol] && typeof record[refCol] === 'string' && !parentRecords[refCol]) {
+                const foreignKeyVal = record[refCol] || record[refCol + '_id'] || record['id__' + refCol];
+                if (foreignKeyVal && typeof foreignKeyVal === 'string' && !parentRecords[refCol]) {
                   const pk = `${refCol}_id`;
                   try {
-                    const pRes = await client.query(`SELECT * FROM "${refCol}" WHERE "${pk}" = $1`, [record[refCol]]);
+                    const pRes = await client.query(`SELECT * FROM "${refCol}" WHERE "${pk}" = $1`, [foreignKeyVal]);
                     if (pRes.rows.length > 0) parentRecords[refCol] = pRes.rows[0];
                   } catch (err) {
                     console.log(`Dynamic dot notation fetch failed for ${refCol}:`, err.message);
@@ -800,7 +801,7 @@ router.post('/execute', async (req, res) => {
     // Execute logic based on action_id
     if (action_id === 'ACT-REQUEST-01' || action_id === 'change_sr_owner') {
       await requestActions.changeSrOwner({ client, record, record_id, user, action_id, data: req.body.data });
-    } else if (action_id === 'ACT-REQUEST-02') {
+    } else if (action_id === 'ACT-REQUEST-02' || action_id === 'ACT-OPPO-02') {
       await requestActions.updateElements({ client, record, record_id, user, action_id, data: req.body.data });
     } else if (action_id === 'ACT-REQUEST-03' || action_id === 'ACT-REQUEST-03-RE') {
       await requestActions.rateRequest({ client, record, record_id, user, action_id, data: req.body.data });

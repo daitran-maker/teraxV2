@@ -38,7 +38,7 @@
       { key: 'department_id', label: 'DEPARTMENT', type: 'select', optionsFrom: 'department', optionValue: 'department_id', optionLabel: 'department_label' },
       { key: 'contract_name_or_description', label: 'CONTRACT NAME OR DESCRIPTION', type: 'textarea', full: true, required: true },
       { key: 'type', label: 'CONTRACT TYPE', labelKey: 'col.contract_type', type: 'select', options: [{ value: 69, label: 'Selling' }, { value: 70, label: 'Buying' }], required: true, onchange: 'handleContractTypeChange(this)' },
-      { key: 'currency', label: 'CURRENCY', type: 'select', options: ['VND', 'USD', 'EUR', 'MMK', 'SGD', 'THB'], required: true, onchange: 'handleContractValueChange()' },
+      { key: 'currency', label: 'CURRENCY', type: 'select', optionsFrom: 'cms_currency', optionValue: 'code', optionLabel: 'label', required: true, onchange: 'handleContractValueChange()' },
       { key: 'exchance_rate', label: 'EXCHANGE RATE', type: 'text', required: true, onchange: 'handleContractValueChange()' },
       { key: 'value_before_vat', label: 'VALUE BEFORE VAT', labelKey: 'col.value_before_vat', type: 'text', required: true, onchange: 'handleContractValueChange()' },
       { key: 'value_before_vat_in_base_currency', label: 'VALUE BEFORE VAT IN BASE CURRENCY', labelKey: 'col.value_before_vat_in_base_currency', type: 'text', createReadonly: true, editReadonly: true },
@@ -80,7 +80,7 @@
       const t = tm[r.type] || (typeof r.type === 'string' && isNaN(r.type) ? r.type : '');
       return [t, r.contractspood_no, r.contract_name_or_description || r.contract_id].filter(Boolean).join(' | ');
     },
-    children: ['invoice', 'payment']
+    children: ['invoice', 'payment', 'service_delivery_contract']
   }
   });
 })();

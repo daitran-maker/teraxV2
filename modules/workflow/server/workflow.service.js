@@ -57,7 +57,7 @@ class WorkflowService {
 
     const rules = rulesResult.rows.filter(rule => {
       if (rule.display === false || String(rule.display).toLowerCase() === 'false') return false;
-      if (/^(add|edit|delete)(_.*)?$/i.test(rule.action_id || '')) return false;
+      if (/^(add|edit|delete|hard_delete)(_.*)?$/i.test(rule.action_id || '')) return false;
       if (baseTable === 'ticket' && !allowedTicketActions.includes(rule.action_id)) return false;
       if (!rule.view_name) return true;
       const views = rule.view_name.split(',').map(v => v.trim().replace(/^\[|\]$/g, '').toLowerCase());

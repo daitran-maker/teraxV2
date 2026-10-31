@@ -90,8 +90,7 @@ window.handleRowCheckboxChange = async function (moduleKey) {
               <span>Delete (${ids.length})</span>
             </button>
           `;
-          const isSuperAdmin = authUser && authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN';
-          if (isSuperAdmin) {
+          if (typeof window.isHardDeleteAllowed === 'function' && window.isHardDeleteAllowed(moduleKey)) {
             actionsHTML += `
               <button class="btn btn-sm" style="background: #FFF5F5; border: 1px solid #FECACA; color: #EF4444; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'" onclick="deleteSelected('${moduleKey}', ${JSON.stringify(ids).replace(/"/g, '&quot;')}, true)">
                 <span class="material-symbols-rounded" style="font-size:15px; color: #EF4444;">delete_forever</span>

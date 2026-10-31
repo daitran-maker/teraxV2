@@ -183,6 +183,7 @@ function isNumericFieldKey(key, type) {
     k === 'asset' ||
     k.includes('selling') ||
     k.includes('buying') ||
+    k.includes('revenue') ||
     k.includes('paid_') ||
     k.includes('_paid')
   ) {
@@ -423,7 +424,7 @@ function applyChildTablePagination(container, childKey, tabPane = null) {
         }
         return '';
       }
-      return `<button class="btn pagination-page-btn ct-page-btn${isActive ? ' is-active' : ''}" data-page="${pageNum}" style="height:28px !important;width:28px !important;min-width:28px !important;padding:0 !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;font-size:12px !important;border:1px solid ${isActive ? '#F97316' : '#E5E7EB'} !important;border-radius:6px !important;background:${isActive ? '#FFF7ED' : '#FFFFFF'} !important;color:${isActive ? '#EA580C' : '#374151'} !important;font-weight:${isActive ? '600' : '500'} !important;cursor:pointer;transition:all 0.2s ease;">${pageNum}</button>`;
+      return `<button class="btn pagination-page-btn ct-page-btn${isActive ? ' is-active' : ''}" data-page="${pageNum}" style="height:28px !important;width:28px !important;min-width:28px !important;padding:0 !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;font-size:12px !important;border:1px solid ${isActive ? '#9CA3AF' : '#E5E7EB'} !important;border-radius:6px !important;background:${isActive ? '#FFF7ED' : '#FFFFFF'} !important;color:${isActive ? '#EA580C' : '#374151'} !important;font-weight:${isActive ? '600' : '500'} !important;cursor:pointer;transition:all 0.2s ease;">${pageNum}</button>`;
     }).join('');
   }
 
@@ -1372,9 +1373,10 @@ function rowMatchesClientFilters(moduleKey, row, excludeKey = null) {
       if (v !== undefined) rowVal = v;
     }
     rowVal = resolveLookupValue(moduleKey, key, rowVal);
+    const rawVal = row[key];
     if (filterVal instanceof Set) {
-      if (!filterVal.has(String(rowVal))) return false;
-    } else if (String(rowVal) !== String(filterVal)) {
+      if (!filterVal.has(String(rowVal)) && (rawVal === undefined || !filterVal.has(String(rawVal)))) return false;
+    } else if (String(rowVal) !== String(filterVal) && (rawVal === undefined || String(rawVal) !== String(filterVal))) {
       return false;
     }
   }
@@ -2811,9 +2813,11 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
       let limit = isClientSide ? 10000 : 50;
 
       let filterParams = '';
-      for (const [key, valSet] of Object.entries(dropdownFilters)) {
-        if (valSet && valSet.size > 0) {
-          filterParams += `&${key}=${Array.from(valSet).map(encodeURIComponent).join(',')}`;
+      if (serverFilteredModules.includes(moduleKey)) {
+        for (const [key, valSet] of Object.entries(dropdownFilters)) {
+          if (valSet && valSet.size > 0) {
+            filterParams += `&${key}=${Array.from(valSet).map(encodeURIComponent).join(',')}`;
+          }
         }
       }
 
@@ -2824,9 +2828,20 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
       }
       let endpointUrl = `${mod.endpoint}${sep}slice=${moduleKey}&page=${page}&limit=${limit}${filterParams}`;
 
-      const serverSearch = moduleStates[moduleKey]?.serverSearch;
+      const serverSearch = isClientSide ? '' : moduleStates[moduleKey]?.serverSearch;
       if (serverSearch) {
         endpointUrl += `&search=${encodeURIComponent(serverSearch)}`;
+      }
+
+      if (!moduleStates[moduleKey]) moduleStates[moduleKey] = {};
+      if (!moduleStates[moduleKey].sort_by) {
+        if (mod && mod.defaultSort) {
+          moduleStates[moduleKey].sort_by = mod.defaultSort.column;
+          moduleStates[moduleKey].sort_dir = mod.defaultSort.dir || 'DESC';
+        } else if (['oppotunity', 'opportunity', 'oppo'].includes(moduleKey)) {
+          moduleStates[moduleKey].sort_by = 'fy_recognized';
+          moduleStates[moduleKey].sort_dir = 'DESC';
+        }
       }
 
       const sortBy = moduleStates[moduleKey]?.sort_by;
@@ -2835,7 +2850,7 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
         endpointUrl += `&sort_by=${encodeURIComponent(sortBy)}&sort_dir=${encodeURIComponent(sortDir || 'DESC')}`;
       }
 
-      // FETCH DATA FIRST
+      // FETCH DATA FIRST (non-blocking for immediate table render)
       const res = await apiGet(endpointUrl);
 
       const data = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
@@ -2846,6 +2861,12 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
 
       // FIRE AND FORGET PREFETCH: Do not block the initial render!
       const fireAndForgetPromises = [prefetchLookups(moduleKey)];
+
+      if (['oppotunity', 'opportunity', 'oppo', 'service_contract', 'service_contracts', 'service_delivery_contract', 'service_task_request'].includes(moduleKey)) {
+        if (!selectCache['employee'] || !selectCache['employee'].isFullList) fireAndForgetPromises.push(getSelectOptions('employee').catch(() => []));
+        if (!selectCache['company'] || !selectCache['company'].isFullList) fireAndForgetPromises.push(getSelectOptions('company').catch(() => []));
+        if (!selectCache['my_company'] || !selectCache['my_company'].isFullList) fireAndForgetPromises.push(getSelectOptions('my_company').catch(() => []));
+      }
 
       if (moduleKey === 'employee' || moduleKey === 'employee_active') {
         fireAndForgetPromises.push(getSelectOptions('my_company').catch(() => []));
@@ -2860,15 +2881,13 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
         fireAndForgetPromises.push(getSelectOptions('company').catch(() => []));
       } else if (['account', 'mtr', 'asset', 'service', 'expense'].includes(moduleKey)) {
         fireAndForgetPromises.push(getSelectOptions('my_company').catch(() => []));
-      } else if (moduleKey === 'service_task_request') {
-        fireAndForgetPromises.push(getSelectOptions('service_delivery_contract').catch(() => []));
       }
 
       Promise.all(fireAndForgetPromises).then(() => {
         const tbody = document.getElementById(`tbody-${moduleKey}`);
         if (tbody && currentView === 'table' && currentModule === moduleKey) {
           applyAllFilters(moduleKey);
-          if (['employee', 'employee_active', 'payment', 'request', 'account', 'mtr', 'asset', 'service', 'my_company', 'department', 'request_activity_log', 'policy', 'finance', 'contract', 'company'].includes(moduleKey)) {
+          if (['employee', 'employee_active', 'payment', 'request', 'account', 'mtr', 'asset', 'service', 'my_company', 'department', 'request_activity_log', 'policy', 'finance', 'contract', 'company', 'oppotunity', 'opportunity', 'oppo', 'service_contract', 'service_contracts', 'service_delivery_contract', 'service_task_request'].includes(moduleKey)) {
             drawFilterSidebar(moduleKey);
           }
         }
@@ -2893,7 +2912,7 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
         }
         // Cache original unfiltered data for client-side filtered modules (preserves filter sidebar counts)
         const serverFilteredModules = ['employee', 'employee_active', 'payment', 'invoice', 'request', 'service', 'asset', 'mtr', 'account', 'request_activity_log', 'finance', 'contract', 'expense', 'action_rules'];
-        if (!serverFilteredModules.includes(moduleKey) && filterParams === '') {
+        if (!serverFilteredModules.includes(moduleKey)) {
           originalClientData[moduleKey] = [...data];
         }
       }
@@ -2922,7 +2941,7 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
           return '';
         }
         return `
-          <button class="btn pagination-page-btn ${isActive ? 'is-active' : ''}" onclick="changePage('${moduleKey}', ${pageNum})" style="height: 28px !important; width: 28px !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-size: 12px !important; border: 1px solid ${isActive ? '#FF6A00' : '#E5E7EB'} !important; border-radius: 6px !important; background: ${isActive ? '#FFF1E8' : '#FFFFFF'} !important; color: ${isActive ? '#FF6A00' : '#374151'} !important; font-weight: ${isActive ? '600' : '500'} !important; cursor: pointer; transition: all 0.2s ease;">${pageNum}</button>
+          <button class="btn pagination-page-btn ${isActive ? 'is-active' : ''}" onclick="changePage('${moduleKey}', ${pageNum})" style="height: 28px !important; width: 28px !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-size: 12px !important; border: 1px solid ${isActive ? '#9CA3AF' : '#E5E7EB'} !important; border-radius: 6px !important; background: ${isActive ? '#FFF1E8' : '#FFFFFF'} !important; color: ${isActive ? '#FF6A00' : '#374151'} !important; font-weight: ${isActive ? '600' : '500'} !important; cursor: pointer; transition: all 0.2s ease;">${pageNum}</button>
         `;
       }).join('');
     }
@@ -2950,12 +2969,12 @@ async function renderTableView(moduleKey, page = 1, skipFetch = false) {
 
     const dropdownFiltersHTML = buildDropdownFiltersHTML(moduleKey);
     const isSidebarModule = (moduleKey === 'employee' || moduleKey === 'employee_active' || moduleKey === 'payment' || moduleKey === 'invoice' || moduleKey === 'request' || moduleKey === 'service' || moduleKey === 'asset' || moduleKey === 'mtr' || moduleKey === 'account' || moduleKey === 'my_company' || moduleKey === 'request_activity_log' || moduleKey === 'finance' || moduleKey === 'contract' || !!(mod && mod.groupBy));
-    const noAddButtonModules = new Set(['employee', 'employee_active', 'payment', 'invoice', 'account', 'service', 'asset', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'policy', 'oppotunity', 'expense']);
+    const noAddButtonModules = new Set(['employee', 'employee_active', 'payment', 'invoice', 'account', 'service', 'asset', 'my_approval', 'my_process_owner', 'my_task', 'my_team', 'policy', 'expense', 'oppotunity', 'contract', 'service_contract', 'service_delivery_contract', 'service_task_request']);
 
     const actionsHTML = `
       ${await buildActionButtons(moduleKey)}
       ${['permissions', 'exception_rules', 'action_rules'].includes(moduleKey) ? `
-        <button class="btn btn-outline btn-sm" id="bulk-edit-btn" onclick="openBulkEditModal('${moduleKey}')" style="display: none; background: #ea580c; color: white; border-color: #ea580c;"></button>
+        <button class="btn btn-outline btn-sm" id="bulk-edit-btn" onclick="openBulkEditModal('${moduleKey}')" style="display: none; background: #ea580c; color: white; border: none;"></button>
       ` : ''}
       ${isSidebarModule ? `<button class="btn table-filter-sidebar-toggle" id="table-filter-sidebar-toggle-${moduleKey}" type="button" aria-expanded="${!window.tableFilterSidebarHidden[moduleKey]}" onclick="toggleTableFilterSidebar('${moduleKey}')"><span class="material-symbols-rounded">filter_list</span><span class="table-filter-sidebar-toggle-label">${window.tableFilterSidebarHidden[moduleKey] ? t('table.show_filter', 'Hiện filter') : t('table.hide_filter', 'Ẩn filter')}</span></button>` : ''}
       ${moduleKey === 'my_request' && dropdownFiltersHTML ? `<button class="btn btn-outline btn-sm table-filter-toggle" id="table-filter-toggle-${moduleKey}" type="button" aria-expanded="${window.tableFilterPanelOpen[moduleKey] ? 'true' : 'false'}" onclick="toggleTableFilterPanel('${moduleKey}')"><span class="material-symbols-rounded" style="font-size:16px;">filter_list</span><span class="filter-toggle-label">${window.tableFilterPanelOpen[moduleKey] ? t('table.hide_filter', 'Ẩn filter') : t('table.show_filter', 'Hiện filter')}</span></button>` : ''}
@@ -3254,28 +3273,45 @@ window.resolveVirtualColumn = function (moduleKey, colKey, row) {
       return [row.project_id, row.project_name].filter(Boolean).join(' - ');
     }
     if (colKey === 'fy_recognized') {
+      if (row.fy_recognized) return String(row.fy_recognized);
       if (!row.create_date) return '';
       const d = new Date(row.create_date);
       return isNaN(d) ? '' : d.getFullYear().toString();
     }
     if (colKey === 'fy_target_closed_date') {
+      if (row.fy_target_closed_date) return String(row.fy_target_closed_date);
       if (!row.close_date) return '';
       const d = new Date(row.close_date);
       return isNaN(d) ? '' : d.getFullYear().toString();
     }
     if (colKey === 'quarter_by_closed_date') {
+      if (row.quarter_by_closed_date) return String(row.quarter_by_closed_date);
       if (!row.close_date) return '';
       const d = new Date(row.close_date);
       if (isNaN(d)) return '';
       return `Q${Math.floor(d.getMonth() / 3) + 1}`;
     }
+    if (colKey === 'sale_lead') {
+      if (typeof resolveEmployeeLabel === 'function') {
+        const resolved = resolveEmployeeLabel(row.sale_lead);
+        if (resolved && resolved !== row.sale_lead) return resolved;
+      }
+      return row.sale_lead || '';
+    }
     if (colKey === 'sale_team') {
+      if (typeof resolveEmployeeLabel === 'function') {
+        const resolved = resolveEmployeeLabel(row.sale_team);
+        if (resolved && resolved !== row.sale_team) return resolved;
+      }
       const ids = Array.isArray(row.sale_team) ? row.sale_team : (typeof row.sale_team === 'string' ? row.sale_team.split(',').map(x => x.trim().replace(/^\[|\]$/g, '').replace(/^"|"$/g, '')).filter(Boolean) : []);
       if (!ids || ids.length === 0) return '';
-      const empOpts = window.selectCache && window.selectCache['employee'] ? window.selectCache['employee'] : [];
+      const sc = window.selectCache || (typeof selectCache !== 'undefined' ? selectCache : {});
+      const empOpts = sc['employee'] || [];
       const names = ids.map(id => {
-        const emp = empOpts.find(e => String(e.employee_id) === String(id));
-        return emp ? emp.full_name : id;
+        const cleanId = String(id).toLowerCase().trim();
+        const emp = empOpts.find(e => (e.employee_id && String(e.employee_id).toLowerCase().trim() === cleanId) || (e.id && String(e.id).toLowerCase().trim() === cleanId));
+        if (emp) return typeof formatEmployeeLabel === 'function' ? formatEmployeeLabel(emp) : (emp.full_name || id);
+        return (typeof resolveLookupValue === 'function' ? resolveLookupValue('oppotunity', 'sale_team', id) : null) || id;
       });
       return names.filter(Boolean).join(', ');
     }
@@ -4100,8 +4136,7 @@ window.toggleRowActionMenu = async function (moduleKey, pkVal, btn, event) {
             <span>Delete</span>
           </button>
         `);
-        const isSuperAdmin = authUser && authUser.role && authUser.role.toUpperCase() === 'SUPER ADMIN';
-        if (isSuperAdmin) {
+        if (typeof window.isHardDeleteAllowed === 'function' && window.isHardDeleteAllowed(moduleKey)) {
           allItems.push(`
             <button class="row-action-dropdown-item is-danger" style="background:#FFF5F5; border-top:1px solid #FFEBEB;" onclick="event.stopPropagation(); const _mk='${moduleKey}', _pv='${pkVal}', _dn='${String(displayName).replace(/'/g, "\\'")}'; closeRowActionDropdown(); setTimeout(() => { confirmHardDelete(_mk, _pv, _dn); }, 20);">
               <span class="material-symbols-rounded" style="font-size:15px; color:#EF4444;">delete_forever</span>
@@ -4208,17 +4243,27 @@ function applyAllFilters(moduleKey) {
           if (filterVal instanceof Set) {
             if (filterVal.size === 0) return true;
             let hasMatch = filterVal.has(String(rowVal));
-            if (!hasMatch && row && (key === 'my_company' || key === 'company_id' || key === 'company_entity')) {
-              const rawId = String(row.my_company || row.company_id || row.company_entity || '');
-              if (rawId && filterVal.has(rawId)) hasMatch = true;
+            if (!hasMatch && row) {
+              if (key === 'my_company' || key === 'company_id' || key === 'company_entity') {
+                const rawId = String(row.my_company || row.company_id || row.company_entity || '');
+                if (rawId && filterVal.has(rawId)) hasMatch = true;
+              } else if (key === 'sale_lead' || key === 'sale_team' || key.includes('employee')) {
+                const rawId = String(row[key] || '');
+                if (rawId && filterVal.has(rawId)) hasMatch = true;
+              }
             }
             return hasMatch;
           }
           if (!filterVal) return true;
           let hasMatch = String(rowVal) === String(filterVal);
-          if (!hasMatch && row && (key === 'my_company' || key === 'company_id' || key === 'company_entity')) {
-            const rawId = String(row.my_company || row.company_id || row.company_entity || '');
-            if (rawId && String(rawId) === String(filterVal)) hasMatch = true;
+          if (!hasMatch && row) {
+            if (key === 'my_company' || key === 'company_id' || key === 'company_entity') {
+              const rawId = String(row.my_company || row.company_id || row.company_entity || '');
+              if (rawId && String(rawId) === String(filterVal)) hasMatch = true;
+            } else if (key === 'sale_lead' || key === 'sale_team' || key.includes('employee')) {
+              const rawId = String(row[key] || '');
+              if (rawId && String(rawId) === String(filterVal)) hasMatch = true;
+            }
           }
           return hasMatch;
         };
@@ -4409,7 +4454,7 @@ function applyAllFilters(moduleKey) {
             return '';
           }
           return `
-               <button class="btn" onclick="changePage('${moduleKey}', ${pageNum})" style="height: 36px !important; width: 36px !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-size: 13px !important; border: 1px solid ${isActive ? '#FF6A00' : '#E5E7EB'} !important; border-radius: 6px !important; background: ${isActive ? '#FFF1E8' : '#FFFFFF'} !important; color: ${isActive ? '#FF6A00' : '#374151'} !important; font-weight: ${isActive ? '600' : '500'} !important; cursor: pointer; transition: all 0.2s ease;">${pageNum}</button>
+               <button class="btn" onclick="changePage('${moduleKey}', ${pageNum})" style="height: 36px !important; width: 36px !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-size: 13px !important; border: 1px solid ${isActive ? '#9CA3AF' : '#E5E7EB'} !important; border-radius: 6px !important; background: ${isActive ? '#FFF1E8' : '#FFFFFF'} !important; color: ${isActive ? '#FF6A00' : '#374151'} !important; font-weight: ${isActive ? '600' : '500'} !important; cursor: pointer; transition: all 0.2s ease;">${pageNum}</button>
              `;
         }).join('');
 
