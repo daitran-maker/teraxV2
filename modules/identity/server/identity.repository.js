@@ -53,8 +53,8 @@ class IdentityRepository {
     const query = `
       SELECT employee_id, username, full_name, nick_name, email, role, employee_level, position, department_id, company_id, app_user_enabled, status
       FROM employee
-      WHERE employee_id = $1
-        AND (status = 17 OR status IS NULL)
+      WHERE (employee_id = $1 OR LOWER(employee_id) = LOWER(TRIM($1)) OR LOWER(email) = LOWER(TRIM($1)) OR LOWER(username) = LOWER(TRIM($1)))
+        AND (status = 17 OR status IS NULL OR status::text = '17' OR LOWER(status::text) = 'active')
         AND deleted_at IS NULL
       LIMIT 1
     `;
