@@ -67,6 +67,9 @@ const SW_I18N_FALLBACK = {
   "en": {
     "category.title": "Category",
     "common.actions": "Actions",
+    "sw.fill_handle_tip": "Drag to fill cells",
+    "sw.select_column_tip": "Click to select entire column",
+    "sw.select_value_tip": "Select value",
     "common.add": "Add",
     "common.cancel": "Cancel",
     "common.city": "City",
@@ -373,6 +376,9 @@ const SW_I18N_FALLBACK = {
   "vi": {
     "category.title": "Danh mục",
     "common.actions": "Thao tác",
+    "sw.fill_handle_tip": "Kéo để điền các ô",
+    "sw.select_column_tip": "Click để chọn cả cột",
+    "sw.select_value_tip": "Chọn giá trị",
     "common.add": "Thêm",
     "common.cancel": "Hủy",
     "common.city": "Thành phố",
@@ -971,7 +977,7 @@ window.swAttachFillHandle = function() {
   if (!cell) return;
   const handle = document.createElement('span');
   handle.className = 'sw-fill-handle';
-  handle.title = 'Kéo để điền (fill) các ô';
+  handle.title = swT('sw.fill_handle_tip', 'Kéo để điền các ô', 'Drag to fill cells');
   handle.addEventListener('mousedown', window.swStartFillDrag);
   cell.appendChild(handle);
 };
@@ -1402,7 +1408,7 @@ window.renderSpreadsheetGrid = function(type, columns, data) {
   ths += `<th style="width:44px;min-width:44px;text-align:center;padding:6px 4px;background:#F1F5F9;border:1px solid #CBD5E1;color:#64748B;font-size:11px;font-weight:600;">${swT('common.actions', 'Thao tác')}</th>`;
 
   columns.forEach((col, cIdx) => {
-    ths += `<th class="sw-sheet-th" data-type="${type}" data-col="${col.key}" data-col-idx="${cIdx}" onclick="window.swSelectColumn('${type}', '${col.key}', ${cIdx})" title="Click để chọn cả cột">
+    ths += `<th class="sw-sheet-th" data-type="${type}" data-col="${col.key}" data-col-idx="${cIdx}" onclick="window.swSelectColumn('${type}', '${col.key}', ${cIdx})" title="${swT('sw.select_column_tip', 'Click để chọn cả cột', 'Click to select entire column')}">
       ${escapeHTML(col.label)}
     </th>`;
   });
@@ -1431,7 +1437,7 @@ window.renderSpreadsheetGrid = function(type, columns, data) {
         cellInner = `
           <div class="sw-sheet-cell-inner" ondblclick="window.swOpenCellSelect('${type}', ${i}, '${col.key}', ${cIdx})">
             <span class="sw-sheet-cell-text">${escapeHTML(displayLabel)}</span>
-            <span class="sw-sheet-cell-arrow material-symbols-rounded" onclick="event.stopPropagation(); window.swOpenCellSelect('${type}', ${i}, '${col.key}', ${cIdx})" title="Chọn giá trị">arrow_drop_down</span>
+            <span class="sw-sheet-cell-arrow material-symbols-rounded" onclick="event.stopPropagation(); window.swOpenCellSelect('${type}', ${i}, '${col.key}', ${cIdx})" title="${swT('sw.select_value_tip', 'Chọn giá trị', 'Select value')}">arrow_drop_down</span>
           </div>
           <select data-grid-type="${type}" data-row="${i}" data-col="${col.key}" data-col-idx="${cIdx}"
             onchange="window.swOnGridSelectChange('${type}', ${i}, '${col.key}', this.value)"
