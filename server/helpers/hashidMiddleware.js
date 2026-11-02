@@ -36,6 +36,9 @@ function encodeObj(obj) {
   return newObj;
 }
 
+// Endpoints whose body carries natural string keys (not hashids) that must reach the handler untouched
+const RAW_BODY_PATHS = new Set(['/auth/switch-user']);
+
 module.exports = (req, res, next) => {
   // Decode inputs
   if (req.params) {
@@ -44,7 +47,7 @@ module.exports = (req, res, next) => {
   if (req.query) {
     req.query = decodeObj(req.query);
   }
-  if (req.body) {
+  if (req.body && !RAW_BODY_PATHS.has(req.path)) {
     req.body = decodeObj(req.body);
   }
 

@@ -712,6 +712,7 @@ async function handleHashChange() {
     if (topbarTitle) topbarTitle.innerHTML = 'Dashboard';
     const topbarSubtitle = document.getElementById('topbar-subtitle');
     if (topbarSubtitle) topbarSubtitle.textContent = 'Tổng quan & Thông báo';
+    if (typeof updateGlobalStatusCards === 'function') updateGlobalStatusCards('');
     if (typeof loadHomeDashboard === 'function') {
       loadHomeDashboard();
     }
@@ -737,6 +738,8 @@ async function handleHashChange() {
     if (topbarTitle) topbarTitle.innerHTML = typeof t === 'function' ? t('module.workload_report.title', 'Workload & Hoạt Động') : 'Workload & Hoạt Động';
     const topbarSubtitle = document.getElementById('topbar-subtitle');
     if (topbarSubtitle) topbarSubtitle.textContent = typeof t === 'function' ? t('module.workload_report.subtitle', 'Theo dõi khối lượng công việc và hoạt động nhân sự (Super Admin)') : 'Theo dõi khối lượng công việc và hoạt động nhân sự (Super Admin)';
+    // The workload view has no status-badge cards: hide the row left over from a previous view
+    if (typeof updateGlobalStatusCards === 'function') updateGlobalStatusCards('');
     if (typeof loadWorkloadDashboardView === 'function') {
       loadWorkloadDashboardView();
     }
