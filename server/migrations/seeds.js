@@ -445,7 +445,7 @@ async function seedDefaultPermissions() {
     'target_table', 'request_rating',
     // Virtual dashboard views
     'my_request', 'my_approval', 'my_process_owner', 'my_task', 'my_team',
-    'cms_tenant_info', 'support', 'assigned_task', 'task_subtask',
+    'cms_tenant_info', 'support', 'assigned_task', 'task_subtask', 'workload_report',
   ];
 
   for (const name of ALL_VIEWS) {
@@ -453,6 +453,12 @@ async function seedDefaultPermissions() {
       await pool.query(
         `INSERT INTO exception_rules (name, roles) VALUES ($1, 'Super Admin,Admin')
          ON CONFLICT (name) DO UPDATE SET roles = COALESCE(exception_rules.roles, 'Super Admin,Admin')`,
+        [name]
+      );
+    } else if (name === 'workload_report') {
+      await pool.query(
+        `INSERT INTO exception_rules (name, roles) VALUES ($1, 'Super Admin')
+         ON CONFLICT (name) DO UPDATE SET roles = COALESCE(exception_rules.roles, 'Super Admin')`,
         [name]
       );
     } else if (name === 'assigned_task' || name === 'task_subtask' || name === 'support') {

@@ -715,6 +715,31 @@ async function handleHashChange() {
     if (typeof loadHomeDashboard === 'function') {
       loadHomeDashboard();
     }
+  } else if (moduleKey === 'workload_report') {
+    if (!window.userPermissionsMap) {
+      try {
+        window.userPermissionsMap = await apiGet('/permissions/my-slices');
+      } catch (err) {
+        console.error('Error loading page permissions:', err);
+      }
+    }
+    const isSuperAdmin = window.authUser && window.authUser.role && window.authUser.role.toUpperCase() === 'SUPER ADMIN';
+    if (!isSuperAdmin && window.userPermissionsMap && window.userPermissionsMap['workload_report'] === false) {
+      redirectToAccessDenied();
+      return;
+    }
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.classList.toggle('active', el.id === 'nav-workload_report');
+    });
+    currentModule = 'workload_report';
+    currentView = 'workload_dashboard';
+    const topbarTitle = document.getElementById('topbar-title');
+    if (topbarTitle) topbarTitle.innerHTML = typeof t === 'function' ? t('module.workload_report.title', 'Workload & Hoạt Động') : 'Workload & Hoạt Động';
+    const topbarSubtitle = document.getElementById('topbar-subtitle');
+    if (topbarSubtitle) topbarSubtitle.textContent = typeof t === 'function' ? t('module.workload_report.subtitle', 'Theo dõi khối lượng công việc và hoạt động nhân sự (Super Admin)') : 'Theo dõi khối lượng công việc và hoạt động nhân sự (Super Admin)';
+    if (typeof loadWorkloadDashboardView === 'function') {
+      loadWorkloadDashboardView();
+    }
   } else if (DASHBOARD_VIEWS.includes(moduleKey)) {
     // Dashboard View
     if (!window.userPermissionsMap) {

@@ -73,23 +73,26 @@ async function install(externalPool = null) {
       ALTER TABLE public.service_task_request ALTER COLUMN title TYPE TEXT;
 
       -- Columns for oppotunity (fy_recognized, fy_target_closed_date, quarter_by_closed_date)
-      IF to_regclass('public.oppotunity') IS NOT NULL THEN
-        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_recognized VARCHAR(20);
-        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_target_closed_date VARCHAR(20);
-        ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS quarter_by_closed_date VARCHAR(20);
+      DO $$
+      BEGIN
+        IF to_regclass('public.oppotunity') IS NOT NULL THEN
+          ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_recognized VARCHAR(20);
+          ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS fy_target_closed_date VARCHAR(20);
+          ALTER TABLE public.oppotunity ADD COLUMN IF NOT EXISTS quarter_by_closed_date VARCHAR(20);
 
-        UPDATE public.oppotunity
-        SET fy_recognized = to_char(create_date::date, 'YYYY')
-        WHERE create_date IS NOT NULL AND (fy_recognized IS NULL OR fy_recognized = '');
+          UPDATE public.oppotunity
+          SET fy_recognized = to_char(create_date::date, 'YYYY')
+          WHERE create_date IS NOT NULL AND (fy_recognized IS NULL OR fy_recognized = '');
 
-        UPDATE public.oppotunity
-        SET fy_target_closed_date = to_char(close_date::date, 'YYYY')
-        WHERE close_date IS NOT NULL AND (fy_target_closed_date IS NULL OR fy_target_closed_date = '');
+          UPDATE public.oppotunity
+          SET fy_target_closed_date = to_char(close_date::date, 'YYYY')
+          WHERE close_date IS NOT NULL AND (fy_target_closed_date IS NULL OR fy_target_closed_date = '');
 
-        UPDATE public.oppotunity
-        SET quarter_by_closed_date = 'Q' || to_char(close_date::date, 'Q')
-        WHERE close_date IS NOT NULL AND (quarter_by_closed_date IS NULL OR quarter_by_closed_date = '');
-      END IF;
+          UPDATE public.oppotunity
+          SET quarter_by_closed_date = 'Q' || to_char(close_date::date, 'Q')
+          WHERE close_date IS NOT NULL AND (quarter_by_closed_date IS NULL OR quarter_by_closed_date = '');
+        END IF;
+      END $$;
 
       -- Ensure service_contract table
       CREATE TABLE IF NOT EXISTS public.service_contract (

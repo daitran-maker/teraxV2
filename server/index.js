@@ -595,6 +595,7 @@ app.use('/api/my-views', require('../modules/request/server/myViews.routes'));
 app.use('/api/notifications', require('../modules/notification/server').router);
 app.use('/api/backup', require('../modules/system/server/backup.routes'));
 app.use('/api/automations', require('../modules/system/server/automations.routes'));
+app.use('/api/workload', require('./routes/workload'));
 
 // Fallback: serve index.html for all non-API routes
 // 404 handler for unmatched API routes

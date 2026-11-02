@@ -754,10 +754,561 @@ function injectSetupStyles() {
     .sw-grid-input, .sw-grid-select { width:100%; height:30px; padding:3px 8px; font-size:11.5px; border:1px solid #E2E8F0; border-radius:6px; background:#FFFFFF; color:#1E293B; font-family:inherit; box-sizing:border-box; transition:border-color 0.15s ease, box-shadow 0.15s ease; }
     .sw-grid-input:hover, .sw-grid-select:hover { border-color:#94A3B8; }
     .sw-grid-input:focus, .sw-grid-select:focus { border-color:#ea580c; outline:none; box-shadow:0 0 0 2px rgba(234,88,12,0.15); background:#FFFDF9; }
+
+    /* ─── Excel-like Spreadsheet Grid Styles ───────────────────── */
+    .sw-sheet-wrapper { border:1px solid #CBD5E1; border-radius:8px; overflow:hidden; background:#FFFFFF; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:12px; position:relative; }
+    .sw-sheet-table { width:100%; border-collapse:collapse; table-layout:auto; font-family:inherit; font-size:12px; white-space:nowrap; user-select:none; }
+    .sw-sheet-th { background:#F1F5F9; color:#334155; font-weight:600; font-size:11px; padding:7px 10px; border:1px solid #CBD5E1; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:10; cursor:pointer; user-select:none; transition:background 0.1s ease; }
+    .sw-sheet-th:hover { background:#E2E8F0; }
+    .sw-sheet-th.is-col-selected { background:#DBEAFE !important; color:#1E40AF !important; border-color:#60A5FA !important; }
+    .sw-sheet-row-num { background:#F8FAFC !important; color:#64748B; font-size:11px; font-weight:500; text-align:center; border:1px solid #CBD5E1 !important; width:36px; min-width:36px; user-select:none; }
+    
+    .sw-sheet-cell { border:1px solid #CBD5E1; padding:0; margin:0; height:32px; position:relative; background:#FFFFFF; vertical-align:middle; box-sizing:border-box; transition:background 0.05s ease; outline:none; }
+    .sw-sheet-cell.is-selected { background:#DBEAFE !important; }
+    .sw-sheet-cell.is-selected .sw-sheet-input,
+    .sw-sheet-cell.is-selected .sw-sheet-cell-text { background-color:transparent !important; color:#1E3A8A !important; }
+    .sw-sheet-cell.is-active { outline:2px solid #2563EB !important; outline-offset:-2px; z-index:5; background:#EFF6FF !important; }
+    .sw-sheet-cell.is-active .sw-sheet-input,
+    .sw-sheet-cell.is-active .sw-sheet-cell-text { background-color:transparent !important; }
+    .sw-sheet-cell.is-active::after { content:''; position:absolute; right:-2px; bottom:-2px; width:6px; height:6px; background:#2563EB; border:1px solid #FFFFFF; z-index:6; cursor:crosshair; }
+    
+    .sw-sheet-input { width:100%; height:32px; border:none !important; outline:none !important; box-shadow:none !important; background-color:transparent !important; border-radius:0 !important; padding:4px 8px; font-size:12px; font-family:inherit; color:#0F172A; box-sizing:border-box; }
+    
+    .sw-sheet-select-cell { cursor:default; }
+    .sw-sheet-cell-inner { display:flex; align-items:center; justify-content:space-between; width:100%; height:32px; padding:4px 8px; box-sizing:border-box; }
+    .sw-sheet-cell-text { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:#0F172A; pointer-events:none; }
+    .sw-sheet-cell-arrow { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:4px; color:#64748B; cursor:pointer; flex-shrink:0; margin-left:2px; transition:background 0.1s ease, color 0.1s ease; }
+    .sw-sheet-cell-arrow:hover { background:#E2E8F0; color:#1E293B; }
+
+    /* When dragging across cells, disable pointer events on child controls so mouseover reliably fires on td */
+    body.sw-grid-dragging, body.sw-grid-dragging * { user-select:none !important; -webkit-user-select:none !important; }
+    body.sw-grid-dragging .sw-sheet-input,
+    body.sw-grid-dragging .sw-sheet-cell-arrow { pointer-events:none !important; }
   `;
   document.head.appendChild(style);
 }
 injectSetupStyles();
+
+// ─── Excel Spreadsheet Interactive Engine ──────────────────────────
+window._swGridColumns = window._swGridColumns || {};
+
+window.swGridState = {
+  type: null,
+  activeCell: null,   // { type, row, colKey, colIdx }
+  anchorCell: null,   // { type, row, colKey, colIdx }
+  selectedRange: null,// { type, minRow, maxRow, minColIdx, maxColIdx }
+  selectedColKey: null,
+  isMouseDown: false,
+  isNavigating: false
+};
+
+window.getSetupParsedList = function(type) {
+  if (type === 'department') return window.setupParsedDepartments;
+  if (type === 'employee') return window.setupParsedEmployees;
+  if (type === 'policy') return window.setupParsedPolicies;
+  if (type === 'account') return window.setupParsedAccounts;
+  return null;
+};
+
+window.swGetSelectLabel = function(optsHtml, val) {
+  if (!optsHtml) return val || '';
+  const strVal = String(val != null ? val : '');
+  try {
+    const d = document.createElement('select');
+    d.innerHTML = optsHtml;
+    if (strVal !== '') {
+      d.value = strVal;
+    }
+    const opt = d.options[d.selectedIndex];
+    if (opt && opt.text) return opt.text;
+  } catch(e) {}
+  return strVal;
+};
+
+window.swOnCellMouseDown = function(type, row, colKey, colIdx, event) {
+  window.swGridState.type = type;
+  window.swGridState.isMouseDown = true;
+  document.body.classList.add('sw-grid-dragging');
+  window.swGridState.selectedColKey = null;
+
+  if (event && event.shiftKey && window.swGridState.anchorCell && window.swGridState.anchorCell.type === type) {
+    const anchor = window.swGridState.anchorCell;
+    window.swGridState.selectedRange = {
+      type,
+      minRow: Math.min(anchor.row, row),
+      maxRow: Math.max(anchor.row, row),
+      minColIdx: Math.min(anchor.colIdx, colIdx),
+      maxColIdx: Math.max(anchor.colIdx, colIdx)
+    };
+    window.swGridState.activeCell = { type, row, colKey, colIdx };
+  } else {
+    window.swGridState.anchorCell = { type, row, colKey, colIdx };
+    window.swGridState.activeCell = { type, row, colKey, colIdx };
+    window.swGridState.selectedRange = {
+      type,
+      minRow: row,
+      maxRow: row,
+      minColIdx: colIdx,
+      maxColIdx: colIdx
+    };
+  }
+  window.swRefreshGridHighlight();
+};
+
+window.swOnCellMouseOver = function(type, row, colKey, colIdx, event) {
+  if (!window.swGridState.isMouseDown || !window.swGridState.anchorCell) return;
+  if (window.swGridState.anchorCell.type !== type) return;
+
+  const anchor = window.swGridState.anchorCell;
+  window.swGridState.selectedRange = {
+    type,
+    minRow: Math.min(anchor.row, row),
+    maxRow: Math.max(anchor.row, row),
+    minColIdx: Math.min(anchor.colIdx, colIdx),
+    maxColIdx: Math.max(anchor.colIdx, colIdx)
+  };
+  window.swGridState.activeCell = { type, row, colKey, colIdx };
+  window.swRefreshGridHighlight();
+};
+
+window.swOnCellFocus = function(type, row, colKey, colIdx) {
+  if (window.swGridState.isMouseDown || window.swGridState.isNavigating) return;
+  window.swGridState.type = type;
+  window.swGridState.selectedColKey = null;
+  window.swGridState.anchorCell = { type, row, colKey, colIdx };
+  window.swGridState.activeCell = { type, row, colKey, colIdx };
+  window.swGridState.selectedRange = {
+    type,
+    minRow: row,
+    maxRow: row,
+    minColIdx: colIdx,
+    maxColIdx: colIdx
+  };
+  window.swRefreshGridHighlight();
+};
+
+if (!window._swMouseUpAttached) {
+  window._swMouseUpAttached = true;
+  document.addEventListener('mouseup', function() {
+    window.swGridState.isMouseDown = false;
+    document.body.classList.remove('sw-grid-dragging');
+  });
+}
+
+window.swSelectColumn = function(type, colKey, colIdx) {
+  const list = window.getSetupParsedList(type);
+  if (!list || !list.length) return;
+
+  window.swGridState.type = type;
+  window.swGridState.anchorCell = { type, row: 0, colKey, colIdx };
+  window.swGridState.activeCell = { type, row: 0, colKey, colIdx };
+  window.swGridState.selectedColKey = colKey;
+  window.swGridState.selectedRange = {
+    type,
+    minRow: 0,
+    maxRow: list.length - 1,
+    minColIdx: colIdx,
+    maxColIdx: colIdx
+  };
+  window.swRefreshGridHighlight();
+};
+
+window.swRefreshGridHighlight = function() {
+  document.querySelectorAll('.sw-sheet-cell').forEach(el => {
+    el.classList.remove('is-selected', 'is-active');
+  });
+  document.querySelectorAll('.sw-sheet-th').forEach(el => {
+    el.classList.remove('is-col-selected');
+  });
+
+  const state = window.swGridState;
+  if (!state || !state.type) return;
+
+  const cols = window._swGridColumns[state.type] || [];
+
+  if (state.selectedRange) {
+    const { type, minRow, maxRow, minColIdx, maxColIdx } = state.selectedRange;
+    for (let c = minColIdx; c <= maxColIdx; c++) {
+      const col = cols[c];
+      if (!col) continue;
+      for (let r = minRow; r <= maxRow; r++) {
+        const cell = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${r}"][data-col="${col.key}"]`);
+        if (cell) {
+          cell.classList.add('is-selected');
+          if (state.activeCell && state.activeCell.row === r && state.activeCell.colKey === col.key) {
+            cell.classList.add('is-active');
+          }
+        }
+      }
+    }
+  } else if (state.activeCell) {
+    const cell = document.querySelector(`.sw-sheet-cell[data-type="${state.activeCell.type}"][data-row="${state.activeCell.row}"][data-col="${state.activeCell.colKey}"]`);
+    if (cell) {
+      cell.classList.add('is-active', 'is-selected');
+    }
+  }
+
+  if (state.selectedColKey) {
+    const th = document.querySelector(`.sw-sheet-th[data-type="${state.type}"][data-col="${state.selectedColKey}"]`);
+    if (th) th.classList.add('is-col-selected');
+  }
+};
+
+window.swNavigateCell = function(type, targetRow, targetColIdx, isShift) {
+  const list = window.getSetupParsedList(type);
+  const cols = window._swGridColumns[type] || [];
+  if (!list || !list.length || !cols.length) return;
+
+  targetRow = Math.max(0, Math.min(list.length - 1, targetRow));
+  targetColIdx = Math.max(0, Math.min(cols.length - 1, targetColIdx));
+  const colKey = cols[targetColIdx].key;
+
+  if (isShift && window.swGridState.anchorCell && window.swGridState.anchorCell.type === type) {
+    const anchor = window.swGridState.anchorCell;
+    window.swGridState.selectedRange = {
+      type,
+      minRow: Math.min(anchor.row, targetRow),
+      maxRow: Math.max(anchor.row, targetRow),
+      minColIdx: Math.min(anchor.colIdx, targetColIdx),
+      maxColIdx: Math.max(anchor.colIdx, targetColIdx)
+    };
+    window.swGridState.activeCell = { type, row: targetRow, colKey, colIdx: targetColIdx };
+  } else {
+    window.swGridState.anchorCell = { type, row: targetRow, colKey, colIdx: targetColIdx };
+    window.swGridState.activeCell = { type, row: targetRow, colKey, colIdx: targetColIdx };
+    window.swGridState.selectedRange = {
+      type,
+      minRow: targetRow,
+      maxRow: targetRow,
+      minColIdx: targetColIdx,
+      maxColIdx: targetColIdx
+    };
+    window.swGridState.selectedColKey = null;
+  }
+
+  window.swRefreshGridHighlight();
+
+  // Focus element while preventing focus-event from wiping selection
+  window.swGridState.isNavigating = true;
+  const inputEl = document.querySelector(`.sw-sheet-table input[data-grid-type="${type}"][data-row="${targetRow}"][data-col="${colKey}"]`);
+  const cellEl = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${targetRow}"][data-col="${colKey}"]`);
+  const targetEl = inputEl || cellEl;
+  if (targetEl) {
+    targetEl.focus();
+    if (typeof targetEl.select === 'function' && !isShift && targetEl.tagName === 'INPUT') {
+      targetEl.select();
+    }
+  }
+  window.swGridState.isNavigating = false;
+};
+
+window.swOpenCellSelect = function(type, row, colKey, colIdx) {
+  const sel = document.querySelector(`.sw-sheet-table select[data-grid-type="${type}"][data-row="${row}"][data-col="${colKey}"]`);
+  if (!sel) return;
+
+  window.swGridState.type = type;
+  window.swGridState.anchorCell = { type, row, colKey, colIdx };
+  window.swGridState.activeCell = { type, row, colKey, colIdx };
+  window.swGridState.selectedRange = { type, minRow: row, maxRow: row, minColIdx: colIdx, maxColIdx: colIdx };
+  window.swRefreshGridHighlight();
+
+  if (typeof sel.showPicker === 'function') {
+    try {
+      sel.showPicker();
+      return;
+    } catch(e) {}
+  }
+
+  // Fallback: temporarily reveal and focus
+  sel.style.pointerEvents = 'auto';
+  sel.style.opacity = '1';
+  sel.focus();
+  sel.onblur = function() {
+    sel.style.pointerEvents = 'none';
+    sel.style.opacity = '0';
+  };
+};
+
+window.swOnGridSelectChange = function(type, row, colKey, val) {
+  window.updateParsedGridCell(type, row, colKey, val);
+  const cellText = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${row}"][data-col="${colKey}"] .sw-sheet-cell-text`);
+  const sel = document.querySelector(`.sw-sheet-table select[data-grid-type="${type}"][data-row="${row}"][data-col="${colKey}"]`);
+  if (cellText && sel && sel.options[sel.selectedIndex]) {
+    cellText.textContent = sel.options[sel.selectedIndex].text;
+  }
+  if (sel) {
+    sel.style.pointerEvents = 'none';
+    sel.style.opacity = '0';
+  }
+};
+
+window.swFillDown = function(type) {
+  const list = window.getSetupParsedList(type);
+  const cols = window._swGridColumns[type] || [];
+  if (!list || !list.length || !cols.length) return;
+
+  const state = window.swGridState;
+  let minRow, maxRow, minColIdx, maxColIdx;
+  if (state.selectedRange) {
+    minRow = state.selectedRange.minRow;
+    maxRow = state.selectedRange.maxRow;
+    minColIdx = state.selectedRange.minColIdx;
+    maxColIdx = state.selectedRange.maxColIdx;
+  } else if (state.activeCell) {
+    minRow = state.activeCell.row;
+    maxRow = list.length - 1;
+    minColIdx = state.activeCell.colIdx;
+    maxColIdx = state.activeCell.colIdx;
+  } else {
+    return;
+  }
+
+  if (minRow === maxRow) {
+    maxRow = list.length - 1;
+  }
+  if (minRow >= maxRow) return;
+
+  for (let c = minColIdx; c <= maxColIdx; c++) {
+    const colKey = cols[c].key;
+    const sourceVal = list[minRow] ? list[minRow][colKey] : undefined;
+    if (sourceVal === undefined) continue;
+
+    for (let r = minRow + 1; r <= maxRow; r++) {
+      if (list[r]) {
+        list[r][colKey] = sourceVal;
+        const inputEl = document.querySelector(`.sw-sheet-table input[data-grid-type="${type}"][data-row="${r}"][data-col="${colKey}"]`);
+        if (inputEl) {
+          inputEl.value = sourceVal != null ? sourceVal : '';
+        }
+        const selEl = document.querySelector(`.sw-sheet-table select[data-grid-type="${type}"][data-row="${r}"][data-col="${colKey}"]`);
+        if (selEl) {
+          selEl.value = sourceVal != null ? sourceVal : '';
+          const cellText = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${r}"][data-col="${colKey}"] .sw-sheet-cell-text`);
+          if (cellText) {
+            const opt = selEl.options[selEl.selectedIndex];
+            cellText.textContent = opt ? opt.text : (sourceVal || '');
+          }
+        }
+      }
+    }
+  }
+
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
+  }
+
+  window.swGridState.selectedRange = { type, minRow, maxRow, minColIdx, maxColIdx };
+  window.swRefreshGridHighlight();
+};
+
+window.swFillRight = function(type) {
+  const list = window.getSetupParsedList(type);
+  const cols = window._swGridColumns[type] || [];
+  if (!list || !list.length || !cols.length) return;
+
+  const state = window.swGridState;
+  if (!state.selectedRange) return;
+
+  const { minRow, maxRow, minColIdx, maxColIdx } = state.selectedRange;
+  if (minColIdx >= maxColIdx) return;
+
+  const sourceColKey = cols[minColIdx].key;
+  for (let r = minRow; r <= maxRow; r++) {
+    const sourceVal = list[r] ? list[r][sourceColKey] : undefined;
+    if (sourceVal === undefined) continue;
+
+    for (let c = minColIdx + 1; c <= maxColIdx; c++) {
+      const targetColKey = cols[c].key;
+      list[r][targetColKey] = sourceVal;
+      const inputEl = document.querySelector(`.sw-sheet-table input[data-grid-type="${type}"][data-row="${r}"][data-col="${targetColKey}"]`);
+      if (inputEl) {
+        inputEl.value = sourceVal != null ? sourceVal : '';
+      }
+      const selEl = document.querySelector(`.sw-sheet-table select[data-grid-type="${type}"][data-row="${r}"][data-col="${targetColKey}"]`);
+      if (selEl) {
+        selEl.value = sourceVal != null ? sourceVal : '';
+        const cellText = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${r}"][data-col="${targetColKey}"] .sw-sheet-cell-text`);
+        if (cellText) {
+          const opt = selEl.options[selEl.selectedIndex];
+          cellText.textContent = opt ? opt.text : (sourceVal || '');
+        }
+      }
+    }
+  }
+
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
+  }
+
+  window.swRefreshGridHighlight();
+};
+
+if (!window._swKeyboardAttached) {
+  window._swKeyboardAttached = true;
+  document.addEventListener('keydown', function(e) {
+    const activeEl = document.activeElement;
+    const table = activeEl ? activeEl.closest('.sw-sheet-table') : null;
+    const wrapper = activeEl ? activeEl.closest('.sw-sheet-wrapper') : null;
+
+    // STRICT SCOPING: Only handle keyboard events if user is currently inside the spreadsheet grid!
+    if (!table && !wrapper) {
+      return;
+    }
+
+    const cell = activeEl ? activeEl.closest('.sw-sheet-cell') : null;
+    const type = (cell && cell.dataset.type) || (table && table.dataset.type) || window.swGridState.type;
+    if (!type) return;
+
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const key = e.key;
+
+    // Ctrl + D (Fill Down) and Ctrl + R (Fill Right)
+    if (isCtrl && (key === 'd' || key === 'D' || key === 'r' || key === 'R')) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (key === 'd' || key === 'D') {
+        window.swFillDown(type);
+      } else {
+        window.swFillRight(type);
+      }
+      return;
+    }
+
+    // Open dropdown picker on Alt+Down or Enter / Space when focused on select cell
+    if ((e.altKey && key === 'ArrowDown') || ((key === 'Enter' || key === ' ') && cell && cell.classList.contains('sw-sheet-select-cell'))) {
+      if (window.swGridState.activeCell) {
+        e.preventDefault();
+        window.swOpenCellSelect(type, window.swGridState.activeCell.row, window.swGridState.activeCell.colKey, window.swGridState.activeCell.colIdx);
+        return;
+      }
+    }
+
+    // Arrow Key & Enter & Tab Navigation
+    if (window.swGridState.activeCell && window.swGridState.activeCell.type === type) {
+      const curRow = window.swGridState.activeCell.row;
+      const curColIdx = window.swGridState.activeCell.colIdx;
+      const cols = window._swGridColumns[type] || [];
+      const list = window.getSetupParsedList(type) || [];
+      const isInput = activeEl && activeEl.tagName === 'INPUT';
+
+      if (key === 'ArrowUp') {
+        e.preventDefault();
+        window.swNavigateCell(type, curRow - 1, curColIdx, e.shiftKey);
+      } else if (key === 'ArrowDown') {
+        e.preventDefault();
+        window.swNavigateCell(type, curRow + 1, curColIdx, e.shiftKey);
+      } else if (key === 'Enter') {
+        e.preventDefault();
+        window.swNavigateCell(type, curRow + 1, curColIdx, false);
+      } else if (key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (curColIdx > 0) {
+            window.swNavigateCell(type, curRow, curColIdx - 1, false);
+          } else if (curRow > 0) {
+            window.swNavigateCell(type, curRow - 1, cols.length - 1, false);
+          }
+        } else {
+          if (curColIdx < cols.length - 1) {
+            window.swNavigateCell(type, curRow, curColIdx + 1, false);
+          } else if (curRow < list.length - 1) {
+            window.swNavigateCell(type, curRow + 1, 0, false);
+          }
+        }
+      } else if (key === 'ArrowLeft') {
+        const atStart = !isInput || (activeEl.selectionStart === 0 && activeEl.selectionEnd === 0);
+        if (atStart || e.shiftKey || !isInput) {
+          e.preventDefault();
+          window.swNavigateCell(type, curRow, curColIdx - 1, e.shiftKey);
+        }
+      } else if (key === 'ArrowRight') {
+        const atEnd = !isInput || (activeEl.selectionStart === activeEl.value.length && activeEl.selectionEnd === activeEl.value.length);
+        if (atEnd || e.shiftKey || !isInput) {
+          e.preventDefault();
+          window.swNavigateCell(type, curRow, curColIdx + 1, e.shiftKey);
+        }
+      }
+    }
+  });
+}
+
+window.renderSpreadsheetGrid = function(type, columns, data) {
+  const list = data || [];
+  if (!list.length) return '';
+
+  window._swGridColumns = window._swGridColumns || {};
+  window._swGridColumns[type] = columns;
+
+  let ths = '';
+  ths += `<th style="width:36px;min-width:36px;text-align:center;padding:6px 4px;background:#F1F5F9;border:1px solid #CBD5E1;color:#64748B;font-size:11px;font-weight:600;">#</th>`;
+  ths += `<th style="width:44px;min-width:44px;text-align:center;padding:6px 4px;background:#F1F5F9;border:1px solid #CBD5E1;color:#64748B;font-size:11px;font-weight:600;">${swT('common.actions', 'Thao tác')}</th>`;
+
+  columns.forEach((col, cIdx) => {
+    ths += `<th class="sw-sheet-th" data-type="${type}" data-col="${col.key}" data-col-idx="${cIdx}" onclick="window.swSelectColumn('${type}', '${col.key}', ${cIdx})" title="Click để chọn cả cột">
+      ${escapeHTML(col.label)}
+    </th>`;
+  });
+
+  let rowsHtml = '';
+  const maxRows = Math.min(list.length, 100);
+  for (let i = 0; i < maxRows; i++) {
+    const row = list[i];
+    let tds = '';
+    tds += `<td class="sw-sheet-row-num">${i + 1}</td>`;
+    tds += `<td style="border:1px solid #CBD5E1;text-align:center;padding:2px;background:#FFFFFF;">
+      <button type="button" onclick="window.deleteSetupParsedItem('${type}', ${i})" style="width:24px;height:24px;border-radius:4px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="${swT('common.delete', 'Xóa')}">
+        <span class="material-symbols-rounded" style="font-size:14px;color:#EF4444;">delete</span>
+      </button>
+    </td>`;
+
+    columns.forEach((col, cIdx) => {
+      const val = row[col.key] != null ? row[col.key] : '';
+      let cellInner = '';
+      let cellClass = 'sw-sheet-cell';
+
+      if (col.type === 'select') {
+        cellClass += ' sw-sheet-select-cell';
+        const optsHtml = col.optionsBuilder ? col.optionsBuilder(row, val) : '';
+        const displayLabel = window.swGetSelectLabel(optsHtml, val) || col.placeholder || '';
+        cellInner = `
+          <div class="sw-sheet-cell-inner" ondblclick="window.swOpenCellSelect('${type}', ${i}, '${col.key}', ${cIdx})">
+            <span class="sw-sheet-cell-text">${escapeHTML(displayLabel)}</span>
+            <span class="sw-sheet-cell-arrow material-symbols-rounded" onclick="event.stopPropagation(); window.swOpenCellSelect('${type}', ${i}, '${col.key}', ${cIdx})" title="Chọn giá trị">arrow_drop_down</span>
+          </div>
+          <select data-grid-type="${type}" data-row="${i}" data-col="${col.key}" data-col-idx="${cIdx}"
+            onchange="window.swOnGridSelectChange('${type}', ${i}, '${col.key}', this.value)"
+            style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;pointer-events:none;z-index:2;">
+            ${optsHtml}
+          </select>`;
+      } else {
+        const inputType = col.type || 'text';
+        const colorStyle = col.color ? `color:${col.color};` : '';
+        const weightStyle = col.weight ? `font-weight:${col.weight};` : '';
+        cellInner = `<input type="${inputType}" class="sw-sheet-input" data-grid-type="${type}" data-row="${i}" data-col="${col.key}" data-col-idx="${cIdx}" value="${escapeHTML(String(val))}" placeholder="${escapeHTML(col.placeholder || '')}" style="${colorStyle}${weightStyle}" onfocus="window.swOnCellFocus('${type}', ${i}, '${col.key}', ${cIdx})" oninput="window.updateParsedGridCell('${type}', ${i}, '${col.key}', this.value)" />`;
+      }
+
+      tds += `<td class="${cellClass}" tabindex="0" data-type="${type}" data-row="${i}" data-col="${col.key}" data-col-idx="${cIdx}" onfocus="window.swOnCellFocus('${type}', ${i}, '${col.key}', ${cIdx})" onmousedown="window.swOnCellMouseDown('${type}', ${i}, '${col.key}', ${cIdx}, event)" onmouseover="window.swOnCellMouseOver('${type}', ${i}, '${col.key}', ${cIdx}, event)">
+        ${cellInner}
+      </td>`;
+    });
+
+    rowsHtml += `<tr>${tds}</tr>`;
+  }
+
+  return `
+    <div class="sw-sheet-wrapper">
+      <div class="sw-table-scroll-container" style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+        <table class="sw-sheet-table" data-type="${type}">
+          <thead><tr>${ths}</tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>
+    <button type="button" onclick="window.addParsedGridRow('${type}')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;">
+      <span class="material-symbols-rounded" style="font-size:16px;">add</span> ${swT('sw.step2_add_row', 'Thêm dòng')}
+    </button>
+  `;
+};
 
 window.loadSetupView = async function () {
   currentModule = 'setup'; currentView = 'setup';
@@ -1896,27 +2447,14 @@ function renderStep2HTML(counts){
     let prev = '';
     const parsed = window.setupParsedDepartments || [];
     const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
+    const deptCols = [
+      { key: 'company_id', label: swT('sw.step1_company', 'Công ty *'), type: 'select', optionsBuilder: (d, val) => (typeof window.buildSetupCompanyOptions === 'function') ? window.buildSetupCompanyOptions(val || '', isVi ? 'Chọn công ty' : 'Select Company') : '<option value="' + escapeHTML(val || '1') + '">' + escapeHTML(val || '1') + '</option>' },
+      { key: 'department_code', label: swT('sw.step2_dept_code', 'Mã phòng ban *'), type: 'text', placeholder: swT('sw.step2_dept_code', 'Mã PB'), color: '#ea580c', weight: '700' },
+      { key: 'department_name', label: swT('sw.step2_dept_name', 'Tên phòng ban *'), type: 'text', placeholder: swT('sw.step2_dept_name', 'Tên phòng ban'), weight: '600' },
+      { key: 'type', label: swT('common.type', 'Loại'), type: 'select', optionsBuilder: (d, val) => ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((val || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('') },
+      { key: 'manager_email', label: swT('sw.step2_dept_manager', 'Email Quản lý'), type: 'email', placeholder: 'email@company.com', color: '#2563EB' }
+    ];
     if (parsed.length > 0) {
-      let rows = '';
-      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
-        const d = parsed[i];
-        const typeOpts = ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((d.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
-        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
-          ? window.buildSetupCompanyOptions(d.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
-          : '<option value="' + escapeHTML(d.company_id || '1') + '">' + escapeHTML(d.company_id || '1') + '</option>';
-        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
-          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
-          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
-          + '</td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'company_id\', this.value)" style="min-width:110px;">' + compOpts + '</select></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_code || '') + '" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_code\', this.value)" style="min-width:90px;font-weight:700;color:#ea580c;"></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_name || '') + '" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'type\', this.value)" style="min-width:110px;">' + typeOpts + '</select></td>'
-          + '<td style="padding:4px;"><input type="email" class="sw-grid-input" value="' + escapeHTML(d.manager_email || '') + '" placeholder="email@company.com" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'manager_email\', this.value)" style="min-width:140px;color:#2563EB;"></td>'
-          + '</tr>';
-      }
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
         + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">domain</span>'
@@ -1928,20 +2466,7 @@ function renderStep2HTML(counts){
         + '<button onclick="window.setupParsedDepartments=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
-        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
-        + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
-        + '</tr></thead>'
-        + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>'
-        + '<button type="button" onclick="window.addParsedGridRow(\'department\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
+        + window.renderSpreadsheetGrid('department', deptCols, parsed);
     }
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'department\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleDepartmentExcelUpload(event)"></label></div></div>' + prev;
   } else if(tab==='quick'){
@@ -1951,47 +2476,21 @@ function renderStep2HTML(counts){
   } else {
     const parsed = window.setupParsedDepartments || [];
     const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
+    const deptCols = [
+      { key: 'company_id', label: swT('sw.step1_company', 'Công ty *'), type: 'select', optionsBuilder: (d, val) => (typeof window.buildSetupCompanyOptions === 'function') ? window.buildSetupCompanyOptions(val || '', isVi ? 'Chọn công ty' : 'Select Company') : '<option value="' + escapeHTML(val || '1') + '">' + escapeHTML(val || '1') + '</option>' },
+      { key: 'department_code', label: swT('sw.step2_dept_code', 'Mã phòng ban *'), type: 'text', placeholder: swT('sw.step2_dept_code', 'Mã PB'), color: '#ea580c', weight: '700' },
+      { key: 'department_name', label: swT('sw.step2_dept_name', 'Tên phòng ban *'), type: 'text', placeholder: swT('sw.step2_dept_name', 'Tên phòng ban'), weight: '600' },
+      { key: 'type', label: swT('common.type', 'Loại'), type: 'select', optionsBuilder: (d, val) => ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((val || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('') },
+      { key: 'manager_email', label: swT('sw.step2_dept_manager', 'Email Quản lý'), type: 'email', placeholder: 'email@company.com', color: '#2563EB' }
+    ];
     if (parsed.length > 0) {
-      let rows = '';
-      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
-        const d = parsed[i];
-        const typeOpts = ['Operation', 'Finance', 'Technical', 'Sale and MKT'].map(t => '<option value="' + t + '" ' + ((d.type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
-        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
-          ? window.buildSetupCompanyOptions(d.company_id || '', isVi ? 'Chọn công ty' : 'Select Company')
-          : '<option value="' + escapeHTML(d.company_id || '1') + '">' + escapeHTML(d.company_id || '1') + '</option>';
-        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
-          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
-          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'department\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
-          + '</td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'company_id\', this.value)" style="min-width:110px;">' + compOpts + '</select></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_code || '') + '" placeholder="' + swT('sw.step2_dept_code', 'Mã PB') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_code\', this.value)" style="min-width:90px;font-weight:700;color:#ea580c;"></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(d.department_name || '') + '" placeholder="' + swT('sw.step2_dept_name', 'Tên phòng ban') + ' *" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'department_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'department\', ' + i + ', \'type\', this.value)" style="min-width:110px;">' + typeOpts + '</select></td>'
-          + '<td style="padding:4px;"><input type="email" class="sw-grid-input" value="' + escapeHTML(d.manager_email || '') + '" placeholder="email@company.com" oninput="window.updateParsedGridCell(\'department\', ' + i + ', \'manager_email\', this.value)" style="min-width:140px;color:#2563EB;"></td>'
-          + '</tr>';
-      }
       tc = '<div>'
         + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:12px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;">'
         + '<div><div style="font-size:13px;font-weight:700;color:#065F46;">' + swT('sw.step2_preview_title', 'Xem trước phòng ban từ file Excel') + '</div>'
         + '<div style="font-size:11.5px;color:#047857;">' + parsed.length + ' ' + swT('sw.step3_rows', 'dòng dữ liệu') + '</div></div>'
         + '<button onclick="saveStep2AndAdvance()" class="sw-btn-primary" style="padding:6px 14px;font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px;">check</span> ' + swT('sw.step2_confirm_import', 'Xác nhận lưu danh sách') + '</button>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
-        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
-        + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_code', 'Mã phòng ban') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_name', 'Tên phòng ban') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step2_dept_manager', 'Email Quản lý') + '</th>'
-        + '</tr></thead>'
-        + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>'
-        + '<button type="button" onclick="window.addParsedGridRow(\'department\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>'
+        + window.renderSpreadsheetGrid('department', deptCols, parsed)
         + '</div>';
     } else {
       tc='<div><div style="background:#F9FAFB;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;"><div style="padding:10px 16px;background:#F3F4F6;font-size:12px;font-weight:700;color:#374151;">' + swT('sw.step2_header', 'Thiết lập phòng ban') + ': <strong style="color:#16a34a;">'+(counts.department||0)+'</strong> ' + swT('sw.step2_name', 'Phòng ban') + '</div>'+(counts.department>0?'<div style="padding:16px;font-size:12px;color:#6B7280;">' + swT('sw.step2_choose_desc', 'Chọn các phòng ban phù hợp với doanh nghiệp.') + '</div>':'<div style="padding:20px;text-align:center;font-size:12px;color:#9CA3AF;">' + swT('sw.status_pending', 'Chưa thiết lập') + '</div>')+'</div></div>';
@@ -2166,8 +2665,6 @@ function renderStep3HTML(counts){
 
   let tc='';
   if(tab==='quick'){
-    // Quick entry with full required employee fields:
-    // Full Name *, Username *, Email *, Department, Position, Start Date *, Direct Mgr *, HR Mgr *, Emergency Contact Name *, Emergency Contact Phone *
     tc='<div><p style="font-size:12px;color:#6B7280;margin-bottom:14px;">' + swT('sw.step3_sample_desc', 'File mẫu nhân viên chuẩn TeraX gồm đầy đủ các cột bắt buộc: Họ tên, Tên đăng nhập, Email, Phòng ban, Chức vụ, Ngày bắt đầu, Quản lý trực tiếp, Quản lý nhân sự, Người liên hệ khẩn cấp và SĐT.') + '</p>'
       +'<div id="quick-emp-container">'
       +renderQuickEmpCard(0, {full_name:'', username:'', email:'', dept:'', pos:'', start_date:todayStr, direct_mgr:'Super Admin', hr_mgr:'Super Admin', emg_name:'', emg_phone:''})
@@ -2177,41 +2674,21 @@ function renderStep3HTML(counts){
   } else {
     let prev='';
     if(parsed.length>0){
-      const vc=parsed.filter(e=>e.full_name&&e.email).length;
-      let rows='';
       const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
-      for(let i=0;i<Math.min(parsed.length,50);i++){
-        const e=parsed[i];
-        const compOpts = (typeof window.buildSetupCompanyOptions === 'function')
-          ? window.buildSetupCompanyOptions(e.company_id || e.company_entity || '', isVi ? 'Chọn công ty' : 'Select Company')
-          : '<option value="' + escapeHTML(e.company_id || '1') + '">' + escapeHTML(e.company_id || '1') + '</option>';
-        const deptOpts = (typeof window.buildSetupDepartmentSelectOptions === 'function')
-          ? window.buildSetupDepartmentSelectOptions(e.department_code || e.department_name || '')
-          : '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>';
-        const directOpts = (typeof window.buildSetupEmployeeOptions === 'function')
-          ? window.buildSetupEmployeeOptions(e.direct_manager || 'Super Admin', true)
-          : '<option value="Super Admin">Super Admin</option>';
-
-        rows+='<tr style="border-bottom:1px solid #E2E8F0;">'
-          +'<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">'+(i+1)+'</td>'
-          +'<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
-          +'<button type="button" onclick="window.editSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          +'<button type="button" onclick="window.deleteSetupParsedItem(\'employee\', '+i+')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
-          +'</td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.employee_code||'')+'" placeholder="' + swT('sw.step3_emp_code', 'Mã NV') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'employee_code\', this.value)" style="min-width:85px;font-weight:700;color:#ea580c;"></td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.nick_name||'')+'" placeholder="' + swT('sw.step3_emp_nick', 'Biệt danh') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'nick_name\', this.value)" style="min-width:85px;"></td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.username||'')+'" placeholder="' + swT('sw.step3_emp_username', 'Username', 'Username') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'username\', this.value)" style="min-width:90px;color:#2563EB;"></td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.password||'')+'" placeholder="' + swT('common.password', 'Mật khẩu', 'Password') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'password\', this.value)" style="min-width:90px;font-family:monospace;"></td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.full_name||'')+'" placeholder="' + swT('sw.step3_emp_name', 'Họ và tên', 'Full Name') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'full_name\', this.value)" style="min-width:130px;font-weight:600;"></td>'
-          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'company_id\', this.value)" style="min-width:110px;">'+compOpts+'</select></td>'
-          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'department_code\', this.value)" style="min-width:120px;">'+deptOpts+'</select></td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.position||'')+'" placeholder="' + swT('sw.step3_emp_position', 'Chức vụ', 'Position') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'position\', this.value)" style="min-width:100px;"></td>'
-          +'<td style="padding:4px;"><input type="email" class="sw-grid-input" value="'+escapeHTML(e.email||'')+'" placeholder="' + swT('sw.step3_emp_email_ph', 'email@company.com', 'email@company.com') + ' *" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'email\', this.value)" style="min-width:140px;"></td>'
-          +'<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'employee\', '+i+', \'direct_manager\', this.value)" style="min-width:125px;">'+directOpts+'</select></td>'
-          +'<td style="padding:4px;"><input type="text" class="sw-grid-input" value="'+escapeHTML(e.phone||e.emergency_contact_phone||'')+'" placeholder="' + swT('sw.step3_emp_phone', 'SĐT', 'Phone') + '" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'phone\', this.value)" style="min-width:95px;"></td>'
-          +'<td style="padding:4px;"><input type="date" class="sw-grid-input" value="'+escapeHTML(e.start_date||todayStr)+'" oninput="window.updateParsedGridCell(\'employee\', '+i+', \'start_date\', this.value)" style="min-width:115px;"></td>'
-          +'</tr>';
-      }
+      const empCols = [
+        { key: 'company_id', label: swT('sw.step1_company', 'Công ty *'), type: 'select', optionsBuilder: (e, val) => (typeof window.buildSetupCompanyOptions === 'function') ? window.buildSetupCompanyOptions(val || e.company_entity || '', isVi ? 'Chọn công ty' : 'Select Company') : '<option value="' + escapeHTML(val || '1') + '">' + escapeHTML(val || '1') + '</option>' },
+        { key: 'department_code', label: swT('sw.step3_emp_dept', 'Phòng ban *'), type: 'select', optionsBuilder: (e, val) => (typeof window.buildSetupDepartmentSelectOptions === 'function') ? window.buildSetupDepartmentSelectOptions(val || e.department_name || '') : '<option value="">-- ' + (isVi ? 'Chọn phòng ban' : 'Select Department') + ' --</option>' },
+        { key: 'employee_code', label: swT('sw.step3_emp_code', 'Mã NV'), type: 'text', placeholder: swT('sw.step3_emp_code', 'Mã NV'), color: '#ea580c', weight: '700' },
+        { key: 'nick_name', label: swT('sw.step3_emp_nick', 'Biệt danh'), type: 'text', placeholder: swT('sw.step3_emp_nick', 'Biệt danh') },
+        { key: 'username', label: swT('sw.step3_emp_username', 'Username *'), type: 'text', placeholder: 'Username *', color: '#2563EB' },
+        { key: 'password', label: swT('common.password', 'Mật khẩu'), type: 'text', placeholder: 'Password' },
+        { key: 'full_name', label: swT('sw.step3_emp_name', 'Họ và tên *'), type: 'text', placeholder: swT('sw.step3_emp_name', 'Họ và tên'), weight: '600' },
+        { key: 'position', label: swT('sw.step3_emp_position', 'Chức vụ'), type: 'text', placeholder: swT('sw.step3_emp_position', 'Chức vụ') },
+        { key: 'email', label: swT('sw.step3_emp_email', 'Email *'), type: 'email', placeholder: 'email@company.com' },
+        { key: 'direct_manager', label: swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp'), type: 'select', optionsBuilder: (e, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || 'Super Admin', true) : '<option value="Super Admin">Super Admin</option>' },
+        { key: 'phone', label: swT('sw.step3_emp_phone', 'SĐT'), type: 'text', placeholder: '0912345678' },
+        { key: 'start_date', label: swT('sw.step3_emp_start_date', 'Ngày bắt đầu'), type: 'date' }
+      ];
       prev='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-bottom:14px;">'
         +'<div style="display:flex;align-items:center;gap:10px;">'
         +'<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">grid_on</span>'
@@ -2223,14 +2700,13 @@ function renderStep3HTML(counts){
         +'<button onclick="window.setupParsedEmployees=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file', 'Delete File') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         +'</div>'
         +'</div>'
-        +'<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:360px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;white-space:nowrap;"><thead><tr style="background:#F8FAFC;"><th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th><th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:55px;">' + swT('common.actions', 'Thao tác', 'Actions') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_code', 'Mã NV', 'Emp Code') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_nick', 'Biệt danh', 'Nick Name') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_username', 'Username', 'Username') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.password', 'Mật khẩu', 'Password') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_name', 'Họ và tên', 'Full Name') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step1_company', 'Công ty', 'Company') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban', 'Department') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_position', 'Chức vụ', 'Position') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_email', 'Email', 'Email') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_direct_mgr', 'Quản lý trực tiếp', 'Direct Manager') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_phone', 'SĐT', 'Phone') + '</th><th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_start_date', 'Ngày bắt đầu', 'Start Date') + '</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
-        +'<button type="button" onclick="window.addParsedGridRow(\'employee\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
+        +window.renderSpreadsheetGrid('employee', empCols, parsed);
     }
     tc='<div><div class="sw-upload-zone" style="margin-bottom:16px;"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:14px;">(.xlsx, .xls, .csv)</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="downloadEmployeeTemplate()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:14px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleEmployeeExcelUpload(event)"></label></div></div>'+prev+'</div>';
   }
   const btnLabel = parsed.length>0 ? (swT('sw.step3_imported', 'Nhập {{count}} nhân viên').replace('{{count}}', parsed.length)) : swT('sw.btn_continue', 'Tiếp tục bước tiếp theo');
   return '<div class="sw-card">'+swStepHeader('group', 3, swT('sw.step3_header', 'Thiết lập nhân viên'), swT('sw.step3_desc', 'Nhập danh sách nhân sự. Có thể nhập từ Excel hoặc thêm nhanh.'))+'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">'+modeCards+'</div>'+tc+swBottomNav(2,4,btnLabel,'saveStep3AndAdvance()')+'</div>';
-}
+};
 
 window.buildManagerSelectOptions = function(selectedVal) {
   const norm = String(selectedVal || '').trim();
@@ -2478,7 +2954,6 @@ window.downloadEmployeeTemplate = async function(){
   }
   const isVi = swIsVi();
   const headers = [
-    'employee_id',
     'employee_code',
     'nick_name',
     'user_name',
@@ -2486,8 +2961,6 @@ window.downloadEmployeeTemplate = async function(){
     'full_name',
     'gen',
     'position',
-    'company_id',
-    'department_id',
     'status',
     'direct_manager',
     'role',
@@ -2499,7 +2972,6 @@ window.downloadEmployeeTemplate = async function(){
   ];
   const sampleData = isVi ? [
     {
-      employee_id: '',
       employee_code: 'NV002',
       nick_name: 'TuanNV',
       user_name: 'tuan.nguyen',
@@ -2507,8 +2979,6 @@ window.downloadEmployeeTemplate = async function(){
       full_name: 'Nguyễn Văn Tuấn',
       gen: 'Nam',
       position: 'Trưởng phòng Kỹ thuật',
-      company_id: 1,
-      department_id: 1,
       status: 17,
       direct_manager: 'Super Admin',
       role: 'Staff',
@@ -2520,7 +2990,6 @@ window.downloadEmployeeTemplate = async function(){
     }
   ] : [
     {
-      employee_id: '',
       employee_code: 'EMP002',
       nick_name: 'JohnS',
       user_name: 'john.smith',
@@ -2528,8 +2997,6 @@ window.downloadEmployeeTemplate = async function(){
       full_name: 'John Smith',
       gen: 'Male',
       position: 'Technical Manager',
-      company_id: 1,
-      department_id: 1,
       status: 17,
       direct_manager: 'Super Admin',
       role: 'Staff',
@@ -4202,7 +4669,6 @@ window.downloadSetupTemplate = async function(moduleKey){
 
   if (moduleKey === 'company') {
     headers = [
-      'my_company_id',
       'company_shortname',
       'company_fullname',
       'address',
@@ -4213,7 +4679,6 @@ window.downloadSetupTemplate = async function(moduleKey){
     ];
     sampleData = isVi ? [
       {
-        'my_company_id': 1,
         'company_shortname': 'SaoViet',
         'company_fullname': 'Công ty Cổ phần Sao Việt',
         'address': 'Hà Nội, Việt Nam',
@@ -4224,7 +4689,6 @@ window.downloadSetupTemplate = async function(moduleKey){
       }
     ] : [
       {
-        'my_company_id': 1,
         'company_shortname': 'SaoViet',
         'company_fullname': 'Sao Viet Joint Stock Company',
         'address': 'Hanoi, Vietnam',
@@ -4241,75 +4705,57 @@ window.downloadSetupTemplate = async function(moduleKey){
       'department_code',
       'department_name',
       'type',
-      'manager_email',
-      'company_id',
-      'department_id'
+      'manager_email'
     ];
     sampleData = isVi ? [
       {
         'department_code': 'BGD',
         'department_name': 'Ban Giám Đốc',
         'type': 'Operation',
-        'manager_email': 'ceo@company.com',
-        'company_id': 1,
-        'department_id': 1
+        'manager_email': 'ceo@company.com'
       },
       {
         'department_code': 'KD',
         'department_name': 'Phòng Kinh Doanh',
         'type': 'Sale and MKT',
-        'manager_email': 'manager@company.com',
-        'company_id': 1,
-        'department_id': 2
+        'manager_email': 'manager@company.com'
       },
       {
         'department_code': 'KT',
         'department_name': 'Phòng Kỹ Thuật',
         'type': 'Technical',
-        'manager_email': 'tech@company.com',
-        'company_id': 1,
-        'department_id': 3
+        'manager_email': 'tech@company.com'
       },
       {
         'department_code': 'TCKT',
         'department_name': 'Phòng Tài Chính Kế Toán',
         'type': 'Finance',
-        'manager_email': 'accountant@company.com',
-        'company_id': 1,
-        'department_id': 4
+        'manager_email': 'accountant@company.com'
       }
     ] : [
       {
         'department_code': 'BGD',
         'department_name': 'Board of Directors',
         'type': 'Operation',
-        'manager_email': 'ceo@company.com',
-        'company_id': 1,
-        'department_id': 1
+        'manager_email': 'ceo@company.com'
       },
       {
         'department_code': 'KD',
         'department_name': 'Sales & Marketing',
         'type': 'Sale and MKT',
-        'manager_email': 'manager@company.com',
-        'company_id': 1,
-        'department_id': 2
+        'manager_email': 'manager@company.com'
       },
       {
         'department_code': 'KT',
         'department_name': 'Engineering & Technical',
         'type': 'Technical',
-        'manager_email': 'tech@company.com',
-        'company_id': 1,
-        'department_id': 3
+        'manager_email': 'tech@company.com'
       },
       {
         'department_code': 'TCKT',
         'department_name': 'Finance & Accounting',
         'type': 'Finance',
-        'manager_email': 'accountant@company.com',
-        'company_id': 1,
-        'department_id': 4
+        'manager_email': 'accountant@company.com'
       }
     ];
     fileName = isVi ? 'Mau_Phong_Ban_TeraX.xlsx' : 'Department_Template_TeraX.xlsx';
@@ -4318,7 +4764,6 @@ window.downloadSetupTemplate = async function(moduleKey){
     return window.downloadEmployeeTemplate();
   } else if (moduleKey === 'account') {
     headers = [
-      'account_id',
       'account_name',
       'type',
       'account_status',
@@ -4332,7 +4777,6 @@ window.downloadSetupTemplate = async function(moduleKey){
     ];
     sampleData = [
       {
-        'account_id': 1,
         'account_name': isVi ? 'Tài khoản chính MBV' : 'MBV Main Account',
         'type': 'Bank Account',
         'account_status': 'active',
@@ -4358,7 +4802,6 @@ window.downloadSetupTemplate = async function(moduleKey){
       'tier3_approval',
       'policy_lead',
       'sr_owner',
-      'department_id',
       'elements',
       'description'
     ];
@@ -4373,7 +4816,6 @@ window.downloadSetupTemplate = async function(moduleKey){
         'tier3_approval': '',
         'policy_lead': 'manager@company.com',
         'sr_owner': 'accountant@company.com',
-        'department_id': 'TCKT',
         'elements': 'PAYMENT,EXPENSE',
         'description': 'Quy trình xét duyệt và thanh toán các khoản chi phí hoạt động'
       },
@@ -4387,7 +4829,6 @@ window.downloadSetupTemplate = async function(moduleKey){
         'tier3_approval': '',
         'policy_lead': 'manager@company.com',
         'sr_owner': 'accountant@company.com',
-        'department_id': 'TCKT',
         'elements': 'PAYMENT',
         'description': 'Quy trình tạm ứng kinh phí trước khi đi công tác'
       },
@@ -4401,7 +4842,6 @@ window.downloadSetupTemplate = async function(moduleKey){
         'tier3_approval': 'admin@company.com',
         'policy_lead': 'it.lead@company.com',
         'sr_owner': 'it.support@company.com',
-        'department_id': 'KT',
         'elements': 'ASSET',
         'description': 'Quy trình cấp phát laptop, công cụ dụng cụ làm việc cho nhân viên'
       }
@@ -4416,7 +4856,6 @@ window.downloadSetupTemplate = async function(moduleKey){
         'tier3_approval': '',
         'policy_lead': 'manager@company.com',
         'sr_owner': 'accountant@company.com',
-        'department_id': 'TCKT',
         'elements': 'PAYMENT,EXPENSE',
         'description': 'Workflow for reviewing and paying operational business expenses'
       },
@@ -4430,7 +4869,6 @@ window.downloadSetupTemplate = async function(moduleKey){
         'tier3_approval': '',
         'policy_lead': 'manager@company.com',
         'sr_owner': 'accountant@company.com',
-        'department_id': 'TCKT',
         'elements': 'PAYMENT',
         'description': 'Workflow for requesting travel funds before business trips'
       },
@@ -4444,7 +4882,6 @@ window.downloadSetupTemplate = async function(moduleKey){
         'tier3_approval': 'admin@company.com',
         'policy_lead': 'it.lead@company.com',
         'sr_owner': 'it.support@company.com',
-        'department_id': 'KT',
         'elements': 'ASSET',
         'description': 'Workflow for allocating laptops, tools, and office equipment to employees'
       }
