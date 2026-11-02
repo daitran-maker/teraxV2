@@ -770,7 +770,10 @@ function injectSetupStyles() {
     .sw-sheet-cell.is-active { outline:2px solid #2563EB !important; outline-offset:-2px; z-index:5; background:#EFF6FF !important; }
     .sw-sheet-cell.is-active .sw-sheet-input,
     .sw-sheet-cell.is-active .sw-sheet-cell-text { background-color:transparent !important; }
-    .sw-sheet-cell.is-active::after { content:''; position:absolute; right:-2px; bottom:-2px; width:6px; height:6px; background:#2563EB; border:1px solid #FFFFFF; z-index:6; cursor:crosshair; }
+    .sw-fill-handle { position:absolute; right:-4px; bottom:-4px; width:8px; height:8px; background:#2563EB; border:1px solid #FFFFFF; z-index:8; cursor:crosshair; box-sizing:content-box; }
+    .sw-fill-handle:hover { transform:scale(1.35); }
+    .sw-sheet-cell.is-fill-preview { background:#EFF6FF !important; outline:1px dashed #2563EB; outline-offset:-1px; }
+    body.sw-grid-filling, body.sw-grid-filling * { cursor:crosshair !important; user-select:none !important; }
     
     .sw-sheet-input { width:100%; height:32px; border:none !important; outline:none !important; box-shadow:none !important; background-color:transparent !important; border-radius:0 !important; padding:4px 8px; font-size:12px; font-family:inherit; color:#0F172A; box-sizing:border-box; }
     
@@ -951,6 +954,161 @@ window.swRefreshGridHighlight = function() {
   if (state.selectedColKey) {
     const th = document.querySelector(`.sw-sheet-th[data-type="${state.type}"][data-col="${state.selectedColKey}"]`);
     if (th) th.classList.add('is-col-selected');
+  }
+
+  if (typeof window.swAttachFillHandle === 'function') window.swAttachFillHandle();
+};
+
+// ── Excel-style fill handle: drag the bottom-right corner of the selection to autofill ──
+window.swAttachFillHandle = function() {
+  document.querySelectorAll('.sw-fill-handle').forEach(el => el.remove());
+  const state = window.swGridState;
+  if (!state || !state.selectedRange) return;
+  const { type, maxRow, maxColIdx } = state.selectedRange;
+  const col = (window._swGridColumns[type] || [])[maxColIdx];
+  if (!col) return;
+  const cell = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${maxRow}"][data-col="${col.key}"]`);
+  if (!cell) return;
+  const handle = document.createElement('span');
+  handle.className = 'sw-fill-handle';
+  handle.title = 'Kéo để điền (fill) các ô';
+  handle.addEventListener('mousedown', window.swStartFillDrag);
+  cell.appendChild(handle);
+};
+
+window.swSetGridCellValue = function(type, row, colKey, val) {
+  const list = window.getSetupParsedList(type);
+  if (!list || !list[row]) return;
+  list[row][colKey] = val;
+  const inputEl = document.querySelector(`.sw-sheet-table input[data-grid-type="${type}"][data-row="${row}"][data-col="${colKey}"]`);
+  if (inputEl) inputEl.value = val != null ? val : '';
+  const selEl = document.querySelector(`.sw-sheet-table select[data-grid-type="${type}"][data-row="${row}"][data-col="${colKey}"]`);
+  if (selEl) {
+    selEl.value = val != null ? val : '';
+    const cellText = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${row}"][data-col="${colKey}"] .sw-sheet-cell-text`);
+    if (cellText) {
+      const opt = selEl.options[selEl.selectedIndex];
+      cellText.textContent = opt ? opt.text : (val || '');
+    }
+  }
+};
+
+window.swStartFillDrag = function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const state = window.swGridState;
+  const src = state && state.selectedRange;
+  if (!src) return;
+  state.fill = { type: src.type, src: { ...src }, target: { ...src } };
+  document.body.classList.add('sw-grid-filling');
+  document.addEventListener('mousemove', window.swFillDragMove);
+  document.addEventListener('mouseup', window.swFillDragEnd, { once: true });
+};
+
+window.swFillDragMove = function(e) {
+  const fill = window.swGridState && window.swGridState.fill;
+  if (!fill) return;
+  const { type, src } = fill;
+
+  // Auto-scroll the grid while dragging near its edges
+  const scroller = document.querySelector(`.sw-sheet-table[data-type="${type}"]`)?.closest('.sw-table-scroll-container');
+  if (scroller) {
+    const rect = scroller.getBoundingClientRect();
+    if (e.clientY > rect.bottom - 24) scroller.scrollTop += 20;
+    else if (e.clientY < rect.top + 48) scroller.scrollTop -= 20;
+    if (e.clientX > rect.right - 24) scroller.scrollLeft += 20;
+    else if (e.clientX < rect.left + 24) scroller.scrollLeft -= 20;
+  }
+
+  const hovered = document.elementFromPoint(e.clientX, e.clientY);
+  const cell = hovered && hovered.closest ? hovered.closest('.sw-sheet-cell') : null;
+  if (!cell || cell.dataset.type !== type) return;
+  const row = parseInt(cell.dataset.row, 10);
+  const colIdx = parseInt(cell.dataset.colIdx, 10);
+  if (isNaN(row) || isNaN(colIdx)) return;
+
+  const dr = row > src.maxRow ? row - src.maxRow : (row < src.minRow ? row - src.minRow : 0);
+  const dc = colIdx > src.maxColIdx ? colIdx - src.maxColIdx : (colIdx < src.minColIdx ? colIdx - src.minColIdx : 0);
+
+  let target = { ...src };
+  if (dr !== 0 || dc !== 0) {
+    if (Math.abs(dr) >= Math.abs(dc)) {
+      target.minRow = Math.min(src.minRow, row);
+      target.maxRow = Math.max(src.maxRow, row);
+    } else {
+      target.minColIdx = Math.min(src.minColIdx, colIdx);
+      target.maxColIdx = Math.max(src.maxColIdx, colIdx);
+    }
+  }
+  fill.target = target;
+
+  // Preview (dashed outline) on the cells that will be filled
+  document.querySelectorAll('.sw-sheet-cell.is-fill-preview').forEach(el => el.classList.remove('is-fill-preview'));
+  const cols = window._swGridColumns[type] || [];
+  for (let c = target.minColIdx; c <= target.maxColIdx; c++) {
+    if (!cols[c]) continue;
+    for (let r = target.minRow; r <= target.maxRow; r++) {
+      const inSrc = r >= src.minRow && r <= src.maxRow && c >= src.minColIdx && c <= src.maxColIdx;
+      if (inSrc) continue;
+      const el = document.querySelector(`.sw-sheet-cell[data-type="${type}"][data-row="${r}"][data-col="${cols[c].key}"]`);
+      if (el) el.classList.add('is-fill-preview');
+    }
+  }
+};
+
+window.swFillDragEnd = function() {
+  const state = window.swGridState;
+  const fill = state && state.fill;
+  document.removeEventListener('mousemove', window.swFillDragMove);
+  document.body.classList.remove('sw-grid-filling');
+  document.querySelectorAll('.sw-sheet-cell.is-fill-preview').forEach(el => el.classList.remove('is-fill-preview'));
+  if (!fill) return;
+  state.fill = null;
+
+  const { type, src, target } = fill;
+  const changed = target.minRow !== src.minRow || target.maxRow !== src.maxRow ||
+    target.minColIdx !== src.minColIdx || target.maxColIdx !== src.maxColIdx;
+  if (!changed) return;
+
+  window.swApplyFill(type, src, target);
+
+  const cols = window._swGridColumns[type] || [];
+  state.type = type;
+  state.selectedColKey = null;
+  state.selectedRange = { type, ...{ minRow: target.minRow, maxRow: target.maxRow, minColIdx: target.minColIdx, maxColIdx: target.maxColIdx } };
+  state.anchorCell = { type, row: target.minRow, colKey: cols[target.minColIdx].key, colIdx: target.minColIdx };
+  state.activeCell = { type, row: target.maxRow, colKey: cols[target.maxColIdx].key, colIdx: target.maxColIdx };
+  window.swRefreshGridHighlight();
+};
+
+// Copy the source block over the target block, repeating it cyclically (like Excel autofill with plain values)
+window.swApplyFill = function(type, src, target) {
+  const list = window.getSetupParsedList(type);
+  const cols = window._swGridColumns[type] || [];
+  if (!list || !list.length || !cols.length) return;
+
+  const srcRows = src.maxRow - src.minRow + 1;
+  const srcCols = src.maxColIdx - src.minColIdx + 1;
+  const mapIdx = (i, min, max, size) => {
+    if (i > max) return min + ((i - max - 1) % size);
+    if (i < min) return max - ((min - 1 - i) % size);
+    return i;
+  };
+
+  for (let r = target.minRow; r <= target.maxRow; r++) {
+    for (let c = target.minColIdx; c <= target.maxColIdx; c++) {
+      const inSrc = r >= src.minRow && r <= src.maxRow && c >= src.minColIdx && c <= src.maxColIdx;
+      if (inSrc || !cols[c] || !list[r]) continue;
+      const sr = mapIdx(r, src.minRow, src.maxRow, srcRows);
+      const sc = mapIdx(c, src.minColIdx, src.maxColIdx, srcCols);
+      const sourceVal = list[sr] ? list[sr][cols[sc].key] : undefined;
+      if (sourceVal === undefined) continue;
+      window.swSetGridCellValue(type, r, cols[c].key, sourceVal);
+    }
+  }
+
+  if (typeof saveSetupDraftToStorage === 'function') {
+    saveSetupDraftToStorage();
   }
 };
 
