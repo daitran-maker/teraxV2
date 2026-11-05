@@ -3894,47 +3894,34 @@ function renderStep4HTML(counts){
         ? window.setupParsedDepartments
         : (window.setupWizardData?.departments || []);
 
-      let rows = '';
-      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
-        const p = parsed[i];
-        const types = ['Operation', 'Finance', 'Technical', 'Sale and MKT', 'HR', 'Admin', 'Procurement', 'Legal'];
-        const typeOpts = types.map(t => '<option value="' + t + '" ' + ((p.policy_type || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('');
-        const levels = ['Tier 1', 'Tier 2', 'Tier 3'];
-        const levelOpts = levels.map(l => '<option value="' + l + '" ' + ((p.approval_level || 'Tier 1') === l ? 'selected' : '') + '>' + l + '</option>').join('');
+      const policyCols = [
+        { key: 'policy_name', label: swT('sw.step4_policy_name', 'Tên quy trình *'), type: 'text', placeholder: swT('sw.step4_policy_name', 'Tên quy trình'), weight: '600' },
+        { key: 'policy_type', label: swT('common.type', 'Loại'), type: 'select', optionsBuilder: (p, val) => ['Operation', 'Finance', 'Technical', 'Sale and MKT', 'HR', 'Admin', 'Procurement', 'Legal'].map(t => '<option value="' + t + '" ' + ((val || 'Operation') === t ? 'selected' : '') + '>' + t + '</option>').join('') },
+        { key: 'approval_level', label: swT('sw.step4_approval_level', 'Cấp duyệt'), type: 'select', optionsBuilder: (p, val) => ['Tier 1', 'Tier 2', 'Tier 3'].map(l => '<option value="' + l + '" ' + ((val || 'Tier 1') === l ? 'selected' : '') + '>' + l + '</option>').join('') },
+        { key: 'tier1_approval', label: swT('sw.step4_tier1', 'Bậc 1'), type: 'select', optionsBuilder: (p, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || 'Direct Manager', true) : '<option value="' + escapeHTML(val || 'Direct Manager') + '">' + escapeHTML(val || 'Direct Manager') + '</option>' },
+        { key: 'tier2_approval', label: swT('sw.step4_tier2', 'Bậc 2'), type: 'select', optionsBuilder: (p, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || '', false, isVi ? '-- Bậc 2 (tùy chọn) --' : '-- Tier 2 --') : '<option value="">-- Tier 2 --</option>' },
+        { key: 'tier3_approval', label: swT('sw.step4_tier3', 'Bậc 3'), type: 'select', optionsBuilder: (p, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || '', false, isVi ? '-- Bậc 3 (tùy chọn) --' : '-- Tier 3 --') : '<option value="">-- Tier 3 --</option>' },
+        { key: 'policy_lead', label: 'Policy Lead', type: 'select', optionsBuilder: (p, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || '', false, '-- Policy Lead --') : '<option value="">-- Policy Lead --</option>' },
+        { key: 'sr_owner', label: 'SR Owner', type: 'select', optionsBuilder: (p, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || '', false, '-- SR Owner --') : '<option value="">-- SR Owner --</option>' },
+        {
+          key: 'department_id',
+          label: swT('sw.step3_emp_dept', 'Phòng ban'),
+          type: 'select',
+          optionsBuilder: (p, val) => {
+            let opts = '<option value="">-- ' + (isVi ? 'Phòng ban' : 'Dept') + ' --</option>';
+            for (const d of deptList) {
+              const code = d.department_code || d.code || '';
+              const dname = d.department_name || d.name || code;
+              const isSel = (val && (val === code || val === dname || val === d.department_id));
+              opts += '<option value="' + escapeHTML(code || dname) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + dname) + '</option>';
+            }
+            return opts;
+          }
+        },
+        { key: 'sla', label: swT('sw.step4_sla', 'SLA (days)'), type: 'number', placeholder: '3' },
+        { key: 'description', label: swT('common.description', 'Mô tả'), type: 'text', placeholder: swT('common.description', 'Mô tả') }
+      ];
 
-        let deptOpts = '<option value="">-- ' + (isVi ? 'Phòng ban' : 'Dept') + ' --</option>';
-        for (const d of deptList) {
-          const code = d.department_code || d.code || '';
-          const dname = d.department_name || d.name || code;
-          const isSel = (p.department_id && (p.department_id === code || p.department_id === dname || p.department_id === d.department_id));
-          deptOpts += '<option value="' + escapeHTML(code || dname) + '" ' + (isSel ? 'selected' : '') + '>' + escapeHTML((code ? code + ' - ' : '') + dname) + '</option>';
-        }
-
-        const t1Opts = window.buildSetupEmployeeOptions(p.tier1_approval || 'Direct Manager', true);
-        const t2Opts = window.buildSetupEmployeeOptions(p.tier2_approval || '', false, isVi ? '-- Bậc 2 (tùy chọn) --' : '-- Tier 2 --');
-        const t3Opts = window.buildSetupEmployeeOptions(p.tier3_approval || '', false, isVi ? '-- Bậc 3 (tùy chọn) --' : '-- Tier 3 --');
-        const leadOpts = window.buildSetupEmployeeOptions(p.policy_lead || '', false, isVi ? '-- Policy Lead --' : '-- Policy Lead --');
-        const ownerOpts = window.buildSetupEmployeeOptions(p.sr_owner || '', false, isVi ? '-- SR Owner --' : '-- SR Owner --');
-
-        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
-          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
-          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'policy\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
-          + '</td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(p.policy_name || '') + '" placeholder="' + swT('sw.step4_policy_name', 'Tên quy trình') + ' *" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_name\', this.value)" style="min-width:140px;font-weight:600;"></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_type\', this.value)" style="min-width:105px;">' + typeOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'approval_level\', this.value)" style="min-width:85px;font-weight:600;">' + levelOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier1_approval\', this.value)" style="min-width:125px;">' + t1Opts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier2_approval\', this.value)" style="min-width:125px;">' + t2Opts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'tier3_approval\', this.value)" style="min-width:125px;">' + t3Opts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'policy_lead\', this.value)" style="min-width:125px;">' + leadOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'sr_owner\', this.value)" style="min-width:125px;">' + ownerOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'policy\', ' + i + ', \'department_id\', this.value)" style="min-width:120px;">' + deptOpts + '</select></td>'
-          + '<td style="padding:4px;"><input type="number" min="0.5" step="0.5" class="sw-grid-input" value="' + escapeHTML(String(p.sla || 3)) + '" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'sla\', parseFloat(this.value)||1)" style="min-width:55px;text-align:center;"></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(p.description || '') + '" placeholder="' + swT('common.description', 'Mô tả') + '" oninput="window.updateParsedGridCell(\'policy\', ' + i + ', \'description\', this.value)" style="min-width:130px;"></td>'
-          + '</tr>';
-      }
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
         + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">rule</span>'
@@ -3946,26 +3933,7 @@ function renderStep4HTML(counts){
         + '<button onclick="window.setupParsedPolicies=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div class="sw-table-scroll-container" style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
-        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
-        + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_policy_name', 'Tên quy trình') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.type', 'Loại') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_approval_level', 'Cấp duyệt') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier1', 'Bậc 1') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier2', 'Bậc 2') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_tier3', 'Bậc 3') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Policy Lead</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">SR Owner</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step3_emp_dept', 'Phòng ban') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step4_sla', 'SLA (days)') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('common.description', 'Mô tả') + '</th>'
-        + '</tr></thead>'
-        + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>'
-        + '<button type="button" onclick="window.addParsedGridRow(\'policy\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step4_add_process', 'Thêm quy trình') + '</button>';
+        + window.renderSpreadsheetGrid('policy', policyCols, parsed);
     }
     tc='<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;"><button onclick="downloadSetupTemplate(\'policy\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handlePolicyExcelUpload(event)"></label></div></div>' + prev;
   } else {
@@ -4461,35 +4429,21 @@ function renderStep5HTML(comp, counts) {
     const parsed = window.setupParsedAccounts || [];
     let prev = '';
     if (parsed.length > 0) {
-      let rows = '';
-      const isVi = swIsVi();
-      for (let i = 0; i < Math.min(parsed.length, 50); i++) {
-        const a = parsed[i];
-        const typeOpts = ['Bank Account', 'Cash', 'Credit Card', 'Loan', 'Other'].map(t => '<option value="' + t + '" ' + ((a.type || 'Bank Account') === t ? 'selected' : '') + '>' + t + '</option>').join('');
-        const statusOpts = ['active', 'inactive'].map(s => '<option value="' + s + '" ' + ((a.account_status || 'active') === s ? 'selected' : '') + '>' + s + '</option>').join('');
-        const compOpts = window.buildSetupCompanyOptions(a.company_entity || '', isVi ? 'Chọn pháp nhân' : 'Select Company');
-        const mgrOpts = window.buildSetupEmployeeOptions(a.transaction_managed_by || '', false, isVi ? 'Chọn QL Giao dịch' : 'Select Manager');
-        const finOpts = window.buildSetupEmployeeOptions(a.finance_control || '', false, isVi ? 'Chọn kiểm soát TC' : 'Select Fin Control');
+      const isVi = (typeof swIsVi === 'function') ? swIsVi() : true;
+      const acctCols = [
+        { key: 'account_id', label: 'Account ID', type: 'text', placeholder: 'ID' },
+        { key: 'account_name', label: swT('sw.step5_acct_name', 'Tên tài khoản', 'Account Name'), type: 'text', placeholder: swT('sw.step5_acct_name', 'Tên tài khoản'), weight: '600' },
+        { key: 'type', label: swT('sw.account_type', 'Loại', 'Type'), type: 'select', optionsBuilder: (a, val) => ['Bank Account', 'Cash', 'Credit Card', 'Loan', 'Other'].map(t => '<option value="' + t + '" ' + ((val || 'Bank Account') === t ? 'selected' : '') + '>' + t + '</option>').join('') },
+        { key: 'account_status', label: swT('sw.account_status', 'Trạng thái', 'Status'), type: 'select', color: '#059669', weight: '600', optionsBuilder: (a, val) => ['active', 'inactive'].map(s => '<option value="' + s + '" ' + ((val || 'active') === s ? 'selected' : '') + '>' + s + '</option>').join('') },
+        { key: 'currency', label: swT('sw.step5_currency', 'Tiền tệ', 'Currency'), type: 'select', weight: '600', optionsBuilder: (a, val) => (typeof window.buildSetupCurrencyOptions === 'function') ? window.buildSetupCurrencyOptions(val || 'VND') : '<option value="' + escapeHTML(val || 'VND') + '">' + escapeHTML(val || 'VND') + '</option>' },
+        { key: 'account_number', label: swT('sw.step5_acct_num', 'Số tài khoản', 'Account Number'), type: 'text', placeholder: '0011...', color: '#2563EB', weight: '600' },
+        { key: 'bank_name', label: swT('sw.step5_bank', 'Ngân hàng', 'Bank'), type: 'text', placeholder: swT('sw.step5_bank', 'Ngân hàng', 'Bank') },
+        { key: 'exchange_rate', label: swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate'), type: 'number', placeholder: '1' },
+        { key: 'transaction_managed_by', label: swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager'), type: 'select', optionsBuilder: (a, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || '', false, isVi ? 'Chọn QL Giao dịch' : 'Select Manager') : '<option value="">' + escapeHTML(val || '') + '</option>' },
+        { key: 'finance_control', label: swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control'), type: 'select', optionsBuilder: (a, val) => (typeof window.buildSetupEmployeeOptions === 'function') ? window.buildSetupEmployeeOptions(val || '', false, isVi ? 'Chọn kiểm soát TC' : 'Select Fin Control') : '<option value="">' + escapeHTML(val || '') + '</option>' },
+        { key: 'company_entity', label: swT('sw.account_entity', 'Pháp nhân', 'Company Entity'), type: 'select', optionsBuilder: (a, val) => (typeof window.buildSetupCompanyOptions === 'function') ? window.buildSetupCompanyOptions(val || '', isVi ? 'Chọn pháp nhân' : 'Select Company') : '<option value="">' + escapeHTML(val || '') + '</option>' }
+      ];
 
-        rows += '<tr style="border-bottom:1px solid #E2E8F0;">'
-          + '<td style="padding:4px 6px;color:#9CA3AF;font-size:11px;text-align:center;">' + (i + 1) + '</td>'
-          + '<td style="padding:4px 6px;text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">'
-          + '<button type="button" onclick="window.editSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E5E7EB;background:#F9FAFB;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.edit', 'Sửa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#4B5563;">edit</span></button>'
-          + '<button type="button" onclick="window.deleteSetupParsedItem(\'account\', ' + i + ')" style="width:26px;height:26px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa') + '"><span class="material-symbols-rounded" style="font-size:15px;color:#EF4444;">delete</span></button>'
-          + '</td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_id || '') + '" placeholder="ID" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_id\', this.value)" style="min-width:65px;"></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_name || '') + '" placeholder="' + swT('sw.step5_acct_name', 'Tên tài khoản') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_name\', this.value)" style="min-width:130px;font-weight:600;"></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'type\', this.value)" style="min-width:105px;">' + typeOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'account_status\', this.value)" style="min-width:85px;color:#059669;font-weight:600;">' + statusOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'currency\', this.value)" style="min-width:75px;font-weight:600;">' + window.buildSetupCurrencyOptions(a.currency || 'VND') + '</select></td>'
-          + '<td style="padding:4px;"><input type="text" class="sw-grid-input" value="' + escapeHTML(a.account_number || '') + '" placeholder="0011..." oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'account_number\', this.value)" style="min-width:110px;color:#2563EB;font-weight:600;"></td>'
-          + '<td style="padding:4px;"><input type="text" list="step5-banks-datalist" class="sw-grid-input" value="' + escapeHTML(a.bank_name || '') + '" placeholder="' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'bank_name\', this.value)" style="min-width:100px;"></td>'
-          + '<td style="padding:4px;"><input type="number" step="any" class="sw-grid-input" value="' + escapeHTML(String(a.exchange_rate || 1)) + '" oninput="window.updateParsedGridCell(\'account\', ' + i + ', \'exchange_rate\', parseFloat(this.value)||1)" style="min-width:65px;"></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'transaction_managed_by\', this.value)" style="min-width:125px;">' + mgrOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'finance_control\', this.value)" style="min-width:125px;">' + finOpts + '</select></td>'
-          + '<td style="padding:4px;"><select class="sw-grid-select" onchange="window.updateParsedGridCell(\'account\', ' + i + ', \'company_entity\', this.value)" style="min-width:130px;">' + compOpts + '</select></td>'
-          + '</tr>';
-      }
       prev = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-radius:10px;background:#ECFDF5;border:1px solid #A7F3D0;margin-top:16px;margin-bottom:14px;">'
         + '<div style="display:flex;align-items:center;gap:10px;">'
         + '<span class="material-symbols-rounded" style="font-size:26px;color:#059669;">account_balance</span>'
@@ -4501,26 +4455,7 @@ function renderStep5HTML(comp, counts) {
         + '<button onclick="window.setupParsedAccounts=[];renderSetupContent();" style="width:28px;height:28px;border-radius:6px;border:1px solid #FEE2E2;background:#FFF5F5;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="' + swT('common.delete', 'Xóa file') + '"><span class="material-symbols-rounded" style="font-size:15px;">delete</span></button>'
         + '</div>'
         + '</div>'
-        + '<div style="border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:14px;"><div style="overflow-x:auto;max-height:360px;overflow-y:auto;">'
-        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
-        + '<thead><tr style="background:#F8FAFC;">'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:35px;">#</th>'
-        + '<th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:#6B7280;width:40px;">' + swT('common.actions', 'Thao tác') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">Account ID</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_name', 'Tên tài khoản', 'Account Name') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_type', 'Loại', 'Type') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_status', 'Trạng thái', 'Status') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_currency', 'Tiền tệ', 'Currency') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_acct_num', 'Số tài khoản', 'Account Number') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.step5_bank', 'Ngân hàng', 'Bank') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_exchange_rate', 'Tỷ giá', 'Exchange Rate') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_trans_manager', 'QL Giao dịch', 'Trans. Manager') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_fin_control', 'Kiểm soát TC', 'Fin. Control') + '</th>'
-        + '<th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;">' + swT('sw.account_entity', 'Pháp nhân', 'Company Entity') + '</th>'
-        + '</tr></thead>'
-        + '<tbody>' + rows + '</tbody>'
-        + '</table></div></div>'
-        + '<button type="button" onclick="window.addParsedGridRow(\'account\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px dashed #D1D5DB;background:#FFFFFF;color:#374151;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:16px;">add</span> ' + swT('sw.step2_add_row', 'Thêm dòng') + '</button>';
+        + window.renderSpreadsheetGrid('account', acctCols, parsed);
     }
     tabContent = '<div class="sw-upload-zone"><span class="material-symbols-rounded" style="font-size:44px;color:#f97316;display:block;margin-bottom:10px;">upload_file</span><div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;">' + swT('sw.step3_drag_drop', 'Kéo & Thả file Excel vào đây') + '</div><div style="font-size:12px;color:#6B7280;margin-bottom:16px;">(.xlsx, .xls)</div><div style="display:flex;gap:12px;justify-content:center;"><button onclick="downloadSetupTemplate(\'account\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid #E5E7EB;background:white;color:#374151;font-size:12px;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">download</span> ' + swT('sw.step3_download_tpl', 'Tải file mẫu Excel') + '</button><label style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#f97316,#ea580c);color:white;font-size:12px;font-weight:600;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:15px;">folder_open</span> ' + swT('sw.step3_upload_excel', 'Chọn file Excel') + '<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleAccountExcelUpload(event)"></label></div></div>'
       + prev
